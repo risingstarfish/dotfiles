@@ -1,0 +1,5 @@
+alias word='open -a "Microsoft Word"'
+alias discord='open -a "Discord"'
+alias opera='open -a "Opera GX"'
+alias music='open -a "Music"'
+alias finder='open -a "Finder"'

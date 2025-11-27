@@ -1,0 +1,185 @@
+# web_search - Function to perform web searches using different search engines
+# Usage: web_search [engine] "search query"
+# Aliases: google, reddit, youtube, etc.
+
+web_search() {
+    # Function to encode URL parameters (local to web_search)
+    urlencode() {
+        local string="$1"
+        local encoded=""
+        local pos c o
+
+        for ((pos=0; pos<${#string}; pos++)); do
+            c=${string:$pos:1}
+            case "$c" in
+                [-_.~a-zA-Z0-9])
+                    encoded="$encoded$c"
+                    ;;
+                *)
+                    printf -v o '%%%02x' "'$c"
+                    encoded="$encoded$o"
+                    ;;
+            esac
+        done
+        echo "$encoded"
+    }
+
+    # Function to open URL based on OS (local to web_search)
+    open_url() {
+        local url="$1"
+        local os_type=$(uname)
+
+        case "$os_type" in
+            Darwin)
+                # macOS
+                open "$url"
+                ;;
+            Linux|FreeBSD|OpenBSD|NetBSD)
+                # Linux and BSD variants
+                if command -v xdg-open &> /dev/null; then
+                    xdg-open "$url"
+                elif command -v gio &> /dev/null; then
+                    gio open "$url"
+                elif command -v gnome-open &> /dev/null; then
+                    gnome-open "$url"
+                elif command -v kde-open &> /dev/null; then
+                    kde-open "$url"
+                elif command -v firefox &> /dev/null; then
+                    firefox "$url" &
+                elif command -v chromium &> /dev/null; then
+                    chromium "$url" &
+                elif command -v chromium-browser &> /dev/null; then
+                    chromium-browser "$url" &
+                elif command -v google-chrome &> /dev/null; then
+                    google-chrome "$url" &
+                elif command -v brave &> /dev/null; then
+                    brave "$url" &
+                else
+                    echo "Could not find a browser to open the URL."
+                    echo "URL: $url"
+                    return 1
+                fi
+                ;;
+            MINGW*|MSYS*|CYGWIN*)
+                # Windows via MSYS/Cygwin/Git Bash
+                cmd.exe /c start "" "$url" 2>/dev/null
+                if [ $? -ne 0 ]; then
+                    # Try PowerShell if cmd fails
+                    powershell.exe -Command "Start-Process '$url'" 2>/dev/null
+                    if [ $? -ne 0 ]; then
+                        # Fallback to explorer
+                        explorer.exe "$url" 2>/dev/null || {
+                            echo "Could not open browser on Windows."
+                            echo "URL: $url"
+                            return 1
+                        }
+                    fi
+                fi
+                ;;
+            *)
+                echo "Unsupported operating system: $os_type"
+                echo "URL: $url"
+                return 1
+                ;;
+        esac
+        return 0
+    }
+
+    # Check if an engine was provided
+    if [[ $# -lt 1 ]]; then
+        echo "Usage: web_search [engine] \"search query\""
+        return 1 # Use return instead of exit in functions
+    fi
+
+    local engine="$1"
+    shift # Remove the engine from the argument list
+
+    # Define search URLs for different engines using an associative array
+    local -A search_engines=(
+        ["google"]="https://www.google.com"
+        ["reddit"]="https://www.reddit.com"
+        ["youtube"]="https://www.youtube.com" # Corrected YouTube base URL
+        ["stackoverflow"]="https://stackoverflow.com"
+        ["crunchyroll"]="https://www.crunchyroll.com"
+        ["twitch"]="https://www.twitch.tv"
+        ["ebay"]="https://www.ebay.com"
+        ["amazon"]="https://www.amazon.com"
+        ["github"]="https://github.com"
+        ["microcenter"]="https://www.microcenter.com"
+        ["newegg"]="https://www.newegg.com"
+        ["yesmovies"]="https://yesmovies.lol"
+        ["claude"]="https://claude.ai"
+        ["chatgpt"]="https://chatgpt.com"
+        ["gemini"]="https://gemini.google.com"
+        ["gmail"]="https://mail.google.com"
+        ["leetcode"]="https://leetcode.com/problemset"
+        ["learncpp"]="https://www.learncpp.com"
+        ["bidfta"]="https://www.bidfta.com"
+        ["canvas"]="https://osu.instructure.com"
+        ["onedrive"]="https://onedrive.live.com"
+        ["disneyplus"]="https://disneyplus.com"
+    )
+    local -A search_paths=(
+        ["google"]="/search?q="
+        ["reddit"]="/search/?q="
+        ["youtube"]="/results?search_query="
+        ["stackoverflow"]="/search?q="
+        ["crunchyroll"]="/search?q="
+        ["twitch"]="/search?term="
+        ["ebay"]="/sch/i.html?_nkw="
+        ["amazon"]="/s?k="
+        ["github"]="/search?q="
+        ["microcenter"]="/search/search_results.aspx?rd=1&vkw="
+        ["newegg"]="/p/pl?d="
+        ["yesmovies"]="/search/"
+        ["gmail"]="/mail/u/0/#search/"
+        ["leetcode"]="/?search="
+        ["learncpp"]="/gsearch/?q="
+        ["bidfta"]="/items?pageId=1&itemSearchKeywords="
+        # Note: gmail is listed twice in original, consolidated here for clarity.
+    )
+
+    # Define websites without search functionality
+    local -a no_search_paths=( # Explicitly declare as indexed array
+        "disneyplus"
+        "chatgpt"
+        "gemini"
+        "claude"
+        "canvas"
+        "onedrive"
+    )
+
+    # Check if the engine exists
+    if [[ -z "${search_engines[$engine]}" ]]; then
+        echo "Unknown search engine: $engine"
+        echo "Available engines: ${(@k)search_engines}" # Print available keys (Zsh specific)
+        return 1 # Use return instead of exit
+    fi
+
+    # Determine URL based on the engine and arguments
+    local url query # Declare variables as local
+
+    # Check if it's a "no search" site and additional arguments are provided
+    if [[ " ${no_search_paths[@]} " == *" $engine "* && $# -gt 0 ]]; then
+        echo "Warning: The '$engine' website does not support searching. Additional arguments will be ignored."
+        # Pause briefly to ensure user sees the warning
+        sleep 1.5
+        # For "no search" sites with extra args, always use base URL
+        url="${search_engines[$engine]}"
+    elif [[ $# -eq 0 ]]; then
+        # No search query, just go to the homepage
+        url="${search_engines[$engine]}"
+    else
+        # Search query provided, go to search results
+        query=$(urlencode "$*") # Capture all remaining arguments as a single string
+        url="${search_engines[$engine]}${search_paths[$engine]}$query"
+    fi
+
+    # Try open url
+    if ! open_url "$url"; then
+        echo "Failed to open URL: $url"
+        return 1 # Use return instead of exit
+    fi
+
+    return 0
+}
