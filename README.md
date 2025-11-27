@@ -6,11 +6,16 @@ My personal cross-platform dotfiles repository.
 
 ```
 dotfiles/
-├── git/              # Git configuration
-│   └── .gitignore   # C++/CMake gitignore patterns
-└── zshrc/            # Zsh configuration
-    └── .zshrc        # Main zsh config with plugins & profiling
+├── git/                    # Git configuration
+│   └── .gitignore         # C++/CMake gitignore patterns
+└── zsh/                    # Zsh configuration
+    ├── .zshrc             # Main zsh config with plugins & profiling
+    ├── .colours           # Colour configuration
+    ├── .commands.ignore   # Commands ignore list
+    └── alias.ignore/      # Alias files (apps, coding, edit, git_, etc.)
 ```
+
+> ⚠️ **Note**: Files/directories ending in `.ignore` are not yet completed for Windows.
 
 ## 🚀 Quick Setup
 
@@ -18,7 +23,7 @@ dotfiles/
 
 ```zsh
 # Zsh
-ln -s ~/.dotfiles/zshrc/.zshrc ~/.zshrc
+ln -s ~/.dotfiles/zsh/.zshrc ~/.zshrc
 
 # Git (global)
 git config --global core.excludesfile ~/.dotfiles/git/.gitignore
@@ -28,7 +33,7 @@ git config --global core.excludesfile ~/.dotfiles/git/.gitignore
 
 ```zsh
 # Zsh
-ln -s $USERPROFILE/.dotfiles/zshrc/.zshrc $USERPROFILE/.zshrc
+ln -s $USERPROFILE/.dotfiles/zsh/.zshrc $USERPROFILE/.zshrc
 
 # Git (global)
 git config --global core.excludesfile $USERPROFILE/.dotfiles/git/.gitignore
