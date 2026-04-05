@@ -119,3 +119,6 @@ conan_package/
 /bazel-*
 /test/bazel-*
 .eclipse/
+
+#python
+.mypy_cache
