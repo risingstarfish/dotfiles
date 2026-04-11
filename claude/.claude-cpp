@@ -1,0 +1,6 @@
+# Global Routing Instructions
+Before starting work, identify the primary language or task and read the corresponding rule file:
+
+- **For C++ / Header files:** ALWAYS read `~/.claude/rules/cpp-rules.md` first.
+
+Do not proceed with edits until you have read the relevant file above.
