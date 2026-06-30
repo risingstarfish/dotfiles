@@ -18,14 +18,9 @@ lib/
 */_deps/
 
 # Other
-build/Custom-*/
-build/Clang-*/
-build/GCC-*/
-build/MSVC-*/
-out/Custom-*/
-out/Clang-*/
-out/GCC-*/
-out/MSVC-*/
+build/*
+out/*
+
 
 
 ### CMake gitignore ###
@@ -107,8 +102,8 @@ $RECYCLE.BIN/
 
 ### Dependency Management ###
 # vcpkg 
-vcpkg.json
-vcpkg-configuration.json
+#vcpkg.json
+#vcpkg-configuration.json
 vcpkg_installed/
 
 
