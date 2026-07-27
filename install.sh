@@ -17,6 +17,7 @@ for file in "$ZSH_DIR"/*; do
 		filename=$(basename "$file")
 		dest="$HOME/$filename"
 
+		echo "Installing $filename"
 		# Backup existing file or symlink to prevent data loss
 		if [ -e "$dest" ] || [ -L "$dest" ]; then
 			echo "Found existing $dest. Backing up to ${dest}.bak..."
