@@ -170,6 +170,14 @@ else
 	log_message ERROR "Functions file not found: ~/.functions"
 fi
 
+print_header "Git Functions"
+# Source functions from ~/alias/functions directory
+if [[ -f ~/.git_functions ]]; then
+	log_message SUCCESS "Sourcing function file: $f"
+	source ~/.git_functions
+else
+	log_message ERROR "Functions file not found: ~/.git_functions"
+fi
 ##################################
 # Source path
 ##################################
