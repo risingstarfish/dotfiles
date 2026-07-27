@@ -1,16 +1,5 @@
 #!/usr/bin/env zsh
 
-# --- Dependency Checker ---
-# Array of non-default commands used in these aliases
-_custom_cmds=(eza vscodium-insiders clang-format clang-tidy)
-
-for cmd in ${_custom_cmds}; do
-	# Check if the command exists. If not, issue a yellow warning.
-	if ! command -v "$cmd" >/dev/null 2>&1; then
-		print -P "%F{yellow}[WARNING]%f '$cmd' is not installed. Related aliases will fail."
-	fi
-done
-# --------------------------
 
 # System
 alias ez='exec zsh'
