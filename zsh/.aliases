@@ -39,7 +39,7 @@ alias ll='eza -l --icons --no-user --group-directories-first  --time-style long-
 alias la='eza -la --icons --no-user --group-directories-first  --time-style long-iso'
 
 # Code
-alias code='vscodium-insiders'
+alias code='codium-insiders'
 alias c.='code .'
 alias fmt='clang-format -i *.cpp *.hpp *.h'
 alias tidy='clang-tidy -i *.cpp *.hpp *.h'
