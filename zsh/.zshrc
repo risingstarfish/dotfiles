@@ -459,3 +459,6 @@ if [[ $ENABLE_PROFILING == true ]]; then
 
 	print_title "END PROFILING"
 fi
+
+unset DEBUG_MODE
+unset ENABLE_PROFILING
