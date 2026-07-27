@@ -1,16 +1,24 @@
 #!/usr/bin/env zsh
 
-#################################
-# Constants for debugging and profiling
-#################################
-#ENABLE_PROFILING=true  # Enable profiling to analyze performance
-DEBUG_MODE=true # Only prints PROFILE, ERROR, and WARNING messages if not set, otherwise all messages are printed
+# Create .zshrc.local if not already preset with default config
+LOCAL_RC="$HOME/.zshrc.local"
+if [[ ! -f "$LOCAL_RC" ]]; then
+	echo "Creating default $LOCAL_RC"
 
-######################################
+	cat <<'EOF' >"$LOCAL_RC"
+# --- Local Environment Overrides ---
+#ENABLE_PROFILING=true  # Enable profiling to analyze performance
+#DEBUG_MODE=true        # Only prints PROFILE, ERROR, and WARNING messages if not set
+EOF
+fi
+
+source "$LOCAL_RC"
+
+# !!!DO NOT MOVE ANYTHING ABOVE THIS LINE!!!
+
 # Enable zsh profiling for performance analysis
 # This section needs to be at the top of the file
 # to ensure profiling starts before any other commands are executed.
-######################################
 if [[ "$ENABLE_PROFILING" == true ]]; then
 	zmodload zsh/zprof
 
@@ -21,9 +29,7 @@ else
 	ENABLE_PROFILING=false
 fi
 
-##################################
 # Settings
-##################################
 HISTSIZE=5000
 HISTFILESIZE=5000
 HISTCONTROL=ignoredups
@@ -31,12 +37,10 @@ SAVEHIST=1000
 HISTFILE=~/.zsh_history
 HIST_STAMPS="yyyy.mm.dd"
 
-##################################
 # Printing functions
 # These functions are used to print headers and log messages
 # throughout the script.
 # They help in organizing the output and making it more readable.
-##################################
 # Print a title header
 print_title() {
 	local header="$1"
@@ -100,18 +104,14 @@ log_message() {
 	echo -e "${csi}${color_code}${prefix}${reset} ${message}"
 }
 
-##################################
 # Check if DEBUG_MODE is set, if not, set it to false
-##################################
 if [[ "$DEBUG_MODE" == true ]]; then
 	print_title "START DEBUG MODE"
 else
 	DEBUG_MODE=false
 fi
 
-##################################
 # Colours
-##################################
 # Generate LS_COLORS for Zsh completion
 # This populates the LS_COLORS variable that Zsh's completion system expects.
 # Enables envVar LS_COLORS
@@ -129,9 +129,7 @@ else
 	log_message INFO "LS_COLORS is already set, skipping generation."
 fi
 
-##################################
 # Source environment variables
-##################################
 print_header "Source Environment Variables"
 local sourcedEnv=0 # Initialize flag
 
@@ -178,9 +176,8 @@ if [[ -f ~/.git_functions ]]; then
 else
 	log_message ERROR "Functions file not found: ~/.git_functions"
 fi
-##################################
+
 # Source path
-##################################
 print_header "Custom Paths"
 
 if [[ -f ~/.path ]]; then
@@ -190,9 +187,7 @@ else
 	log_message ERROR "PATH variables file not found: ~/.path"
 fi
 
-####################################
 # Zsh options
-####################################
 print_header "Zsh Options"
 # source zsh options
 if [[ -f ~/.zsh_options ]]; then
@@ -202,9 +197,7 @@ else
 	log_message WARNING "Zsh options file not found: ~/.zsh_options"
 fi
 
-###################################
 # fastfetch
-###################################
 print_header "fastfetch"
 
 if ! command -v fastfetch &>/dev/null; then
@@ -228,9 +221,7 @@ else
 	fi
 fi
 
-################################
 # Powerlevel10k configuration
-################################
 print_header "Powerlevel10k"
 
 P10K_DIR="$HOME/powerlevel10k"
@@ -269,9 +260,7 @@ else
 	log_message WARNING "Powerlevel10k not loaded, using a basic prompt."
 fi
 
-##################################
 # Zim configuration
-##################################
 print_header "Zim Configuration"
 
 # Check if Zim is installed at usual location
@@ -310,10 +299,8 @@ fi
 # ruby
 eval "$(rbenv init - zsh)"
 
-##################################
 # Enable zsh plugins
 # keep these at the end of the file
-##################################
 print_header "Zsh Plugins"
 
 # Enable zoxide
@@ -332,11 +319,8 @@ else
 	log_message WARNING "fzf is not installed, skipping plugin."
 fi
 
-###############################
 # Zstyles
-###############################
 print_header "Zstyles"
-##################################
 
 # Source zstyles
 if [[ -f ~/.zstyles ]]; then
@@ -346,14 +330,11 @@ else
 	log_message WARNING "Zstyles file not found: ~/.zstyles"
 fi
 
-##################################
 # iTerm2 shell integration
 # this should be kept at the end of the file
-##################################
 if [[ "$OSTYPE" == "darwin"* ]]; then
 	log_message INFO "MacOS detected"
 	print_header "iTerm2 Shell Integration"
-	##################################
 
 	if [[ -f ~/.iterm2_shell_integration.zsh ]]; then
 		log_message SUCCESS "iTerm2 shell integration file found. Sourcing."
@@ -364,10 +345,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 else
 	log_message INFO "Non-MacOS detected. Skipping iTerm2 shell integration."
 fi
-##################################
+
 # Output debug mode status
 # If DEBUG_MODE is true, print a message indicating the end of debug mode
-##################################
 if [[ "$DEBUG_MODE" == true ]]; then
 	##################################
 	print_header "Debug Mode Status"
@@ -381,11 +361,9 @@ if [[ "$DEBUG_MODE" == true ]]; then
 	print_title "END DEBUG MODE"
 fi
 
-##################################
 # Enable profiling
 # This should be kept at the end of the file
 # It will profile the loading time of the shell and save it to a log file.
-##################################
 if [[ $ENABLE_PROFILING == true ]]; then
 	print_title "START PROFILING"
 	# Define the directory and filename for the zprof log
