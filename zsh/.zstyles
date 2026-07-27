@@ -1,3 +1,5 @@
+#!/usr/bin/env zsh
+
 # .zstyles
 
 # Enable menu selection for completions.
@@ -119,12 +121,12 @@ zstyle ':vcs_info:git:\*' actionformats '%F{yellow}(%b|%a)%f'
 # Show dirty state (uncommitted changes)
 
 zstyle ':vcs*info:git:*' check-for-changes true
-zstyle ':vcs*info:git:*' unstagedstr '!' # Indicator for unstaged changes
-zstyle ':vcs*info:git:*' stagedstr '+' # Indicator for staged changes
-zstyle ':vcs*info:git:*' unmergedstr 'U' # Indicator for unmerged files
-zstyle ':vcs*info:git:*' conflictedstr 'C' # Indicator for conflicted files
-zstyle ':vcs*info:git:*' aheadstr '>' # Indicator for being ahead of remote
-zstyle ':vcs*info:git:*' behindstr '<' # Indicator for being behind remote
+zstyle ':vcs*info:git:*' unstagedstr '!'                   # Indicator for unstaged changes
+zstyle ':vcs*info:git:*' stagedstr '+'                     # Indicator for staged changes
+zstyle ':vcs*info:git:*' unmergedstr 'U'                   # Indicator for unmerged files
+zstyle ':vcs*info:git:*' conflictedstr 'C'                 # Indicator for conflicted files
+zstyle ':vcs*info:git:*' aheadstr '>'                      # Indicator for being ahead of remote
+zstyle ':vcs*info:git:*' behindstr '<'                     # Indicator for being behind remote
 zstyle ':vcs*info:git:*' format '%F{blue}%b%f%c%u%S%s%a%m' # Example format with indicators
 
 # History substring search

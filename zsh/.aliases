@@ -1,15 +1,14 @@
 #!/usr/bin/env zsh
 
-
 # --- Dependency Checker ---
 # Array of non-default commands used in these aliases
 _custom_cmds=(eza vscodium-insiders clang-format clang-tidy)
 
 for cmd in ${_custom_cmds}; do
-    # Check if the command exists. If not, issue a yellow warning.
-    if ! command -v "$cmd" >/dev/null 2>&1; then
-        print -P "%F{yellow}[WARNING]%f '$cmd' is not installed. Related aliases will fail."
-    fi
+	# Check if the command exists. If not, issue a yellow warning.
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		print -P "%F{yellow}[WARNING]%f '$cmd' is not installed. Related aliases will fail."
+	fi
 done
 # --------------------------
 
@@ -19,11 +18,11 @@ alias c='clear'
 alias path='echo $PATH | tr -s ":" "\n"'
 
 if command -v bat >/dev/null 2>&1; then
-    # 'bat' is installed normally, do nothing
+
 elif command -v batcat >/dev/null 2>&1; then
-    alias bat='batcat'
+	alias bat='batcat'
 else
-    alias bat='cat'
+	alias bat='cat'
 fi
 
 # Navigation
@@ -33,7 +32,6 @@ alias ....="cd ../../.."
 alias .....="cd ../../../.."
 alias -- -='cd -'
 alias H='cd ~'
-
 
 # eza package
 alias ls='eza --icons --group-directories-first'
@@ -59,10 +57,10 @@ alias sudo='sudo '
 # Mac
 if [[ "$OSTYPE" == "darwin"* ]]; then
 	if ! command -v brew >/dev/null 2>&1; then
-        print -P "%F{yellow}[WARNING]%f 'brew' is not installed."
-    else
-        alias brewup='brew update && brew upgrade && brew cleanup'
-    fi
+		print -P "%F{yellow}[WARNING]%f 'brew' is not installed."
+	else
+		alias brewup='brew update && brew upgrade && brew cleanup'
+	fi
 
 	# Lock the screen (when going AFK)
 	alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"

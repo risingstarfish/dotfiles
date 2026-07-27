@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 
-
 # git add, commit
 function gac() {
 	local message="$1"

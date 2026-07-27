@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 
-
 # Create a new directory and enter it
 mkcd() {
 	# Check if no arguments are provided
@@ -11,7 +10,7 @@ mkcd() {
 	fi
 
 	# Check if more than one argument is provided
-	if [[ "$#" -gt 1 ]]; then
+	if [[ "$" -gt 1 ]]; then
 		echo "Usage: mkcd <directory_name>"
 		echo "Error: Too many arguments. Please provide only one directory name."
 		return 1
@@ -42,14 +41,14 @@ mkcd() {
 
 # Determine size of a file or total size of a directory
 function fs() {
-	if du -b /dev/null > /dev/null 2>&1; then
-		local arg=-sbh;
+	if du -b /dev/null >/dev/null 2>&1; then
+		local arg=-sbh
 	else
-		local arg=-sh;
+		local arg=-sh
 	fi
 	if [[ -n "$@" ]]; then
-		du $arg -- "$@";
+		du $arg -- "$@"
 	else
-		du $arg .[^.]* ./*;
-	fi;
+		du $arg .[^.]* ./*
+	fi
 }

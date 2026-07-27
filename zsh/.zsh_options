@@ -1,10 +1,12 @@
+#!/usr/bin/env zsh
+
 # .zsh_options
 
 #####################
 # Zsh Core Options
 #####################
 
-bindkey -e  # Use Emacs key bindings
+bindkey -e # Use Emacs key bindings
 
 # Correct spelling errors in commands
 setopt CORRECT
@@ -45,6 +47,5 @@ setopt EXTENDED_HISTORY
 # Do not require a leading ‘.’ in a filename to be matched explicitly.
 setopt GLOB_DOTS
 
-
 # Set the size of the directory stack
-DIRSTACKSIZE=20 
+DIRSTACKSIZE=20
