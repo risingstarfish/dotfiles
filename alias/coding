@@ -1,0 +1,4 @@
+alias code='vscodium-insiders'
+alias c.='code .'
+alias fmt='clang-format -i *.cpp *.hpp *.h'
+alias tidy='clang-tidy -i *.cpp *.hpp *.h'
