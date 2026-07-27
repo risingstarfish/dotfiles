@@ -1,14 +1,30 @@
 #!/usr/bin/env zsh
 
 
+# --- Dependency Checker ---
+# Array of non-default commands used in these aliases
+_custom_cmds=(eza vscodium-insiders clang-format clang-tidy)
+
+for cmd in ${_custom_cmds}; do
+    # Check if the command exists. If not, issue a yellow warning.
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        print -P "%F{yellow}[WARNING]%f '$cmd' is not installed. Related aliases will fail."
+    fi
+done
+# --------------------------
+
 # System
 alias ez='exec zsh'
 alias c='clear'
 alias path='echo $PATH | tr -s ":" "\n"'
 
-# Mac
-alias brewup='brew update && brew upgrade && brew cleanup'
-
+if command -v bat >/dev/null 2>&1; then
+    # 'bat' is installed normally, do nothing
+elif command -v batcat >/dev/null 2>&1; then
+    alias bat='batcat'
+else
+    alias bat='cat'
+fi
 
 # Navigation
 alias ..='cd ..'
@@ -18,11 +34,11 @@ alias .....="cd ../../../.."
 alias -- -='cd -'
 alias H='cd ~'
 
+
 # eza package
 alias ls='eza --icons --group-directories-first'
 alias ll='eza -l --icons --no-user --group-directories-first  --time-style long-iso'
 alias la='eza -la --icons --no-user --group-directories-first  --time-style long-iso'
-
 
 # Code
 alias code='vscodium-insiders'
@@ -30,15 +46,24 @@ alias c.='code .'
 alias fmt='clang-format -i *.cpp *.hpp *.h'
 alias tidy='clang-tidy -i *.cpp *.hpp *.h'
 
-
 # Grep
 alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-
 # Enable aliases to be sudo’ed
 alias sudo='sudo '
 
-# Lock the screen (when going AFK)
-alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
+# Platform Specific
+
+# Mac
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	if ! command -v brew >/dev/null 2>&1; then
+        print -P "%F{yellow}[WARNING]%f 'brew' is not installed."
+    else
+        alias brewup='brew update && brew upgrade && brew cleanup'
+    fi
+
+	# Lock the screen (when going AFK)
+	alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
+fi
