@@ -4,7 +4,7 @@
 # Constants for debugging and profiling
 #################################
 #ENABLE_PROFILING=true  # Enable profiling to analyze performance
-DEBUG_MODE=true        # Only prints PROFILE, ERROR, and WARNING messages if not set, otherwise all messages are printed
+DEBUG_MODE=true # Only prints PROFILE, ERROR, and WARNING messages if not set, otherwise all messages are printed
 
 ######################################
 # Enable zsh profiling for performance analysis
@@ -133,54 +133,25 @@ fi
 # Source environment variables
 ##################################
 print_header "Source Environment Variables"
-##################################
-
 local sourcedEnv=0 # Initialize flag
 
 if [[ -f ~/.env ]]; then
+	sourcedEnv=1
 	log_message SUCCESS "Sourcing environment variables from: ~/.env"
 	source ~/.env
-
-	#############################
-	print_header "Custom Paths"
-	#############################
-
-	# Process custom paths defined in .env
-	if [[ -n "${_custom_paths[@]}" ]]; then
-		log_message INFO "Processing custom paths from ~/.env."
-		for base_dir in "${_custom_paths[@]}"; do
-			# Check for special character 'L' in base_dir
-			# This indicates that there is no 'bin' subdirectory to append
-			if [[ "$base_dir" == *L* ]]; then
-				local_path="${base_dir//L/}" # Remove 'L' character
-				log_message INFO "Detected 'L' in path, removing and not appending '/bin': ${local_path}"
-			else
-				local_path="${base_dir}/bin" # Append '/bin' here
-			fi
-			if [[ -d "$local_path" ]]; then
-				export PATH="${local_path}:${PATH}"
-				log_message SUCCESS "Added to PATH: ${local_path}"
-			else
-				log_message WARNING "Directory not found for PATH, skipping: ${local_path}"
-			fi
-		done
-	else
-		log_message INFO "No custom paths defined in ~/.env to process."
-	fi
-
 else
-	sourcedEnv=1
 	log_message ERROR "Environment variables file not found: ~/.env"
+	log_message ERROR "Unable to generate LS_COLORS for Zsh completion without environment variables. Some features may not work as expected."
 fi
 
 ##################################
 # Source alias files/functions
 ##################################
 print_header "Alias Files"
-##################################
+
 if [[ -d ~/alias ]]; then
 	# issue warning if envVars file was not sourced
-	if [[ sourcedEnv -eq 1 ]]; then
+	if [[ sourcedEnv -eq 0 ]]; then
 		log_message WARNING "Some aliases may not work as expected because ~/.env was not sourced."
 	fi
 	# Source all alias files in ~/alias directory
@@ -190,10 +161,9 @@ if [[ -d ~/alias ]]; then
 			source "$f"
 		fi
 	done
+
 	##################################
 	print_header "Alias Functions"
-	##################################
-
 	# Source functions from ~/alias/functions directory
 	if [[ -d ~/alias/functions ]]; then
 		for f in ~/alias/functions/*; do
@@ -211,12 +181,22 @@ else
 	log_message ERROR "Alias directory not found: ~/alias"
 fi
 
+##################################
+# Source path
+##################################
+print_header "Custom Paths"
+
+if [[ -f ~/.path ]]; then
+	log_message SUCCESS "Sourcing PATH variables from: ~/.path"
+	source ~/.path
+else
+	log_message ERROR "PATH variables file not found: ~/.path"
+fi
+
 ####################################
 # Zsh options
 ####################################
 print_header "Zsh Options"
-##################################
-
 # source zsh options
 if [[ -f ~/.zsh_options ]]; then
 	log_message SUCCESS "Sourcing Zsh options from: ~/.zsh_options"
@@ -229,9 +209,7 @@ fi
 # fastfetch
 ###################################
 print_header "fastfetch"
-##################################
 
-# Enable fastfetch if running in iTerm2
 if ! command -v fastfetch &>/dev/null; then
 	log_message WARNING "fastfetch command not found, skipping fastfetch."
 	return
@@ -245,14 +223,12 @@ else
 		echo "\n\n"
 
 		log_message SUCCESS "fastfetch executed with custom configuration."
-
 	else
 		log_message INFO "No custom fastfetch config found, using default settings."
 
 		echo "\n\n"
 		fastfetch
 		echo "\n\n"
-
 	fi
 fi
 
@@ -260,7 +236,6 @@ fi
 # Powerlevel10k configuration
 ################################
 print_header "Powerlevel10k"
-##################################
 # TODO: platform specific
 # Enable Powerlevel10k instant prompt
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" && -f ~/.p10k.zsh ]]; then
@@ -285,7 +260,6 @@ fi
 # Zim configuration
 ##################################
 print_header "Zim Configuration"
-##################################
 
 # Check if Zim is installed at usual location
 if [[ -d ~/.zim ]]; then
@@ -320,12 +294,14 @@ else
 	log_message ERROR "Zim directory not found: ~/.zim"
 fi
 
+# ruby
+eval "$(rbenv init - zsh)"
+
 ##################################
 # Enable zsh plugins
 # keep these at the end of the file
 ##################################
 print_header "Zsh Plugins"
-##################################
 
 # Enable zoxide
 if command -v zoxide &>/dev/null; then
