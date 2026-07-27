@@ -5,9 +5,6 @@
 .vs/
 .vscode/
 
-# claude
-.claude/
-
 
 # Project
 out*/
