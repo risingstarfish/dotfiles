@@ -1,3 +1,5 @@
+#!/usr/bin/env zsh
+
 zmodule romkatv/powerlevel10k
 
 zmodule jeffreytse/zsh-vi-mode
@@ -14,7 +16,16 @@ zmodule duration-info
 zmodule prompt-pwd
 zmodule exa
 zmodule magic-enter
-zmodule homebrew >>>>Macos<<<<
+
+# --- Platform Specific Modules ---
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	zmodule homebrew
+fi
+
+if command -v pacman >/dev/null 2>&1; then
+	zmodule pacman
+fi
+
 zmodule environment
 zmodule git
 zmodule input
@@ -22,7 +33,6 @@ zmodule termtitle
 zmodule utility
 zmodule run-help
 zmodule archive
-
 
 zmodule zsh-users/zsh-completions --fpath src
 zmodule completion
