@@ -7,7 +7,7 @@ cd "$DIR" || exit 1
 echo "Pulling latest changes from git..."
 git pull origin main || echo -e "\033[33mWarning: Git pull failed, continuing with local files.\033[0m"
 
-ZSH_DIR="$DIR/symlink"
+ZSH_DIR="$DIR/zsh"
 
 if [ ! -d "$ZSH_DIR" ]; then
 	echo "Directory not found: $ZSH_DIR"
