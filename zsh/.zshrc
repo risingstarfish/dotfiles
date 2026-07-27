@@ -2,17 +2,13 @@
 
 # Create .zshrc.local if not already preset with default config
 LOCAL_RC="$HOME/.zshrc.local"
-if [[ ! -f "$LOCAL_RC" ]]; then
-	echo "Creating default $LOCAL_RC"
-
-	cat <<'EOF' >"$LOCAL_RC"
-# --- Local Environment Overrides ---
-#ENABLE_PROFILING=true  # Enable profiling to analyze performance
-#DEBUG_MODE=true        # Only prints PROFILE, ERROR, and WARNING messages if not set
-EOF
+if [[ -f "$LOCAL_RC" ]]; then
+	source "$LOCAL_RC"
+else
+	echo "No $LOCAL_RC file. Setting default values."
+	ENABLE_PROFILING=false
+	DEBUG_MODE=false
 fi
-
-source "$LOCAL_RC"
 
 # !!!DO NOT MOVE ANYTHING ABOVE THIS LINE!!!
 
