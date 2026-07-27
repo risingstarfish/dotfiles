@@ -209,7 +209,6 @@ print_header "fastfetch"
 
 if ! command -v fastfetch &>/dev/null; then
 	log_message WARNING "fastfetch command not found, skipping fastfetch."
-	return
 else
 	# check for custom fastfetch config
 	if [[ -f ~/.config/fastfetch/config.jsonc ]]; then
