@@ -147,38 +147,27 @@ fi
 ##################################
 # Source alias files/functions
 ##################################
-print_header "Alias Files"
+print_header "Aliases"
 
-if [[ -d ~/alias ]]; then
+if [[ -f ~/.aliases ]]; then
 	# issue warning if envVars file was not sourced
 	if [[ sourcedEnv -eq 0 ]]; then
 		log_message WARNING "Some aliases may not work as expected because ~/.env was not sourced."
 	fi
-	# Source all alias files in ~/alias directory
-	for f in ~/alias/*; do
-		if [[ -f "$f" ]]; then
-			log_message SUCCESS "Sourcing alias file: $f"
-			source "$f"
-		fi
-	done
 
-	##################################
-	print_header "Alias Functions"
-	# Source functions from ~/alias/functions directory
-	if [[ -d ~/alias/functions ]]; then
-		for f in ~/alias/functions/*; do
-			if [[ -f "$f" ]]; then
-				log_message SUCCESS "Sourcing function file: $f"
-				source "$f"
-			fi
-		done
-	# No functions directory found
-	else
-		log_message ERROR "Functions directory not found: ~/alias/functions"
-	fi
-# No alias directory found
+	log_message SUCCESS "Sourcing alias file: ~/.aliases"
+	source ~/.aliases
 else
-	log_message ERROR "Alias directory not found: ~/alias"
+	log_message ERROR "Alias file not found: ~/.aliases"
+fi
+
+print_header "Functions"
+# Source functions from ~/alias/functions directory
+if [[ -f ~/.functions ]]; then
+	log_message SUCCESS "Sourcing function file: $f"
+	source ~/.functions
+else
+	log_message ERROR "Functions file not found: ~/.functions"
 fi
 
 ##################################
@@ -236,24 +225,41 @@ fi
 # Powerlevel10k configuration
 ################################
 print_header "Powerlevel10k"
-# TODO: platform specific
+
+P10K_DIR="$HOME/powerlevel10k"
+P10K_THEME="$P10K_DIR/powerlevel10k.zsh-theme"
+P10K_CONFIG="$HOME/.p10k.zsh"
+
 # Enable Powerlevel10k instant prompt
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" && -f ~/.p10k.zsh ]]; then
-	log_message SUCCESS "Powerlevel10k instant prompt files found. Sourcing."
-	source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-
-	log_message SUCCESS "Powerlevel10k configuration file found. Sourcing."
-	source ~/.p10k.zsh
+# check for p10k
+if [[ ! -d $P10K_DIR/.git || ! -f "$P10K_THEME" ]]; then
+	log_message WARNING "Powerlevel10k not found at $P10K_DIR. Cloning repository..."
+	if git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"; then
+		log_message SUCCESS "Successfully cloned Powerlevel10k."
+	else
+		log_message ERROR "Failed to clone Powerlevel10k."
+	fi
 else
-	if [[ ! -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-		log_message ERROR "Powerlevel10k instant prompt file not found: ${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+	log_message SUCCESS "Powerlevel10k detected. Sourcing..."
+fi
+
+if [[ -d "$P10K_DIR/.git" && -f "$P10K_THEME" ]]; then
+
+	source "$P10K_THEME"
+	log_message SUCCESS "Powerlevel10k theme loaded from manual git directory."
+
+	if [[ -f "$P10K_CONFIG" ]]; then
+		log_message SUCCESS "Powerlevel10k configuration file found. Sourcing."
+		source "$P10K_CONFIG"
+	else
+		log_message WARNING "Powerlevel10k config (~/.p10k.zsh) not found. Run 'p10k configure'."
 	fi
 
-	if [[ ! -f ~/.p10k.zsh ]]; then
-		PROMPT="%{%F{green}%}%n@%{%F{blue}%}%m %{%F{yellow}%}%~%{%F{white}%} %# %{%F{reset}%}"
-		RPROMPT=""
-		log_message WARNING "Powerlevel10k not loaded, using a basic prompt."
-	fi
+else
+	# Fallback if the git clone failed
+	PROMPT="%{%F{green}%}%n@%{%F{blue}%}%m %{%F{yellow}%}%~%{%F{white}%} %# %{%F{reset}%}"
+	RPROMPT=""
+	log_message WARNING "Powerlevel10k not loaded, using a basic prompt."
 fi
 
 ##################################
@@ -263,7 +269,7 @@ print_header "Zim Configuration"
 
 # Check if Zim is installed at usual location
 if [[ -d ~/.zim ]]; then
-	ZIM_HOME=~/.zim
+	ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
 	log_message SUCCESS "Zim directory found: ~/.zim"
 
 	# Download zimfw plugin manager if missing.
@@ -276,7 +282,7 @@ if [[ -d ~/.zim ]]; then
 	fi
 
 	# Install missing modules, and update ${ZIM_HOME}/init.zsh if missing or outdated.
-	if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZDOTDIR:-${HOME}}/.zimrc ]]; then
+	if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}}/.zimrc ]]; then
 		source ${ZIM_HOME}/zimfw.zsh init -q
 		log_message SUCCESS "Zim modules initialized and ${ZIM_HOME}/init.zsh updated."
 	else
@@ -337,16 +343,20 @@ fi
 # iTerm2 shell integration
 # this should be kept at the end of the file
 ##################################
-print_header "iTerm2 Shell Integration"
-##################################
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	log_message INFO "MacOS detected"
+	print_header "iTerm2 Shell Integration"
+	##################################
 
-if [[ -f ~/.iterm2_shell_integration.zsh ]]; then
-	log_message SUCCESS "iTerm2 shell integration file found. Sourcing."
-	source ~/.iterm2_shell_integration.zsh
+	if [[ -f ~/.iterm2_shell_integration.zsh ]]; then
+		log_message SUCCESS "iTerm2 shell integration file found. Sourcing."
+		source ~/.iterm2_shell_integration.zsh
+	else
+		log_message WARNING "iTerm2 shell integration file not found: ~/.iterm2_shell_integration.zsh"
+	fi
 else
-	log_message WARNING "iTerm2 shell integration file not found: ~/.iterm2_shell_integration.zsh"
+	log_message INFO "Non-MacOS detected. Skipping iTerm2 shell integration."
 fi
-
 ##################################
 # Output debug mode status
 # If DEBUG_MODE is true, print a message indicating the end of debug mode
