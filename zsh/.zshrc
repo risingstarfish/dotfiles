@@ -1,4 +1,4 @@
-# .zshrc
+#!/usr/bin/env zsh
 
 #################################
 # Constants for debugging and profiling
