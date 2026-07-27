@@ -7,10 +7,10 @@ cd "$DIR" || exit 1
 echo "Pulling latest changes from git..."
 git pull origin main || echo -e "\033[33mWarning: Git pull failed, continuing with local files.\033[0m"
 
-SYMLINK_DIR="$DIR/symlink"
+ZSH_DIR="$DIR/symlink"
 
-if [ ! -d "$SYMLINK_DIR" ]; then
-	echo "Directory not found: $SYMLINK_DIR"
+if [ ! -d "$ZSH_DIR" ]; then
+	echo "Directory not found: $ZSH_DIR"
 	echo "Exiting..."
 	exit 1
 fi
@@ -19,7 +19,7 @@ echo "Installing zsh config files..."
 # Tell bash to include hidden files
 shopt -s dotglob
 
-for file in "$SYMLINK_DIR"/*; do
+for file in "$ZSH_DIR"/*; do
 	# Check if the current item is a regular file
 	if [ -f "$file" ]; then
 		filename=$(basename "$file")

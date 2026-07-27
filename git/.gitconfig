@@ -1,6 +1,6 @@
 [user]
-	name = pierce katai
-	email = 169690632+risingstarfish@users.noreply.github.com
+	name = FIXME:
+	email = FIXME:
 	signingKey = FIXME:
 [credential]
 	helper = FIXME:
@@ -8,7 +8,7 @@
 	program = FIXME:
 [core]
 	editor = code -n --wait
-	excludesfile = /FIXME:/dotfiles/git/.gitignore_global
+	excludesfile = ~/dotfiles/git/.gitignore
 	autocrlf = input
 	pager = diff-so-fancy | less --tabs=4 -RF
 	compression = 9
