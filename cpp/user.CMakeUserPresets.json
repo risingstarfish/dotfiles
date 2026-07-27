@@ -29,12 +29,7 @@
         "CMAKE_CXX_STANDARD": "23"
         //
       },
-      "environment": {
-        "APPLE_CLANG": "/usr",
-        "GCC_TRUNK": "/opt/gcc-trunk",
-        "CLANG_P2996": "/opt/clang-p2996",
-        "CLANG_TRUNK": "/opt/clang-trunk"
-      }
+      "environment": {}
     },
     // Debug and Release Base
     {
@@ -52,27 +47,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
-    },
-    // Apple Clang
-    {
-      "hidden": true,
-      "name": "Apple Clang",
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{APPLE_CLANG}/bin/clang",
-        "CMAKE_CXX_COMPILER": "$env{APPLE_CLANG}/bin/clang++"
-      }
-    },
-    {
-      "inherits": ["Apple Clang", "Debug"],
-      "name": "Apple Clang Debug",
-      "displayName": "Apple Clang Debug",
-      "description": "Configures Debug build for Apple Clang"
-    },
-    {
-      "inherits": ["Apple Clang", "Release"],
-      "name": "Apple Clang Release",
-      "displayName": "Apple Clang Release",
-      "description": "Configures Release build for Apple Clang"
     },
     // GCC Trunk
     {
@@ -139,19 +113,6 @@
     }
   ],
   "buildPresets": [
-    // Apple Clang
-    {
-      "name": "Apple Clang Debug",
-      "displayName": "Apple Clang Debug Build",
-      "description": "Configures Debug build for Apple Clang",
-      "configurePreset": "Apple Clang Debug"
-    },
-    {
-      "name": "Apple Clang Release",
-      "displayName": "Apple Clang Release Build",
-      "description": "Configures Release build for Apple Clang",
-      "configurePreset": "Apple Clang Release"
-    },
     // GCC
     {
       "name": "GCC Trunk Debug",

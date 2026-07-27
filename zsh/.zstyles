@@ -1,0 +1,132 @@
+# .zstyles
+
+# Enable menu selection for completions.
+
+# This allows you to navigate through completion suggestions using arrow keys.
+
+zstyle ':completion:\*' menu select
+
+# Show a more verbose completion menu with descriptions for items.
+
+# This adds helpful context to the suggestions.
+
+zstyle ':completion:\*' verbose yes
+
+# Group completion items by type (e.g., files, directories, commands).
+
+# An empty string for group-name uses default grouping.
+
+zstyle ':completion:\*' group-name ''
+
+# Define the order of completers. Zsh will try these in order until matches are found.
+
+# \_complete: standard completion
+
+# \_match: case-sensitive matching
+
+# \_approximate: fuzzy matching (allows typos)
+
+# \_prefix: matches only from the beginning
+
+# \_ignored: includes ignored files/patterns
+
+# \_history: includes items from history
+
+zstyle ':completion:\*' completer \_complete \_match \_approximate \_prefix \_ignored \_history
+
+# Case-insensitive completion:
+
+# 'm:{a-zA-Z}={A-Za-z}' makes matching case-insensitive.
+
+# 'r:|=_' and 'l:|=_ r:|=\*' enable substring matching (match anywhere in the string).
+
+zstyle ':completion:_' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|=_ r:|=_' 'l:|=_ r:|=\*'
+
+# Add a trailing slash to directories when completing.
+
+zstyle ':completion:\*' add-space true
+
+# Always show a list of completions even if there's only one match.
+
+# Useful for seeing context or if you expect more options.
+
+zstyle ':completion:\*' list-always yes
+
+# --- Completion Formatting & Colors ---
+
+# These styles use ANSI escape sequences or Zsh's prompt expansion for coloring.
+
+# Color descriptions in the completion menu (e.g., "-- files --").
+
+# %F{color} sets foreground color, %f resets it. %d is the description text.
+
+zstyle ':completion:\*:descriptions' format '%F{yellow}-- %d --%f'
+
+# Color messages (e.g., "completing files").
+
+zstyle ':completion:\*:messages' format '%F{cyan}%d%f'
+
+# Color warnings (e.g., "No matches for:").
+
+zstyle ':completion:\*:warnings' format '%F{red}No matches for: %d%f'
+
+# Apply LS_COLORS to completion listings.
+
+# This makes file/directory completions match the colors defined by your `ls` command.
+
+# ${(s.:.)LS_COLORS} splits the LS_COLORS string by colons.
+
+zstyle ':completion:\*' list-colors ${(s.:.)LS_COLORS}
+
+# --- Command-Specific Completion Styles ---
+
+# For 'cd' command, prioritize local directories, then directory stack, then path directories.
+
+zstyle ':completion:_:cd:_' tag-order local-directories directory-stack path-directories
+
+# For 'ssh' command, prioritize known hosts, then users.
+
+zstyle ':completion:_:ssh:_' tag-order hosts users
+
+# For 'git checkout', do not sort branches alphabetically.
+
+# This can be useful if you prefer a different order (e.g., most recent).
+
+zstyle ':completion:_:git-checkout:_' sort false
+
+# --- vcs_info (Version Control System Information) Styles ---
+
+# These styles configure how VCS information (like Git branch) is displayed.
+
+# Ensure `autoload -Uz vcs_info` is in your .zshrc before sourcing this.
+
+# Enable vcs_info for Git, SVN, and Mercurial.
+
+zstyle ':vcs_info:\*' enable git svn hg
+
+# Define the format for the prompt when in a Git repository (no pending actions).
+
+# %F{color} sets foreground, %f resets. %b is the branch name.
+
+zstyle ':vcs_info:git:\*' formats '%F{green}(%b)%f'
+
+# Define the format when there are pending actions (e.g., merging, rebasing).
+
+# %a is the action.
+
+zstyle ':vcs_info:git:\*' actionformats '%F{yellow}(%b|%a)%f'
+
+# Show dirty state (uncommitted changes)
+
+zstyle ':vcs*info:git:*' check-for-changes true
+zstyle ':vcs*info:git:*' unstagedstr '!' # Indicator for unstaged changes
+zstyle ':vcs*info:git:*' stagedstr '+' # Indicator for staged changes
+zstyle ':vcs*info:git:*' unmergedstr 'U' # Indicator for unmerged files
+zstyle ':vcs*info:git:*' conflictedstr 'C' # Indicator for conflicted files
+zstyle ':vcs*info:git:*' aheadstr '>' # Indicator for being ahead of remote
+zstyle ':vcs*info:git:*' behindstr '<' # Indicator for being behind remote
+zstyle ':vcs*info:git:*' format '%F{blue}%b%f%c%u%S%s%a%m' # Example format with indicators
+
+# History substring search
+
+zstyle ':history-substring-search:\*' search-modes 'completion-insert'

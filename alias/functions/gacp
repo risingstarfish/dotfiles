@@ -1,0 +1,13 @@
+function gacp() {
+	local message="$1"
+	local currBranch=$(git symbolic-ref --short -q HEAD)
+
+	if [[ -n "$message" ]]; then
+		git add -A
+		git commit -m "$message"
+		git push origin "$currBranch"
+	else
+		echo "Error: Commit message is not provided"
+		echo "Usage: gacp \"Your commit message here\""
+	fi
+}

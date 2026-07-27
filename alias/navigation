@@ -3,17 +3,8 @@ alias ...='cd ../..'
 alias -- -='cd -'
 alias H='cd ~'
 alias c='clear'
-alias Hl='cd ~/Downloads'
-alias Ht='cd ~/Desktop'
 
 # eza package
 alias ls='eza --icons --group-directories-first'
 alias ll='eza -l --icons --no-user --group-directories-first  --time-style long-iso'
 alias la='eza -la --icons --no-user --group-directories-first  --time-style long-iso'
-
-#alias rm='safe_rm'
-#alias urm='undo_rm'
-#alias cp='safe_cp'
-#alias mv='safe_mv'
-alias mk='make_directory'
-#alias mkcd='make_directory_and_touch'

@@ -1,3 +1,0 @@
-alias edit='$EDITOR ~/.zshrc'
-alias edit_alias='$EDITOR $HOME/.alias'
-alias edit_env='$EDITOR $HOME/.env'

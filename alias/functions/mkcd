@@ -1,0 +1,37 @@
+mkcd() {
+	# Check if no arguments are provided
+	if [[ -z "$1" ]]; then
+		echo "Usage: mkcd <directory_name>"
+		echo "Error: No directory name provided."
+		return 1
+	fi
+
+	# Check if more than one argument is provided
+	if [[ "$#" -gt 1 ]]; then
+		echo "Usage: mkcd <directory_name>"
+		echo "Error: Too many arguments. Please provide only one directory name."
+		return 1
+	fi
+
+	local target_dir="$1"
+
+	# Check if the directory already exists
+	if [[ -d "$target_dir" ]]; then
+		echo "Directory '$target_dir' already exists. Changing into it."
+		if cd "$target_dir"; then
+			echo "Successfully changed to: $(pwd)"
+			return 0
+		else
+			echo "Error: Could not change to directory '$target_dir' (permissions issue?)."
+			return 1
+		fi
+	fi
+
+	# Attempt to create the directory and then change into it
+	if mkdir -p "$target_dir" && cd "$target_dir"; then
+		echo "Successfully created and changed to: $(pwd)"
+	else
+		echo "Error: Could not create or change to directory '$target_dir'."
+		return 1
+	fi
+}

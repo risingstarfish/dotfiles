@@ -1,0 +1,50 @@
+# .zsh_options
+
+#####################
+# Zsh Core Options
+#####################
+
+bindkey -e  # Use Emacs key bindings
+
+# Correct spelling errors in commands
+setopt CORRECT
+
+# Enable multi-line commands
+setopt EXTENDED_HISTORY
+
+# Don't beep on errors
+setopt NO_BEEP
+
+# List all matches when tab-completing ambiguous commands
+setopt AUTO_MENU
+
+# List results of completion automatically, no need to hit Tab twice
+setopt AUTO_LIST
+
+# Automatically cd into a directory if you type its name
+setopt AUTO_CD
+
+# Append history to HISTFILE, don't overwrite it
+setopt APPEND_HISTORY
+
+# Share history between all sessions
+setopt SHARE_HISTORY
+
+# Ensure that aliases are expanded when used as command arguments
+setopt ALIASES
+
+# Hide all files beginning with '.' from globbing except '..' and '.'
+setopt GLOB_DOTS
+
+# Immediately add commands to history
+setopt INC_APPEND_HISTORY
+
+# Enable multi-line commands
+setopt EXTENDED_HISTORY
+
+# Do not require a leading ‘.’ in a filename to be matched explicitly.
+setopt GLOB_DOTS
+
+
+# Set the size of the directory stack
+DIRSTACKSIZE=20 

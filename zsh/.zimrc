@@ -1,0 +1,31 @@
+zmodule romkatv/powerlevel10k
+
+zmodule jeffreytse/zsh-vi-mode
+zmodule Aloxaf/fzf-tab
+zmodule shanwker1223/zim-alias-finder
+zmodule hlissner/zsh-autopair
+zmodule kiesman99/zim-zoxide
+zmodule joke/zim-github-cli
+
+zmodule fzf
+zmodule ssh
+zmodule git-info
+zmodule duration-info
+zmodule prompt-pwd
+zmodule exa
+zmodule magic-enter
+zmodule homebrew >>>>Macos<<<<
+zmodule environment
+zmodule git
+zmodule input
+zmodule termtitle
+zmodule utility
+zmodule run-help
+zmodule archive
+
+
+zmodule zsh-users/zsh-completions --fpath src
+zmodule completion
+
+zmodule zsh-users/zsh-autosuggestions
+zmodule zsh-users/zsh-syntax-highlighting
