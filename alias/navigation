@@ -2,7 +2,6 @@ alias ..='cd ..'
 alias ...='cd ../..'
 alias -- -='cd -'
 alias H='cd ~'
-alias c='clear'
 
 # eza package
 alias ls='eza --icons --group-directories-first'

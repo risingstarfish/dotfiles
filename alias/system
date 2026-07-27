@@ -1,5 +1,5 @@
 alias ez='exec zsh'
-
+alias c='clear'
 alias path='echo $PATH | tr -s ":" "\n"'
 
 # Mac
