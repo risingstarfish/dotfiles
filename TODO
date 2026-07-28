@@ -1,1 +1,6 @@
-symlink: wgetrc, git
+pull setting.yml from code_settings
+
+paths.local
+exports.local
+.env
+

@@ -25,16 +25,6 @@ else
 	ENABLE_PROFILING=false
 fi
 
-# FIXME: move to exports
-# Settings
-HISTSIZE=32768
-HISTFILESIZE="${HISTSIZE}"
-HISTCONTROL=ignoredups
-SAVEHIST=1000
-HISTFILE=~/.zsh_history
-HIST_STAMPS="yyyy.mm.dd"
-
-# Printing functions
 # These functions are used to print headers and log messages
 # throughout the script.
 # They help in organizing the output and making it more readable.
@@ -108,9 +98,24 @@ else
 	DEBUG_MODE=false
 fi
 
+# NOTE: keep here
+if [[ -f ~/.exports ]]; then
+	source ~/.exports
+	log_message SUCCESS "Sourced ~/.exports"
+else
+	log_message ERROR "Unable to find ~/.exports.\nExiting..."
+fi
+
+if [[ -f ~/.paths ]]; then
+	source ~/.paths
+	log_message SUCCESS "Sourced ~/.paths"
+else
+	log_message ERROR "Unable to find ~/.paths.\nExiting..."
+fi
+
 # Colours
 # Generate LS_COLORS for Zsh completion
-# This populates the LS_COLORS variable that Zsh's completion system expects.
+# Tb populates the LS_COLORS variable that Zsh's completion system expects.
 # Enables envVar LS_COLORS
 if [[ -z "$LS_COLORS" ]]; then
 	if command -v gdircolors &>/dev/null; then
@@ -287,11 +292,8 @@ fi
 # ruby
 eval "$(rbenv init - zsh)"
 
-
 # FIXME: archlinux libsecret
 # source /usr/share/nvm/init-nvm.sh
-
-
 
 # Enable zsh plugins
 # keep these at the end of the file

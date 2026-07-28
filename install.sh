@@ -10,10 +10,26 @@ git pull origin main || echo -e "\033[33mWarning: Git pull failed, continuing wi
 # Tell bash to include hidden files
 shopt -s dotglob
 
+# copy sync-settings to platform location
+SYNC_DIR= "$DIR/sync-settings"
+if [ -d "$SYNC_DIR" ]; then
+	if [ -f "$SYNC_DIR"/settings.yml ]; then
+		echo "Copying sync-settings config..."
+
+		echo "# FIXME: platform specific"
+
+	else
+		echo "Error: unable to locate sync file: $SYNC_DIR/settings.yml.\nSkipping."
+		continue
+	fi
+else
+	echo "Error: unable to locate sync directory: $SYNC_DIR\nSkipping."
+fi
+
 # NOTE: keep .exports first
-BARE_FILES=(".exports" ".paths" ".curlrc" ".wgetrc")
+BARE_FILES=("$DIR/.exports" "$DIR/.paths" "$DIR/.curlrc" "$DIR/.wgetrc")
 for file in "${BARE_FILES[@]}"; do
-	target_path="$DIR/$file"
+	target_path="$file"
 	if [ ! -f $target_path ]; then
 		echo "[ERROR] file not found: $target_path"
 		echo "Exiting..."
