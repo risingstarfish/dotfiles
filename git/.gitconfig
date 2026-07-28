@@ -8,7 +8,7 @@
 	program = FIXME:
 [core]
 	editor = code -n --wait
-	excludesfile = ~/dotfiles/git/.gitignore
+	excludesfile = ~/.gitignore
 	autocrlf = input
 	pager = diff-so-fancy | less --tabs=4 -RF
 	compression = 9

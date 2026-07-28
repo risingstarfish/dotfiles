@@ -128,15 +128,11 @@ fi
 
 # Source environment variables
 print_header "Source Environment Variables"
-local sourcedEnv=0 # Initialize flag
-
 if [[ -f ~/.env ]]; then
-	sourcedEnv=1
 	log_message SUCCESS "Sourcing environment variables from: ~/.env"
 	source ~/.env
 else
 	log_message ERROR "Environment variables file not found: ~/.env"
-	log_message ERROR "Unable to generate LS_COLORS for Zsh completion without environment variables. Some features may not work as expected."
 fi
 
 ##################################
@@ -145,11 +141,6 @@ fi
 print_header "Aliases"
 
 if [[ -f ~/.aliases ]]; then
-	# issue warning if envVars file was not sourced
-	if [[ sourcedEnv -eq 0 ]]; then
-		log_message WARNING "Some aliases may not work as expected because ~/.env was not sourced."
-	fi
-
 	log_message SUCCESS "Sourcing alias file: ~/.aliases"
 	source ~/.aliases
 else
@@ -177,11 +168,11 @@ fi
 # Source path
 print_header "Custom Paths"
 
-if [[ -f ~/.path ]]; then
-	log_message SUCCESS "Sourcing PATH variables from: ~/.path"
-	source ~/.path
+if [[ -f ~/.paths ]]; then
+	log_message SUCCESS "Sourcing PATH variables from: ~/.paths"
+	source ~/.paths
 else
-	log_message ERROR "PATH variables file not found: ~/.path"
+	log_message ERROR "PATH variables file not found: ~/.paths"
 fi
 
 # Zsh options
@@ -295,6 +286,12 @@ fi
 
 # ruby
 eval "$(rbenv init - zsh)"
+
+
+# FIXME: archlinux libsecret
+# source /usr/share/nvm/init-nvm.sh
+
+
 
 # Enable zsh plugins
 # keep these at the end of the file

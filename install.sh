@@ -7,23 +7,61 @@ cd "$DIR" || exit 1
 echo "Pulling latest changes from git..."
 git pull origin main || echo -e "\033[33mWarning: Git pull failed, continuing with local files.\033[0m"
 
-ZSH_DIR="$DIR/zsh"
+# Tell bash to include hidden files
+shopt -s dotglob
 
-if [ ! -d "$ZSH_DIR" ]; then
-	echo "Directory not found: $ZSH_DIR"
+# NOTE: keep .exports first
+BARE_FILES=(".exports" ".paths" ".curlrc" ".wgetrc")
+for file in "${BARE_FILES[@]}"; do
+	target_path="$DIR/$file"
+	if [ ! -f $target_path ]; then
+		echo "[ERROR] file not found: $target_path"
+		echo "Exiting..."
+		exit 1
+	fi
+done
+
+# git
+GIT_DIR="$DIR/git" # TODO: function check_exists
+if [ ! -d "$GIT_DIR" ]; then
+	echo "[ERROR] git directory not found: $GIT_DIR"
 	echo "Exiting..."
 	exit 1
 fi
 
-echo "Installing zsh config files..."
-# Tell bash to include hidden files
-shopt -s dotglob
+# zsh
+ZSH_DIR="$DIR/zsh"
+if [ ! -d "$ZSH_DIR" ]; then
+	echo "[ERROR] zsh directory not found: $ZSH_DIR"
+	echo "Exiting..."
+	exit 1
+fi
 
-for file in "$ZSH_DIR"/*; do
+echo "Installing config files..."
+# NOTE: keep BARE_FILES first
+for file in "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*; do
 	# Check if the current item is a regular file
 	if [ -f "$file" ]; then
 		filename=$(basename "$file")
 		dest="$HOME/$filename"
+
+		# Special handling for .gitconfig
+		if [ "$filename" = ".gitconfig" ]; then
+			if [ -f "$dest" ]; then
+				echo "Updating $dest while preserving the first 8 lines..."
+				# Extract the first 8 lines from the existing destination file
+				# and append everything from the new template file starting from line 9 onward
+				{
+					head -n 8 "$dest"
+					tail -n +9 "$file"
+				} >"${dest}.tmp" && mv "${dest}.tmp" "$dest"
+				continue
+			else
+				echo "Installing initial .gitconfig..."
+				cp "$file" "$dest"
+				continue
+			fi
+		fi
 
 		echo "Installing $filename..."
 		# Backup existing file or symlink to prevent data loss
