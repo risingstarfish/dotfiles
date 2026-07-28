@@ -1,0 +1,3 @@
+[submodule "code_settings"]
+	path = code_settings
+	url = https://github.com/risingstarfish/code_settings.git
