@@ -1,11 +1,29 @@
 #!/usr/bin/env zsh
 
+# settings
+export HISTFILE=~/.zsh_history
+export HISTSIZE="1000000"
+export SAVEHIST="1000000"
+
+setopt EXTENDED_HISTORY       # Write the history file in the ':start:elapsed;command' format.
+setopt INC_APPEND_HISTORY     # Write to the history file immediately, not when the shell exits.
+setopt SHARE_HISTORY          # Share history between all sessions.
+setopt HIST_EXPIRE_DUPS_FIRST # Expire a duplicate event first when trimming history.
+setopt HIST_IGNORE_DUPS       # Do not record an event that was just recorded again.
+setopt HIST_IGNORE_ALL_DUPS   # Delete an old recorded event if a new event is a duplicate.
+setopt HIST_FIND_NO_DUPS      # Do not display a previously found event.
+setopt HIST_IGNORE_SPACE      # Do not record an event starting with a space.
+setopt HIST_SAVE_NO_DUPS      # Do not write a duplicate event to the history file.
+setopt HIST_VERIFY            # Do not execute immediately upon history expansion.
+setopt APPEND_HISTORY         # append to history file
+setopt HIST_NO_STORE          # Don't store history commands
+
 # Create .zshrc.local if not already preset with default config
 LOCAL_RC="$HOME/.zshrc.local"
 if [[ -f "$LOCAL_RC" ]]; then
 	source "$LOCAL_RC"
 else
-	echo "No $LOCAL_RC file. Setting default values."
+	echo "No $LOCAL_RC file detected. Setting default values."
 	ENABLE_PROFILING=false
 	DEBUG_MODE=false
 fi
@@ -99,24 +117,35 @@ else
 fi
 
 # NOTE: keep here
+print_header "Exports"
 if [[ -f ~/.exports ]]; then
 	source ~/.exports
 	log_message SUCCESS "Sourced ~/.exports"
 else
-	log_message ERROR "Unable to find ~/.exports.\nExiting..."
+	log_message ERROR "Unable to find ~/.exports.\nSome functionality may not work properly."
 fi
 
+print_header "Default paths"
 if [[ -f ~/.paths ]]; then
 	source ~/.paths
 	log_message SUCCESS "Sourced ~/.paths"
 else
-	log_message ERROR "Unable to find ~/.paths.\nExiting..."
+	log_message ERROR "Unable to find ~/.paths.\nSome functionality may not work properly."
+fi
+
+print_header "Local paths"
+if [[ -f ~/.paths.local ]]; then
+	source ~/.paths.local
+	log_message SUCCESS "Sourced ~/.paths.local"
+else
+	log_message ERROR "Unable to find ~/.paths.local.\nSome functionality may not work properly."
 fi
 
 # Colours
 # Generate LS_COLORS for Zsh completion
 # Tb populates the LS_COLORS variable that Zsh's completion system expects.
 # Enables envVar LS_COLORS
+print_header "LS_COLORS"
 if [[ -z "$LS_COLORS" ]]; then
 	if command -v gdircolors &>/dev/null; then
 		eval "$(gdircolors -b)"
@@ -137,52 +166,36 @@ if [[ -f ~/.env ]]; then
 	log_message SUCCESS "Sourcing environment variables from: ~/.env"
 	source ~/.env
 else
-	log_message ERROR "Environment variables file not found: ~/.env"
+	log_message WARNING "Environment variables file not found: ~/.env"
 fi
 
-##################################
 # Source alias files/functions
-##################################
 print_header "Aliases"
-
 if [[ -f ~/.aliases ]]; then
 	log_message SUCCESS "Sourcing alias file: ~/.aliases"
 	source ~/.aliases
 else
-	log_message ERROR "Alias file not found: ~/.aliases"
+	log_message WARNING "Alias file not found: ~/.aliases"
 fi
 
 print_header "Functions"
-# Source functions from ~/alias/functions directory
 if [[ -f ~/.functions ]]; then
-	log_message SUCCESS "Sourcing function file: $f"
+	log_message SUCCESS "Sourcing function file: ~/.functions"
 	source ~/.functions
 else
-	log_message ERROR "Functions file not found: ~/.functions"
+	log_message WARNING "Functions file not found: ~/.functions"
 fi
 
 print_header "Git Functions"
-# Source functions from ~/alias/functions directory
 if [[ -f ~/.git_functions ]]; then
-	log_message SUCCESS "Sourcing function file: $f"
+	log_message SUCCESS "Sourcing git functions file: ~/.git_functions"
 	source ~/.git_functions
 else
-	log_message ERROR "Functions file not found: ~/.git_functions"
-fi
-
-# Source path
-print_header "Custom Paths"
-
-if [[ -f ~/.paths ]]; then
-	log_message SUCCESS "Sourcing PATH variables from: ~/.paths"
-	source ~/.paths
-else
-	log_message ERROR "PATH variables file not found: ~/.paths"
+	log_message WARNING "Functions file not found: ~/.git_functions"
 fi
 
 # Zsh options
 print_header "Zsh Options"
-# source zsh options
 if [[ -f ~/.zsh_options ]]; then
 	log_message SUCCESS "Sourcing Zsh options from: ~/.zsh_options"
 	source ~/.zsh_options
@@ -192,7 +205,6 @@ fi
 
 # fastfetch
 print_header "fastfetch"
-
 if ! command -v fastfetch &>/dev/null; then
 	log_message WARNING "fastfetch command not found, skipping fastfetch."
 else
@@ -255,7 +267,6 @@ fi
 
 # Zim configuration
 print_header "Zim Configuration"
-
 # Check if Zim is installed at usual location
 if [[ -d ~/.zim ]]; then
 	ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
@@ -283,22 +294,22 @@ if [[ -d ~/.zim ]]; then
 		log_message SUCCESS "Sourcing Zim initialization file: ${ZIM_HOME}/init.zsh"
 		source ${ZIM_HOME}/init.zsh
 	else
-		log_message ERROR "Zim initialization file not found: ${ZIM_HOME}/init.zsh"
+		log_message WARNING "Zim initialization file not found: ${ZIM_HOME}/init.zsh"
 	fi
 else
 	log_message ERROR "Zim directory not found: ~/.zim"
 fi
 
 # ruby
+print_header "rbenv"
 eval "$(rbenv init - zsh)"
 
-# FIXME: archlinux libsecret
+# TODO: archlinux libsecret
+# print_header "Node Version Manager"
 # source /usr/share/nvm/init-nvm.sh
 
-# Enable zsh plugins
 # keep these at the end of the file
 print_header "Zsh Plugins"
-
 # Enable zoxide
 if command -v zoxide &>/dev/null; then
 	log_message SUCCESS "zoxide command found. Enabling plugin."
@@ -317,7 +328,6 @@ fi
 
 # Zstyles
 print_header "Zstyles"
-
 # Source zstyles
 if [[ -f ~/.zstyles ]]; then
 	log_message SUCCESS "Zstyles file found. Sourcing."
@@ -345,9 +355,7 @@ fi
 # Output debug mode status
 # If DEBUG_MODE is true, print a message indicating the end of debug mode
 if [[ "$DEBUG_MODE" == true ]]; then
-	##################################
 	print_header "Debug Mode Status"
-	##################################
 
 	if [[ "$ENABLE_PROFILING" == true ]]; then
 		log_message INFO "Profiling is enabled. Profiling data will be saved."

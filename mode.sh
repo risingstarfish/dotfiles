@@ -1,17 +1,30 @@
 #!/usr/bin/env bash
-
 # Toggle .zshrc.local environment overrides
+
+# Get the absolute directory path of this script
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$DIR" || exit 1
+# check for --help or -h
+source "$DIR/usage.sh" "$(basename "$0")"
+
+# Set default path if not already provided by an external script
+LOCAL_ZSH="${LOCAL_ZSH:-$HOME/.zshrc.local}"
+LOCAL_ZSH="$HOME/.zshrc.local"
+if [[ ! -f "$LOCAL_ZSH" ]]; then
+	printf "\033[31m[ERROR]\033[0m ~/.zshrc.local could not be found.\n"
+	printf "Run \033[36mbash install.sh\033[0m' first before attempting to change the mode/variables.\n"
+	exit 1
+fi
 
 # Check if 'debug' was passed as the first argument
 ENABLE_DEBUG=false
 ENABLE_PROFILING=false
 
 for arg in "$@"; do
-	clean_arg=$(echo "$arg" | tr '[:upper:]' '[:lower:]')
-
-	if [[ "$clean_arg" == "debug" ]]; then
+	#clean_arg=$(echo "$arg" | tr '[:upper:]' '[:lower:]')
+	if [[ "$arg" == "--enable-debug" || "$arg" == "-d" ]]; then
 		ENABLE_DEBUG=true
-	elif [[ "$clean_arg" == "profile" || "$clean_arg" == "profiling" ]]; then
+	elif [[ "$arg" == "--enable-profiling" || "$arg" == "-p" ]]; then
 		ENABLE_PROFILING=true
 	fi
 done
