@@ -1,10 +1,11 @@
 #!/usr/bin/env zsh
 
-
 # System
 alias ez='exec zsh'
 alias c='clear'
 alias path='echo $PATH | tr -s ":" "\n"'
+# Display formatted history (yyy-mm-dd HH:MM)
+alias history='history -i'
 
 if command -v bat >/dev/null 2>&1; then
 
@@ -26,6 +27,7 @@ alias H='cd ~'
 alias ls='eza --icons --group-directories-first'
 alias ll='eza -l --icons --no-user --group-directories-first  --time-style long-iso'
 alias la='eza -la --icons --no-user --group-directories-first  --time-style long-iso'
+alias ld='eza -ld --icons --no-user --time-style long-iso'
 
 # Code
 alias code='codium-insiders'
