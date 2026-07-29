@@ -449,7 +449,7 @@ if [[ $ENABLE_PROFILING == true ]]; then
 	if [[ -n "$VISUAL" ]]; then
 		log_message PROFILE "  1. $VISUAL \"$ZPROF_LOG_FILE\""
 	else
-		log_message WARNING "   No \$VISUAL environment variable set."
+		log_message WARNING "  No '\$VISUAL' environment variable set."
 	fi
 
 	# Check for 'bat' command
