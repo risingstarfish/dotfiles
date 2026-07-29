@@ -3,8 +3,9 @@
 # Get the absolute directory path of this script
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR" || exit 1
-# check for --help or -h
-source "$DIR/usage.sh" "$(basename "$0")"
+
+# validate input and check for help flag
+source "$DIR/usage.sh" "$(basename "$0")" "$@"
 
 printf "Pulling latest changes from git..."
 git pull origin main || printf "\033[33mWarning: Git pull failed, continuing with local files.\033[0m"
