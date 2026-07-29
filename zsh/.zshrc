@@ -379,7 +379,7 @@ if [[ $ENABLE_PROFILING == true ]]; then
 		log_message INFO "Profiling directory exists: $ZPROF_LOG_DIR"
 	else
 		log_message INFO "Creating profiling directory: $ZPROF_LOG_DIR"
-		mkdir "$ZPROF_LOG_DIR" # No -p option to avoid creating parent directories
+		mkdir -p "$ZPROF_LOG_DIR"
 
 		# Check if the directory was created successfully
 		if [[ $? -ne 0 ]]; then
