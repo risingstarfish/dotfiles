@@ -1,11 +1,5 @@
-[user]
-	name = FIXME:
-	email = FIXME:
-	signingKey = FIXME:
-[credential]
-	helper = FIXME:
-[gpg]
-	program = FIXME:
+[include]
+    path = ~/.gitconfig.local
 [core]
 	editor = code -n --wait
 	excludesfile = ~/.gitignore

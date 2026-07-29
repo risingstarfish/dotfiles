@@ -62,22 +62,6 @@ for file in "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*; do
 		filename=$(basename "$file")
 		dest="$HOME/$filename"
 
-		# Special handling for .gitconfig
-		if [ "$filename" = ".gitconfig" ]; then
-			if [ -f "$dest" ]; then
-				printf "Updating %s while preserving the first 8 lines...\n" "$dest"
-				{
-					head -n 8 "$dest"
-					tail -n +9 "$file"
-				} >"${dest}.tmp" && mv "${dest}.tmp" "$dest"
-				continue
-			else
-				printf "Installing initial .gitconfig...\n"
-				cp "$file" "$dest"
-				continue
-			fi
-		fi
-
 		printf "\nInstalling %s...\n" "$filename"
 		# Backup existing file or symlink to prevent data loss
 		if [ -e "$dest" ] || [ -L "$dest" ]; then
