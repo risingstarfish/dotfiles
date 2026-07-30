@@ -1,3 +1,4 @@
+make local dir
 CHECK FOR .gitconfig.local
 paths.local
 .env
