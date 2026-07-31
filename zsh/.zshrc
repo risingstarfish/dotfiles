@@ -160,9 +160,33 @@ else
 	log_message INFO "LS_COLORS is already set, skipping generation."
 fi
 
+print_header "Local gitconfig"
+if [ -f "$HOME/.gitconfig.local" ]; then
+	# check if its updated
+	if grep -q "FIXME:" "$HOME/.gitconfig.local"; then
+		log_message WARNING "Found ~/.gitconfig.local, but it still contains 'FIXME:' placeholders! Please update it."
+	else
+		log_message SUCCESS "Found ~/.gitconfig.local"
+	fi
+else
+	log_message WARNING "~/.gitconfig.local not found! Creating default ~/.gitconfig.local"
+	log_message WARNING "Please update .gitconfig.local with correct information!"
+
+	cat <<EOF >"$HOME/.gitconfig.local"
+[user]
+    name = FIXME:
+    email = ${GITHUB_EMAIL:-FIXME:}
+    signingKey = FIXME:
+[gpg]
+    program = FIXME:
+[credential]
+    helper = FIXME:
+EOF
+fi
+
 # Source environment variables
 print_header "Source Environment Variables"
-if [[ -f ~/.env ]]; then
+if [[ -f "$HOME/.env" ]]; then
 	log_message SUCCESS "Sourcing environment variables from: ~/.env"
 	source ~/.env
 else
