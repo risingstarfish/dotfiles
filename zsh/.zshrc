@@ -325,7 +325,7 @@ else
 fi
 
 # ruby
-print_header "rbenv"
+print_header "rbenvinit"
 eval "$(rbenv init - zsh)"
 
 # TODO: archlinux libsecret
