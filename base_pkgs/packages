@@ -1,8 +1,0 @@
-bat
-ccache
-cmake
-cmake-language-server
-cppcheck
-doxygen
-fzf
-gcc
