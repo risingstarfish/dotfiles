@@ -18,18 +18,6 @@ setopt HIST_VERIFY            # Do not execute immediately upon history expansio
 setopt APPEND_HISTORY         # append to history file
 setopt HIST_NO_STORE          # Don't store history commands
 
-# Create .zshrc.local if not already preset with default config
-LOCAL_RC="$HOME/.zshrc.local"
-if [[ -f "$LOCAL_RC" ]]; then
-	source "$LOCAL_RC"
-else
-	printf "No %s file detected. Setting default values.\n\n" "$LOCAL_RC"
-	ENABLE_PROFILING=false
-	DEBUG_MODE=false
-fi
-
-# !!!DO NOT MOVE ANYTHING ABOVE THIS LINE!!!
-
 # Enable zsh profiling for performance analysis
 # This section needs to be at the top of the file
 # to ensure profiling starts before any other commands are executed.
@@ -100,6 +88,19 @@ log_message() {
 
 	printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
 }
+
+print_title "Local Files"
+LOCAL_DIR="$HOME/.local"
+if [[ -f "$LOCAL_DIR/.zshrc" ]]; then
+	log_message SUCCESS "Found $LOCAL_DIR/.zshrc"
+	source "$LOCAL_DIR/.zshrc"
+else
+	printf "No %s file detected.\n" "$LOCAL_DIR/.zshrc"
+	printf "Something went wrong!\n"
+	# https://unix.stackexchange.com/questions/579104/start-interactive-zsh-without-running-any-configuration-files-like-zshrc
+	zsh -d -f -i 
+	exit 0
+fi
 
 # Check if DEBUG_MODE is set, if not, set it to false
 if [[ "$DEBUG_MODE" == true ]]; then
