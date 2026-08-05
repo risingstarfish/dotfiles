@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # Create a new directory and enter it
-mkcd() {
+function mkcd() {
 	# Check if no arguments are provided
 	if [[ -z "$1" ]]; then
 		echo "Usage: mkcd <directory_name>"
@@ -10,7 +10,7 @@ mkcd() {
 	fi
 
 	# Check if more than one argument is provided
-	if [[ "$" -gt 1 ]]; then
+	if [[ "$#" -gt 1 ]]; then
 		echo "Usage: mkcd <directory_name>"
 		echo "Error: Too many arguments. Please provide only one directory name."
 		return 1
