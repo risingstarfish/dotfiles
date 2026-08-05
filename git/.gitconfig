@@ -60,8 +60,8 @@
 	auto = 8000
 [pack]
 	threads = 0
-	windowMemory = 4g
-	packSizeLimit = 2g
+	windowMemory = 4294967296
+	packSizeLimit = 2147483648
 	depth = 20
 [rebase]
 	autoSquash = true
