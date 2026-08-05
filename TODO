@@ -1,4 +1,5 @@
 mkdir $HOME/local
+check env for LLAMA_API_KEY and ANTHROPIC_API_KEY
 
 paths.local
 .env
