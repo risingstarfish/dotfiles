@@ -90,17 +90,6 @@ set(DOTFILES_LIBRARIES dotfiles)
 #FIXME:
 target_link_libraries(dotfiles PUBLIC simdjson::simdjson)
 
-# Embed user.config.json as a preprocessor string literal
-set(CONFIG_JSON_FILE "${PROJECT_SOURCE_DIR}/configs/user.config.json")
-if(EXISTS "${CONFIG_JSON_FILE}")
-    file(READ "${CONFIG_JSON_FILE}" CONFIG_JSON_RAW)
-    string(REPLACE "\\" "\\\\" CONFIG_JSON_ESCAPED "${CONFIG_JSON_RAW}")
-    string(REPLACE "\"" "\\\"" CONFIG_JSON_ESCAPED "${CONFIG_JSON_ESCAPED}")
-    string(REGEX REPLACE "\n" "\\n" CONFIG_JSON_ESCAPED "${CONFIG_JSON_ESCAPED}")
-    string(REPLACE "\r" "" CONFIG_JSON_ESCAPED "${CONFIG_JSON_ESCAPED}")
-    target_compile_definitions(dotfiles PRIVATE CONFIG_JSON="${CONFIG_JSON_ESCAPED}")
-endif()
-
 # Enable precompiled headers for faster builds
 set(DOTFILES_PRECOMPILE_HEADERS
     # FIXME: proper headers
@@ -144,7 +133,6 @@ target_include_directories(
     dotfiles
     PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
     PRIVATE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>"
-    PRIVATE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/configs>"
 )
 
 if(DOTFILES_BUILD_STATIC_LIB)
@@ -152,7 +140,6 @@ if(DOTFILES_BUILD_STATIC_LIB)
         dotfiles_static
         PUBLIC "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
         PRIVATE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>"
-        PRIVATE "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/configs>"
     )
 endif(DOTFILES_BUILD_STATIC_LIB)
 
