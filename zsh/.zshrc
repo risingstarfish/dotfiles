@@ -23,7 +23,7 @@ LOCAL_RC="$HOME/.zshrc.local"
 if [[ -f "$LOCAL_RC" ]]; then
 	source "$LOCAL_RC"
 else
-	echo "No $LOCAL_RC file detected. Setting default values."
+	printf "No %s file detected. Setting default values.\n\n" "$LOCAL_RC"
 	ENABLE_PROFILING=false
 	DEBUG_MODE=false
 fi
@@ -48,15 +48,15 @@ fi
 # They help in organizing the output and making it more readable.
 # Print a title header
 print_title() {
-	local header="$1"
-	echo -e "\n\033[38;5;196m\t===== $header =====\033[0m\n" # Red title header
+	local title="$1"
+	printf "\n\033[38;5;196m\t===== %s =====\033[0m\n\n" "$title" # Red title header
 }
 
 # Print a header between sections
 print_header() {
 	local header="$1"
 	if [[ "$DEBUG_MODE" == true ]]; then
-		echo -e "\n\033[38;5;12m=== $header ===\033[0m\n" # Blue header
+		printf "\n\033[38;5;12m=== %s ===\033[0m\n\n" "$header" # Blue header
 	fi
 }
 
@@ -98,6 +98,7 @@ log_message() {
 		# and issue warning
 		log_type="WARNING"
 		echo -e "${csi}${colors[${log_type}]}[UNKNOWN]${reset} ${message}"
+		printf "%s%s[%s][UNKNOWN]%s %s\n" "$csi" "$colors" "$log_type" "$reset" "$message"
 		return
 		;;
 	esac
@@ -107,6 +108,7 @@ log_message() {
 
 	# Print the colored message
 	echo -e "${csi}${color_code}${prefix}${reset} ${message}"
+	printf "%s%s%s%s %s\n" "$csi" "$color_code" "$prefix" "$reset" "$message"
 }
 
 # Check if DEBUG_MODE is set, if not, set it to false
