@@ -74,7 +74,7 @@ cpmaddpackage(
     https://github.com/simdjson/simdjson.git
     GIT_TAG
     9392a55f76ad9838efd1cdc1529f2607b3d613fb
-    OPTIONS 
+    OPTIONS
     "SIMDJSON_STATIC_REFLECTION=1"
     "SIMDJSON_DISABLE_DEPRECATED_API=1"
 )
@@ -88,7 +88,18 @@ add_library(dotfiles::dotfiles ALIAS dotfiles)
 
 set(DOTFILES_LIBRARIES dotfiles)
 #FIXME:
-target_link_libraries(dotfiles PRIVATE simdjson::simdjson)
+target_link_libraries(dotfiles PUBLIC simdjson::simdjson)
+
+# Embed user.config.json as a preprocessor string literal
+set(CONFIG_JSON_FILE "${PROJECT_SOURCE_DIR}/configs/user.config.json")
+if(EXISTS "${CONFIG_JSON_FILE}")
+    file(READ "${CONFIG_JSON_FILE}" CONFIG_JSON_RAW)
+    string(REPLACE "\\" "\\\\" CONFIG_JSON_ESCAPED "${CONFIG_JSON_RAW}")
+    string(REPLACE "\"" "\\\"" CONFIG_JSON_ESCAPED "${CONFIG_JSON_ESCAPED}")
+    string(REGEX REPLACE "\n" "\\n" CONFIG_JSON_ESCAPED "${CONFIG_JSON_ESCAPED}")
+    string(REPLACE "\r" "" CONFIG_JSON_ESCAPED "${CONFIG_JSON_ESCAPED}")
+    target_compile_definitions(dotfiles PRIVATE CONFIG_JSON="${CONFIG_JSON_ESCAPED}")
+endif()
 
 # Enable precompiled headers for faster builds
 set(DOTFILES_PRECOMPILE_HEADERS

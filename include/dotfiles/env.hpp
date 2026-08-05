@@ -9,8 +9,6 @@
 
 namespace dotfiles {
 
-constexpr const char user_config[] = {
-#embed "user.config.json"
-  , 0};
+constexpr const char user_config[] = CONFIG_JSON "\0";
 
 }  // namespace dotfiles
