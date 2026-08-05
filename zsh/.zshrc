@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 
 # settings
-export HISTFILE=~/.zsh_history
+export HISTFILE="$HOME/.zsh_history"
 export HISTSIZE="1000000"
 export SAVEHIST="1000000"
 
@@ -65,40 +65,40 @@ print_header() {
 # Usage: log_message <TYPE> "Your message here"
 # <TYPE> can be ERROR, WARNING, SUCCESS, INFO, or any custom type
 log_message() {
-    local log_type="${1:-INFO}"
-    local message="${2:-}"
-    
-    # Guard against empty messages
-    [[ -z "$message" ]] && return 0
-    
-    # Zsh associative array for colors
-    local -A colors=(
-        [SUCCESS]="\e[38;5;10m" # Green
-        [ERROR]="\e[38;5;9m"    # Red
-        [WARNING]="\e[38;5;3m"  # Yellow/Orange
-        [INFO]="\e[38;5;14m"    # Cyan
-        [PROFILE]="\e[38;5;13m" # Magenta
-    )
-    local reset="\e[0m"
-    
-    case "$log_type" in
-        ERROR|WARNING|PROFILE)
-            # Always print
-            ;;
-        SUCCESS|INFO)
-            # Only print if DEBUG_MODE is explicitly "true"
-            [[ "${DEBUG_MODE:-}" == "true" ]] || return 0
-            ;;
-        *)
-            # Unknown type defaults to WARNING
-            log_type="WARNING"
-            ;;
-    esac
-    
-    local color_code="${colors[$log_type]}"
-    local prefix="[${log_type}]"
-    
-    printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
+	local log_type="${1:-INFO}"
+	local message="${2:-}"
+
+	# Guard against empty messages
+	[[ -z "$message" ]] && return 0
+
+	# Zsh associative array for colors
+	local -A colors=(
+		[SUCCESS]="\e[38;5;10m" # Green
+		[ERROR]="\e[38;5;9m"    # Red
+		[WARNING]="\e[38;5;3m"  # Yellow/Orange
+		[INFO]="\e[38;5;14m"    # Cyan
+		[PROFILE]="\e[38;5;13m" # Magenta
+	)
+	local reset="\e[0m"
+
+	case "$log_type" in
+	ERROR | WARNING | PROFILE)
+		# Always print
+		;;
+	SUCCESS | INFO)
+		# Only print if DEBUG_MODE is explicitly "true"
+		[[ "${DEBUG_MODE:-}" == "true" ]] || return 0
+		;;
+	*)
+		# Unknown type defaults to WARNING
+		log_type="WARNING"
+		;;
+	esac
+
+	local color_code="${colors[$log_type]}"
+	local prefix="[${log_type}]"
+
+	printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
 }
 
 # Check if DEBUG_MODE is set, if not, set it to false
@@ -110,27 +110,27 @@ fi
 
 # NOTE: keep here
 print_header "Exports"
-if [[ -f ~/.exports ]]; then
-	source ~/.exports
-	log_message SUCCESS "Sourced ~/.exports"
+if [[ -f "$HOME/.exports" ]]; then
+	source "$HOME/.exports"
+	log_message SUCCESS "Sourced $HOME/.exports"
 else
-	log_message ERROR "Unable to find ~/.exports.\nSome functionality may not work properly."
+	log_message ERROR "Unable to find $HOME/.exports.\nSome functionality may not work properly."
 fi
 
 print_header "Default paths"
-if [[ -f ~/.paths ]]; then
-	source ~/.paths
-	log_message SUCCESS "Sourced ~/.paths"
+if [[ -f "$HOME/.paths" ]]; then
+	source "$HOME/.paths"
+	log_message SUCCESS "Sourced $HOME/.paths"
 else
-	log_message ERROR "Unable to find ~/.paths.\nSome functionality may not work properly."
+	log_message ERROR "Unable to find $HOME/.paths.\nSome functionality may not work properly."
 fi
 
 print_header "Local paths"
-if [[ -f ~/.paths.local ]]; then
-	source ~/.paths.local
-	log_message SUCCESS "Sourced ~/.paths.local"
+if [[ -f "$HOME/.paths.local" ]]; then
+	source "$HOME/.paths.local"
+	log_message SUCCESS "Sourced $HOME/.paths.local"
 else
-	log_message ERROR "Unable to find ~/.paths.local.\nSome functionality may not work properly."
+	log_message ERROR "Unable to find $HOME/.paths.local.\nSome functionality may not work properly."
 fi
 
 # Colours
@@ -154,45 +154,45 @@ fi
 
 # Source environment variables
 print_header "Source Environment Variables"
-if [[ -f ~/.env ]]; then
-	log_message SUCCESS "Sourcing environment variables from: ~/.env"
-	source ~/.env
+if [[ -f "$HOME/.env" ]]; then
+	log_message SUCCESS "Sourcing environment variables from: $HOME/.env"
+	source "$HOME/.env"
 else
-	log_message WARNING "Environment variables file not found: ~/.env"
+	log_message WARNING "Environment variables file not found: $HOME/.env"
 fi
 
 # Source alias files/functions
 print_header "Aliases"
-if [[ -f ~/.aliases ]]; then
-	log_message SUCCESS "Sourcing alias file: ~/.aliases"
-	source ~/.aliases
+if [[ -f "$HOME/.aliases" ]]; then
+	log_message SUCCESS "Sourcing alias file: $HOME/.aliases"
+	source "$HOME/.aliases"
 else
-	log_message WARNING "Alias file not found: ~/.aliases"
+	log_message WARNING "Alias file not found: $HOME/.aliases"
 fi
 
 print_header "Functions"
-if [[ -f ~/.functions ]]; then
-	log_message SUCCESS "Sourcing function file: ~/.functions"
-	source ~/.functions
+if [[ -f "$HOME/.functions" ]]; then
+	log_message SUCCESS "Sourcing function file: $HOME/.functions"
+	source "$HOME/.functions"
 else
-	log_message WARNING "Functions file not found: ~/.functions"
+	log_message WARNING "Functions file not found: $HOME/.functions"
 fi
 
 print_header "Git Functions"
-if [[ -f ~/.git_functions ]]; then
-	log_message SUCCESS "Sourcing git functions file: ~/.git_functions"
-	source ~/.git_functions
+if [[ -f "$HOME/.git_functions" ]]; then
+	log_message SUCCESS "Sourcing git functions file: $HOME/.git_functions"
+	source "$HOME/.git_functions"
 else
-	log_message WARNING "Functions file not found: ~/.git_functions"
+	log_message WARNING "Functions file not found: $HOME/.git_functions"
 fi
 
 # Zsh options
 print_header "Zsh Options"
-if [[ -f ~/.zsh_options ]]; then
-	log_message SUCCESS "Sourcing Zsh options from: ~/.zsh_options"
-	source ~/.zsh_options
+if [[ -f "$HOME/.zsh_options" ]]; then
+	log_message SUCCESS "Sourcing Zsh options from: $HOME/.zsh_options"
+	source "$HOME/.zsh_options"
 else
-	log_message WARNING "Zsh options file not found: ~/.zsh_options"
+	log_message WARNING "Zsh options file not found: $HOME/.zsh_options"
 fi
 
 # fastfetch
@@ -201,11 +201,11 @@ if ! command -v fastfetch &>/dev/null; then
 	log_message WARNING "fastfetch command not found, skipping fastfetch."
 else
 	# check for custom fastfetch config
-	if [[ -f ~/.config/fastfetch/config.jsonc ]]; then
-		log_message INFO "Custom fastfetch config found at ~/.config/fastfetch/config.jsonc\n\n"
+	if [[ -f "$HOME/.config/fastfetch/config.jsonc" ]]; then
+		log_message INFO "Custom fastfetch config found at $HOME/.config/fastfetch/config.jsonc\n\n"
 
 		echo "\n\n"
-		fastfetch --config ~/.config/fastfetch/config.jsonc
+		fastfetch --config "$HOME/.config/fastfetch/config.jsonc"
 		echo "\n\n"
 
 		log_message SUCCESS "fastfetch executed with custom configuration."
@@ -247,7 +247,7 @@ if [[ -d "$P10K_DIR/.git" && -f "$P10K_THEME" ]]; then
 		log_message SUCCESS "Powerlevel10k configuration file found. Sourcing."
 		source "$P10K_CONFIG"
 	else
-		log_message WARNING "Powerlevel10k config (~/.p10k.zsh) not found. Run 'p10k configure'."
+		log_message WARNING "Powerlevel10k config ($HOME/.p10k.zsh) not found. Run 'p10k configure'."
 	fi
 
 else
@@ -259,10 +259,16 @@ fi
 
 # Zim configuration
 print_header "Zim Configuration"
+if [[ ! -d "$HOME/.zim" ]]; then
+	log_message WARNING "Zim directory not found: $HOME/.zim"
+	log_message WARNING "Attempting to create..."
+	mkdir "$HOME/.zim"
+fi
+
 # Check if Zim is installed at usual location
-if [[ -d ~/.zim ]]; then
+if [[ -d "$HOME/.zim" ]]; then
 	ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
-	log_message SUCCESS "Zim directory found: ~/.zim"
+	log_message SUCCESS "Zim directory found: $HOME/.zim"
 
 	# Download zimfw plugin manager if missing.
 	if [[ ! -e ${ZIM_HOME}/zimfw.zsh ]]; then
@@ -289,12 +295,13 @@ if [[ -d ~/.zim ]]; then
 		log_message WARNING "Zim initialization file not found: ${ZIM_HOME}/init.zsh"
 	fi
 else
-	log_message ERROR "Zim directory not found: ~/.zim"
+	log_message ERROR "Failed to create directory: $HOME/.zim"
+	log_message ERROR "Manually create it then rerun this script."
 fi
 
 # ruby
 print_header "rbenv"
-log_message SUCCESS "# FIXME: git clone https://github.com/rbenv/rbenv.git ~/.rbenv"
+log_message SUCCESS "# FIXME: git clone https://github.com/rbenv/rbenv.git $HOME/.rbenv"
 eval "$(rbenv init - zsh)"
 
 # TODO: archlinux libsecret
@@ -322,11 +329,11 @@ fi
 # Zstyles
 print_header "Zstyles"
 # Source zstyles
-if [[ -f ~/.zstyles ]]; then
+if [[ -f "$HOME/.zstyles" ]]; then
 	log_message SUCCESS "Zstyles file found. Sourcing."
-	source ~/.zstyles
+	source "$HOME/.zstyles"
 else
-	log_message WARNING "Zstyles file not found: ~/.zstyles"
+	log_message WARNING "Zstyles file not found: $HOME/.zstyles"
 fi
 
 # iTerm2 shell integration
@@ -335,11 +342,11 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 	log_message INFO "MacOS detected"
 	print_header "iTerm2 Shell Integration"
 
-	if [[ -f ~/.iterm2_shell_integration.zsh ]]; then
+	if [[ -f "$HOME/.iterm2_shell_integration.zsh" ]]; then
 		log_message SUCCESS "iTerm2 shell integration file found. Sourcing."
-		source ~/.iterm2_shell_integration.zsh
+		source "$HOME/.iterm2_shell_integration.zsh"
 	else
-		log_message WARNING "iTerm2 shell integration file not found: ~/.iterm2_shell_integration.zsh"
+		log_message WARNING "iTerm2 shell integration file not found: $HOME/.iterm2_shell_integration.zsh"
 	fi
 else
 	log_message INFO "Non-MacOS detected. Skipping iTerm2 shell integration."
