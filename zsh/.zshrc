@@ -49,14 +49,14 @@ fi
 # Print a title header
 print_title() {
 	local title="$1"
-	printf "\n\033[38;5;196m\t===== %s =====\033[0m\n\n" "$title" # Red title header
+	printf "\n\e[38;5;196m\t===== %s =====\e[0m\n\n" "$title" # Red title header
 }
 
 # Print a header between sections
 print_header() {
 	local header="$1"
 	if [[ "$DEBUG_MODE" == true ]]; then
-		printf "\n\033[38;5;12m=== %s ===\033[0m\n\n" "$header" # Blue header
+		printf "\n\e[38;5;12m=== %s ===\e[0m\n\n" "$header" # Blue header
 	fi
 }
 
@@ -65,50 +65,40 @@ print_header() {
 # Usage: log_message <TYPE> "Your message here"
 # <TYPE> can be ERROR, WARNING, SUCCESS, INFO, or any custom type
 log_message() {
-	local log_type="$1"
-	local message="$2"
-	local csi="\033["
-	local reset="\033[0m"
-	local color_code=""
-	local prefix=""
-
-	# Define colors
-	local -A colors=(
-		[SUCCESS]="38;5;10m" # Green
-		[ERROR]="38;5;9m"    # Red
-		[WARNING]="38;5;3m"  # Yellow/Orange
-		[INFO]="38;5;14m"    # Cyan
-		[PROFILE]="38;5;13m" # Magenta
-	)
-
-	# ERROR and WARNING messages will always be printed.
-	# Output from ENABLE_PROFILING will be printed regardless of DEBUG_MODE
-	case "$log_type" in
-	ERROR | WARNING | PROFILE)
-		# ERROR, WARNING, and PROFILE messages always print.
-		;;
-	SUCCESS | INFO)
-		# SUCCESS and INFO messages print if DEBUG_MODE is true,
-		if [[ "$DEBUG_MODE" == false ]]; then
-			return # Do not print
-		fi
-		;;
-	*)
-		# Unknown log type, print as WARNING
-		# and issue warning
-		log_type="WARNING"
-		echo -e "${csi}${colors[${log_type}]}[UNKNOWN]${reset} ${message}"
-		printf "%s%s[%s][UNKNOWN]%s %s\n" "$csi" "$colors" "$log_type" "$reset" "$message"
-		return
-		;;
-	esac
-
-	color_code="${colors[$log_type]}"
-	prefix="[${log_type}]"
-
-	# Print the colored message
-	echo -e "${csi}${color_code}${prefix}${reset} ${message}"
-	printf "%s%s%s%s %s\n" "$csi" "$color_code" "$prefix" "$reset" "$message"
+    local log_type="${1:-INFO}"
+    local message="${2:-}"
+    
+    # Guard against empty messages
+    [[ -z "$message" ]] && return 0
+    
+    # Zsh associative array for colors
+    local -A colors=(
+        [SUCCESS]="\e[38;5;10m" # Green
+        [ERROR]="\e[38;5;9m"    # Red
+        [WARNING]="\e[38;5;3m"  # Yellow/Orange
+        [INFO]="\e[38;5;14m"    # Cyan
+        [PROFILE]="\e[38;5;13m" # Magenta
+    )
+    local reset="\e[0m"
+    
+    case "$log_type" in
+        ERROR|WARNING|PROFILE)
+            # Always print
+            ;;
+        SUCCESS|INFO)
+            # Only print if DEBUG_MODE is explicitly "true"
+            [[ "${DEBUG_MODE:-}" == "true" ]] || return 0
+            ;;
+        *)
+            # Unknown type defaults to WARNING
+            log_type="WARNING"
+            ;;
+    esac
+    
+    local color_code="${colors[$log_type]}"
+    local prefix="[${log_type}]"
+    
+    printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
 }
 
 # Check if DEBUG_MODE is set, if not, set it to false
@@ -304,7 +294,7 @@ fi
 
 # ruby
 print_header "rbenv"
-# FIXME: git clone https://github.com/rbenv/rbenv.git ~/.rbenv
+log_message SUCCESS "# FIXME: git clone https://github.com/rbenv/rbenv.git ~/.rbenv"
 eval "$(rbenv init - zsh)"
 
 # TODO: archlinux libsecret
