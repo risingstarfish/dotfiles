@@ -89,7 +89,7 @@ log_message() {
 	printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
 }
 
-print_title "Local Files"
+print_header "Local Files"
 LOCAL_DIR="$HOME/.local"
 if [[ -f "$LOCAL_DIR/.zshrc" ]]; then
 	source "$LOCAL_DIR/.zshrc"

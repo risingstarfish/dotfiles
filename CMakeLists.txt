@@ -88,7 +88,7 @@ add_library(dotfiles::dotfiles ALIAS dotfiles)
 
 set(DOTFILES_LIBRARIES dotfiles)
 #FIXME:
-link_libraries(PRIVATE simdjson::simdjson)
+target_link_libraries(dotfiles PRIVATE simdjson::simdjson)
 
 # Enable precompiled headers for faster builds
 set(DOTFILES_PRECOMPILE_HEADERS
@@ -158,7 +158,7 @@ if(DOTFILES_INSTALL)
     include(GNUInstallDirs)
 
     install(
-        TARGETS dotfiles
+        TARGETS dotfiles simdjson
         EXPORT dotfilesTargets
         RUNTIME COMPONENT dotfiles_Runtime
         LIBRARY COMPONENT dotfiles_Runtime NAMELINK_COMPONENT dotfiles_Development
