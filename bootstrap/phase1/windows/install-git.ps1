@@ -3,7 +3,7 @@
 
 $InstallerUrl = "https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.1/Git-2.47.0-64-bit.exe"
 $InstallerPath = "$env:TEMP\GitInstaller.exe"
-$InstallDir    = "$env:PROFILE\opt\Git"
+$InstallDir    = "$env:USERPROFILE\opt\Git"
 
 # === 1. DOWNLOAD (if not cached) ===
 if (-not (Test-Path $InstallerPath)) {
