@@ -89,10 +89,10 @@ log_message() {
 	printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
 }
 
-print_header "Local Files"
-LOCAL_DIR="$HOME/.local"
-if [[ -f "$LOCAL_DIR/.zshrc" ]]; then
-	source "$LOCAL_DIR/.zshrc"
+print_header "Local .zshrc"
+LOCAL_ZSH="$HOME/.zshrc.local"
+if [[ -f "$LOCAL_ZSH" ]]; then
+	source "$LOCAL_ZSH/.zshrc"
 
 	if [[ "$DEBUG_MODE" == true ]]; then
 		print_title "START DEBUG MODE"
@@ -100,9 +100,9 @@ if [[ -f "$LOCAL_DIR/.zshrc" ]]; then
 		DEBUG_MODE=false
 	fi
 
-	log_message SUCCESS "Found $LOCAL_DIR/.zshrc"
+	log_message SUCCESS "Found $LOCAL_ZSH"
 else
-	printf "No %s file detected.\n" "$LOCAL_DIR/.zshrc"
+	printf "No %s file detected.\n" "$LOCAL_ZSH"
 	printf "Something went wrong!\n"
 	# https://unix.stackexchange.com/questions/579104/start-interactive-zsh-without-running-any-configuration-files-like-zshrc
 	zsh -d -f -i
