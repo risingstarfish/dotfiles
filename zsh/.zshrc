@@ -92,7 +92,7 @@ log_message() {
 print_header "Local .zshrc"
 LOCAL_ZSH="$HOME/.zshrc.local"
 if [[ -f "$LOCAL_ZSH" ]]; then
-	source "$LOCAL_ZSH/.zshrc"
+	source "$LOCAL_ZSH"
 
 	if [[ "$DEBUG_MODE" == true ]]; then
 		print_title "START DEBUG MODE"
