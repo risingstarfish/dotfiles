@@ -1,4 +1,5 @@
 {
+  "version": 1.0,
   "repository": "https://github.com/risingstarfish/dotfiles.git",
   "dependencies": [
     {
