@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
 
+################### 
+# functions
+
+prompt_continue() {
+    local prompt_message="${1:-Do you want to continue? (y/n): }"
+    
+    while true; do
+        read -p "$prompt_message" choice
+        case "$choice" in 
+            [Yy]* ) 
+                break 
+                ;;
+            [Nn]* ) 
+                printf "Exiting script...\n"
+                exit 1 
+                ;;
+            * ) 
+                printf "Please answer yes (y) or no (n).\n" 
+                ;;
+        esac
+    done
+}
+
+
 # Get the absolute directory path of this script
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR" || exit 1
@@ -11,7 +35,6 @@ else
 	# validate input and check for help flag
 	source "$DIR/usage.sh" "$(basename "$0")" "$@"
 fi
-
 
 printf "Pulling latest changes from git..."
 git pull origin main || printf "\033[33mWarning: Git pull failed, continuing with local files.\033[0m"
@@ -113,4 +136,4 @@ fi
 
 source "$DIR/mode.sh" "$@"
 
-printf "\n\033[32mInstall complete!\033[0m Run '\033[36mexec zsh\033[0m' or restart your terminal to apply.\n"
+printf "\n\033[32mInstall complete!\033[0m Run \033[36m'exec zsh'\033[0m or restart your terminal to apply.\n"

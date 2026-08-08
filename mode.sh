@@ -9,10 +9,10 @@ cd "$DIR" || exit 1
 source "$DIR/usage.sh" "$(basename "$0")" "$@"
 
 # Set default path if not already provided by an external script
-LOCAL_ZSH="$HOME/.local/.zshrc"
+LOCAL_ZSH="$HOME/.zshrc.local"
 if [[ ! -f "$LOCAL_ZSH" ]]; then
-	printf "\033[31m[ERROR]\033[0m $HOME/.local/.zshrc could not be found.\n"
-	printf "Run \033[36mbash install.sh\033[0m' first before attempting to change the mode/variables.\n"
+	printf "\033[31m[ERROR]\033[0m $LOCAL_ZSH could not be found.\n"
+	printf "Run \033[36m'bash install.sh'\033[0m first before attempting to change the mode/variables.\n"
 	exit 1
 fi
 
