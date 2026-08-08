@@ -1,2 +1,0 @@
-include("${CMAKE_CURRENT_LIST_DIR}/dotfilesTargets.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/dotfiles_staticTargets.cmake" OPTIONAL)
