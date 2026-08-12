@@ -21,7 +21,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 fi
 
 # llama and claude stuff
-export ANTHROPIC_BASE_URL="http://192.168.0.246:8080"
+export ANTHROPIC_BASE_URL="http://192.168.10.246:8080"
 export ANTHROPIC_MODEL="kvstorm1"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=0
 export DISABLE_TELEMETRY=0
