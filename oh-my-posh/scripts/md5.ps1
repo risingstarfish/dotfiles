@@ -1,0 +1,1 @@
+function sha256 { Get-FileHash -Algorithm MD5 $args }
