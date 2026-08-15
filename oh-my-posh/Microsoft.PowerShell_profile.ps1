@@ -15,5 +15,27 @@ if (-not $env:HOME) {
     $env:HOME = $env:USERPROFILE
 }
 
+# Import-Module syntax-highlighting
+Import-Module cd-extras
+Import-Module LocationHistory
+# Import-Module Terminal-Icons TODO: lazy load https://docs.jimbrig.com/NoClocksVaultNew/04-RESOURCES/Code/PowerShell/PowerShell---Lazy-Loading
+# Import-Module psfzf
+# Import-Module foil
+# Import-Module chocolateyget
+Import-Module PowerShellGet
+Import-Module 7zip4powershell
+Import-Module pspgp
+Import-Module PSReadLine
+# Import-Module posh-git #TODO: alias G
+
+
+$script:LazyModules = @{
+    'psfzf'         = @('fz', 'fzf', 'fzf-preview', 'fzf-ctrl-r', 'fzf-tab')
+    'Terminal-Icons'= @('Get-ChildItemIcon', 'Get-ItemIcon', 'Get-PSDriveIcon', 'Get-FileSystemItemIcon')
+}
+
+
+Invoke-Expression (& { (zoxide init powershell | Out-String) })
+
 # Keep last !!!
 oh-my-posh init pwsh --config ~/oh-my-posh/themes/tiger.omp.json | Invoke-Expression
