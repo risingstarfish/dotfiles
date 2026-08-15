@@ -105,5 +105,8 @@ function AutoCd() {
 $ExecutionContext.InvokeCommand.CommandNotFoundAction += AutoCd
 
 
+# Install-Module -Name cd-extras -RequiredVersion 2.9.4
+# Set-LocationEx Install-Module -Name LocationHistory
+
 # Keep last !!!
-oh-my-posh init pwsh --config ~/themes/tiger.omp.json | Invoke-Expressions
+oh-my-posh init pwsh --config ~/themes/tiger.omp.json | Invoke-Expression
