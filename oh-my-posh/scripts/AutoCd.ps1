@@ -1,7 +1,7 @@
 # Prerequisites
 # Install-Module -Name cd-extras -RequiredVersion 2.9.4
 # Set-LocationEx Install-Module -Name LocationHistory
-
+# https://www.powershellgallery.com/packages/cd-extras/2.8.0/content/private/autocd.ps1
 
 # Enable "autocd" behavior
 function AutoCd() {
