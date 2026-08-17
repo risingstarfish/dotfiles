@@ -1,0 +1,8 @@
+[user]
+	name = pierce katai
+	email = 169690632+risingstarfish@users.noreply.github.com
+	signingKey = FIXME:
+[gpg]
+    program = FIXME:
+[credential]
+    helper = FIXME:

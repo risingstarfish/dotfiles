@@ -1,0 +1,5 @@
+#!/usr/bin/env zsh
+
+# --- Local Environment Overrides ---
+#ENABLE_PROFILING=true  # Enable profiling to analyze performance
+#DEBUG_MODE=true        # Only prints PROFILE, ERROR, and WARNING messages if not set

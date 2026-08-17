@@ -1,28 +1,27 @@
 #!/usr/bin/env bash
 
-################### 
+###################
 # functions
 
 prompt_continue() {
-    local prompt_message="${1:-Do you want to continue? (y/n): }"
-    
-    while true; do
-        read -p "$prompt_message" choice
-        case "$choice" in 
-            [Yy]* ) 
-                break 
-                ;;
-            [Nn]* ) 
-                printf "Exiting script...\n"
-                exit 1 
-                ;;
-            * ) 
-                printf "Please answer yes (y) or no (n).\n" 
-                ;;
-        esac
-    done
-}
+	local prompt_message="${1:-Do you want to continue? (y/n): }"
 
+	while true; do
+		read -p "$prompt_message" choice
+		case "$choice" in
+		[Yy]*)
+			break
+			;;
+		[Nn]*)
+			printf "Exiting script...\n"
+			exit 1
+			;;
+		*)
+			printf "Please answer yes (y) or no (n).\n"
+			;;
+		esac
+	done
+}
 
 # Get the absolute directory path of this script
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -132,6 +131,32 @@ EOF
 else
 	printf "\n~/.zshrc.local already exists. Verifying...\n"
 	printf "# TODO: ensure all default values present\n"
+fi
+
+# FIXME: function
+LOCAL_GIT="$HOME/.gitconfig.local"
+if [[ ! -f "$LOCAL_GIT" ]]; then
+	printf "\nCreating default ~/.gitconfig.local...\n"
+	cat <<'EOF' >"$LOCAL_GIT"
+# --- Local Git Configuration Overrides ---
+[user]
+	name = pierce katai
+	email = 169690632+risingstarfish@users.noreply.github.com
+	signingKey = FIXME:
+[gpg]
+    program = FIXME:
+[credential]
+    helper = FIXME:
+EOF
+else
+	printf "\n~/.gitconfig.local already exists. Verifying...\n"
+	printf "# TODO: ensure all default values present\n"
+fi
+
+if grep -q "FIXME:" "$LOCAL_GIT"; then
+	printf "\n\033[33m[ACTION REQUIRED]\033[0m Your ~/.gitconfig.local contains unresolved 'FIXME:' tags.\n"
+	printf "You must configure your GPG key, program, and credential helper before committing.\n"
+	printf "Run: \033[36mnano %s\033[0m to fix them.\n" "$LOCAL_GIT"
 fi
 
 source "$DIR/mode.sh" "$@"
