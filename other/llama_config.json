@@ -1,0 +1,155 @@
+{
+  "version": 1.0,
+  "global": {
+    "args": {
+      "--ngl": 999,
+      "--host": "192.168.10.240",
+      "--cors-origins": "http://localhost,http://192.168.10.240",
+      "--cors-credentials": true,
+      "--flash-attn": "on",
+      "--jinja": true,
+      "--cont-batching": true,
+      "--metrics": true,
+      "--cache-prompt": true,
+      "-np": 1
+    }
+  },
+  "models": {
+    "qwen3-coder-next": {
+      "model": "${DEVELOPER}/llamacpp/models/Qwen3-Coder-Next-UD-Q4_K_XL.gguf",
+      "alias": "qwen3-coder",
+      "ctx-size": 131072,
+      "presets": {
+        "base": {
+          "description": "Base",
+          "args": {
+            "--temp": 1.0,
+            "--top-p": 0.95,
+            "--top-k": 40,
+            "--min-p": 0.01,
+            "--repeat-penalty": 0.0
+          }
+        }
+      }
+    },
+    "qwen2.5-coder": {
+      "model": "${DEVELOPER}/llamacpp/models/Qwen2.5-Coder-3B-Q8_0.gguf",
+      "alias": "qwen25-coder",
+      "ctx-size": 32768,
+      "presets": {
+        "base": {
+          "description": "Base",
+          "args": {
+            "--temp": 1.0,
+            "--top-p": 0.95,
+            "--top-k": 40,
+            "--min-p": 0.01,
+            "--repeat-penalty": 0.0
+          }
+        }
+      }
+    },
+    "qwen3.8-35b": {
+      "model": "${AI_MODELS}/Qwen3.8-27B-UD-Q6_K_XL.gguf",
+      "alias": "qwen38",
+      "ctx-size": 131072,
+      "presets": {
+        "base": {
+          "description": "Base",
+          "args": {
+            "--top-k": 20,
+            "--min-p": 0.0,
+            "--repeat-penalty": 1.0
+          }
+        },
+        "thinking": {
+          "inherits": "base",
+          "description": "Thinking",
+          "args": {
+            "--temp": 1.0,
+            "--top-p": 0.95,
+            "--presence-penalty": 0.0
+          }
+        },
+        "instruct": {
+          "inherits": "base",
+          "description": "Instruct (Non-Thinking)",
+          "args": {
+            "--temp": 0.7,
+            "--top-p": 0.8,
+            "--presence-penalty": 1.5
+          }
+        }
+      }
+    },
+    "qwen3.6-35b-mtp": {
+      "model": "${DEVELOPER}/llamacpp/models/Qwen3.6-35B-A3B-UD-Q4_K_XL.mtp.gguf",
+      "alias": "qwen36-mtp",
+      "ctx-size": 131072,
+      "args": {
+        "--spec-type": "draft-mtp",
+        "--spec-draft-n-max": 2
+      },
+      "presets": {
+        "thinking-base": {
+          "description": "Base Thinking",
+          "args": {
+            "--top-p": 0.95,
+            "--top-k": 20,
+            "--min-p": 0.0,
+            "--presence-penalty": 0.0,
+            "--repeat-penalty": 0.0
+          }
+        },
+        "thinking-precise": {
+          "inherits": "thinking-base",
+          "description": "Thinking (Precise Coding)",
+          "args": {
+            "--temp": 0.6
+          }
+        },
+        "thinking-general": {
+          "inherits": "thinking-base",
+          "description": "Thinking (General Tasks)",
+          "args": {
+            "--temp": 1.0
+          }
+        },
+        "instruct-general": {
+          "description": "Instruct (General Tasks)",
+          "args": {
+            "--temp": 0.7,
+            "--top-p": 0.8,
+            "--top-k": 20,
+            "--min-p": 0.0,
+            "--presence-penalty": 1.5,
+            "--repeat-penalty": 0.0,
+            "--chat-template-kwargs": "'{\"enable_thinking\":false}'"
+          }
+        }
+      }
+    }
+  },
+  "sessions": {
+    "main": {
+      "description": "Large code refactoring",
+      "model": "qwen3-coder-next",
+      "preset": "base",
+      "env": {
+        "CUDA_VISIBLE_DEVICES": "0,1"
+      },
+      "args": {
+        "--port": "8080",
+        "--split-mode": "tensor"
+      }
+    },
+    "completions": {
+      "description": "Code completions",
+      "model": "qwen2.5-coder",
+      "preset": "base",
+      "args": {
+        "--port": "8082"
+      }
+    }
+  }
+}

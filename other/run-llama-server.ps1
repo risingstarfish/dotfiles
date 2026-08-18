@@ -1,7 +1,6 @@
 # --- Parameter Definition ---
 param(
-    [int]$NgL = 99, 
-    [float]$RepeatPenalty = 1.00 # (default: 1.00, 1.0 = disabled)
+    [int]$NgL = 999 
 )
 
 
@@ -9,31 +8,9 @@ param(
 $MODEL_FILENAME = "MTP/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
 $AI_MODELS_PATH = $env:AI_MODELS
 $MODEL_PATH = Join-Path $AI_MODELS_PATH $MODEL_FILENAME
-$CONTEXT_SIZE = 262144  # Max 262144
-$MAX_MODE_ATTEMPTS = 5 # Max attempts for mode selection
-
-# Function to validate NGL (GPU Layers)
-function Validate-GpuLayers {
-    param([int]$Value)
-
-    # Check for negative value: Red Error + Exit
-    if ($Value -lt 0) {
-        Write-Host "ERROR: GPU Layers cannot be negative. Value ($Value) is invalid." -ForegroundColor Red
-        Write-Host "Exiting script." -ForegroundColor Red
-        exit 1
-    }
-
-    # Check for value > 99: Warning + Cap at 99 + Newline
-    if ($Value -gt 99) {
-        Write-Warning "Value ($Value) exceeds max layers (99). Setting to 99.\n"
-        return 99
-    }
-
-    return $Value
-}
-
-$NgL = Validate-GpuLayers -Value $NgL
-
+$CONTEXT_SIZE = 262144 
+$MAX_MODE_ATTEMPTS = 5 
+llama-server --cors-origins http://localhost,http://192.168.10.240,http://192.168.0.197 --cors-credentials --host 192.168.10.240,192.168.0.197 --port 8080 --alias kvstorm1 --min-p 0 --model ~/Downloads/MTP/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --ctx-size 262144 --jinja --flash-attn on -np 1 --spec-type draft-mtp --spec-draft-n-max 2 --cont-batching --metrics --cache-prompt --gpu-layers 999 --repeat-penalty 0 --temp 0.6 --top-p 0.95 --top-k 20 --presence-penalty 0 \
 # --- Helper Functions ---
 
 function Get-BaseArgs {
@@ -50,9 +27,9 @@ function Get-BaseArgs {
     }
     
     return @(
-        "--cors-origins", "http://localhost,http://192.168.0.246",
+        "--cors-origins", "http://localhost,http://192.168.10.246",
         "--cors-credentials",
-        "--host", "192.168.0.246",
+        "--host", "192.168.10.246",
         "--port", "8080",
         "--alias", "kvstorm1",
         "--min-p", "0",
