@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+# https://github.com/airiclenz/llama-launcher
 
 llama-server \
   --host 0.0.0.0 \

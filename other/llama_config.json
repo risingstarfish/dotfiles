@@ -1,5 +1,31 @@
 {
   "version": 1.0,
+  // ──────────────────────────────────────────────────────────────
+  // Paths
+  // ──────────────────────────────────────────────────────────────
+
+  // Base directory for model files (llamacpp only - LM-Studio supports
+  // re-loating it's models folder so LLaMA.cpp can share it).
+  // Profile model paths are resolved relative to this directory
+  // unless they are absolute. Supports ~ expansion.
+  "models_dir": "~/opt/llamacpp/models",
+  // Directory for server log files.
+  "log_dir": "~/.config/llama-launcher/logs",
+
+  // ──────────────────────────────────────────────────────────────
+  // Loader / Launcher behaviour
+  // ──────────────────────────────────────────────────────────────
+
+  // Automatically stop the old server when switching to a different backend (default: true).
+  // Set to false to allow multiple servers to run simultaneously.
+  "auto_stop_server": true,
+  // Automatically unload the current model when loading a different one on the same
+  // server (default: true). Set to false to keep multiple models loaded at once.
+  "auto_unload": true,
+
+  // Automatically delete log files older than N days on server start.
+  // Logs of running servers are never deleted. 0 or unset disables cleanup.
+  "log_retention": 0,
   "global": {
     "args": {
       "--ngl": 999,
