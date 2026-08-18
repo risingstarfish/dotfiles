@@ -26,8 +26,7 @@
             "--temp": 1.0,
             "--top-p": 0.95,
             "--top-k": 40,
-            "--min-p": 0.01,
-            "--repeat-penalty": 0.0
+            "--min-p": 0.01
           }
         }
       }
@@ -43,8 +42,7 @@
             "--temp": 1.0,
             "--top-p": 0.95,
             "--top-k": 40,
-            "--min-p": 0.01,
-            "--repeat-penalty": 0.0
+            "--min-p": 0.01
           }
         }
       }
@@ -97,8 +95,7 @@
             "--top-p": 0.95,
             "--top-k": 20,
             "--min-p": 0.0,
-            "--presence-penalty": 0.0,
-            "--repeat-penalty": 0.0
+            "--presence-penalty": 0.0
           }
         },
         "thinking-precise": {
@@ -123,7 +120,6 @@
             "--top-k": 20,
             "--min-p": 0.0,
             "--presence-penalty": 1.5,
-            "--repeat-penalty": 0.0,
             "--chat-template-kwargs": "'{\"enable_thinking\":false}'"
           }
         }

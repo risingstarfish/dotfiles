@@ -10,7 +10,6 @@ $AI_MODELS_PATH = $env:AI_MODELS
 $MODEL_PATH = Join-Path $AI_MODELS_PATH $MODEL_FILENAME
 $CONTEXT_SIZE = 262144 
 $MAX_MODE_ATTEMPTS = 5 
-llama-server --cors-origins http://localhost,http://192.168.10.240,http://192.168.0.197 --cors-credentials --host 192.168.10.240,192.168.0.197 --port 8080 --alias kvstorm1 --min-p 0 --model ~/Downloads/MTP/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf --ctx-size 262144 --jinja --flash-attn on -np 1 --spec-type draft-mtp --spec-draft-n-max 2 --cont-batching --metrics --cache-prompt --gpu-layers 999 --repeat-penalty 0 --temp 0.6 --top-p 0.95 --top-k 20 --presence-penalty 0 \
 # --- Helper Functions ---
 
 function Get-BaseArgs {
