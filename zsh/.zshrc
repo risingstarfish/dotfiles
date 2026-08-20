@@ -89,7 +89,7 @@ log_message() {
 	printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
 }
 
-print_header "Local .zshrc"
+print_header "Local zshrc"
 LOCAL_ZSH="$HOME/.zshrc.local"
 if [[ -f "$LOCAL_ZSH" ]]; then
 	source "$LOCAL_ZSH"
@@ -102,8 +102,9 @@ if [[ -f "$LOCAL_ZSH" ]]; then
 
 	log_message SUCCESS "Found $LOCAL_ZSH"
 else
-	printf "No %s file detected.\n" "$LOCAL_ZSH"
 	printf "Something went wrong!\n"
+	printf "No %s file detected.\n" "$LOCAL_ZSH"
+	printf "Make sure to run \033[36m'bash install.sh'\033[0m\n"
 	# https://unix.stackexchange.com/questions/579104/start-interactive-zsh-without-running-any-configuration-files-like-zshrc
 	zsh -d -f -i
 	exit 0
@@ -125,6 +126,20 @@ if [[ -f "$HOME/.paths" ]]; then
 else
 	log_message ERROR "Unable to find $HOME/.paths.\nSome functionality may not work properly."
 fi
+
+print_header "Local gitconfig"
+LOCAL_GIT="$HOME/.gitconfig.local"
+if [[ ! -f "$LOCAL_GIT" ]]; then
+	log_message ERROR "Unable to find $HOME/.gitconfig.local.\nEnsure you have ran 'bash install.sh'."
+else
+	log_message SUCCESS "~/.gitconfig.local already exists. Verifying..."
+	if grep -q "FIXME:" "$LOCAL_GIT"; then
+		log_message ERROR "\nYour ~/.gitconfig.local contains unresolved 'FIXME:' tags.\n"\
+		"You must configure your GPG key, program, and credential helper before committing.\n"\
+		"Run: \033[36m${EDITOR:-${VISUAL:-nano}} %s\033[0m to fix them.\n" "$LOCAL_GIT"
+	fi
+fi
+
 
 print_header "Local paths"
 if [[ -f "$HOME/.paths.local" ]]; then
@@ -150,7 +165,8 @@ if [[ -z "$LS_COLORS" ]]; then
 		log_message WARNING "'gdircolors' and 'dircolors' commands not found. LS_COLORS is not set."
 	fi
 else
-	log_message INFO "LS_COLORS is already set, skipping generation."
+	log_message SUCCESS "LS_COLORS is already set."
+	log_message INFO "Skipping generation..."
 fi
 
 # Source environment variables

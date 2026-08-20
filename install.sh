@@ -149,14 +149,7 @@ if [[ ! -f "$LOCAL_GIT" ]]; then
     helper = FIXME:
 EOF
 else
-	printf "\n~/.gitconfig.local already exists. Verifying...\n"
-	printf "# TODO: ensure all default values present\n"
-fi
-
-if grep -q "FIXME:" "$LOCAL_GIT"; then
-	printf "\n\033[33m[ACTION REQUIRED]\033[0m Your ~/.gitconfig.local contains unresolved 'FIXME:' tags.\n"
-	printf "You must configure your GPG key, program, and credential helper before committing.\n"
-	printf "Run: \033[36mnano %s\033[0m to fix them.\n" "$LOCAL_GIT"
+	printf "\n~/.gitconfig.local already exists...\n"
 fi
 
 source "$DIR/mode.sh" "$@"
