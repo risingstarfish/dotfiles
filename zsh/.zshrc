@@ -133,9 +133,9 @@ if [[ ! -f "$LOCAL_GIT" ]]; then
 else
 	log_message SUCCESS "~/.gitconfig.local already exists. Verifying..."
 	if grep -q "FIXME:" "$LOCAL_GIT"; then
-		log_message ERROR "Your ~/.gitconfig.local contains unresolved 'FIXME:' tags.\n\
-		 				   You must configure your GPG key, program, and credential helper before committing.\n\
-		 				   Run: \033[36m${EDITOR:-${VISUAL:-nano}} %s\033[0m to fix them.\n" "$LOCAL_GIT"
+		log_message ERROR "Your ~/.gitconfig.local contains unresolved 'FIXME:' tags.
+		You must configure your GPG key, program, and credential helper before committing.
+		Run: \033[36m${EDITOR:-${VISUAL:-nano}} %s\033[0m to fix them.\n" "$LOCAL_GIT"
 	fi
 fi
 
