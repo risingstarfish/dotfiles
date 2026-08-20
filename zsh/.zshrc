@@ -86,7 +86,7 @@ log_message() {
 	local color_code="${colors[$log_type]}"
 	local prefix="[${log_type}]"
 
-	printf '%b %s\n' "${color_code}${prefix}${reset}" "$message"
+	printf '%b %b\n' "${color_code}${prefix}${reset}" "$message"
 }
 
 print_header "Local zshrc"
@@ -133,9 +133,9 @@ if [[ ! -f "$LOCAL_GIT" ]]; then
 else
 	log_message SUCCESS "~/.gitconfig.local already exists. Verifying..."
 	if grep -q "FIXME:" "$LOCAL_GIT"; then
-		log_message ERROR "Your ~/.gitconfig.local contains unresolved 'FIXME:' tags.
-		You must configure your GPG key, program, and credential helper before committing.
-		Run: \033[36m${EDITOR:-${VISUAL:-nano}} %s\033[0m to fix them.\n" "$LOCAL_GIT"
+		log_message ERROR "Your ~/.gitconfig.local contains unresolved 'FIXME:' tags."
+		log_message ERROR "You must configure your GPG key, program, and credential helper before committing."
+		log_message ERROR "Run: \033[36m${EDITOR:-${VISUAL:-nano}} ${LOCAL_GIT}\033[0m to fix them.\n"
 	fi
 fi
 
