@@ -7,6 +7,8 @@
 	signingKey = ~/.ssh/id_ed25519_github_sign.pub
 [gpg]
     format = ssh
+[gpg "ssh"]
+	allowedSignersFile = ~/.ssh/allowed_signers
 [core]
 	editor = code -n --wait
 	excludesfile = ~/.gitignore
