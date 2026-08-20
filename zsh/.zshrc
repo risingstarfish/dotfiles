@@ -109,6 +109,28 @@ else
 	exit 0
 fi
 
+print_header "User gitconfig"
+GIT_CONFIG="$HOME/.gitconfig"
+if [[ ! -f "$GIT_CONFIG" ]]; then
+	log_message ERROR "Unable to find $HOME/.gitconfig.\nEnsure you have run \033[36m'bash install.sh'\033[0m."
+	
+	LOCAL_GIT="$HOME/.gitconfig.local"
+	if [[ -f "$LOCAL_GIT" ]]; then
+		log_message INFO "Found $LOCAL_GIT!"
+	else
+		log_message INFO "Could not find $LOCAL_GIT! Creating empty file..."
+		touch "$LOCAL_GIT"
+	fi
+else
+	log_message SUCCESS "~/.gitconfig already exists. Verifying..."
+	if grep -q "FIXME:" "$GIT_CONFIG"; then
+		log_message ERROR "Your ~/.gitconfig contains unresolved 'FIXME:' tags."
+		log_message ERROR "You must configure your credential helper before committing."
+		log_message ERROR "Run: \033[36m'${EDITOR:-${VISUAL:-nano}} ${GIT_CONFIG}'\033[0m to fix them."
+		log_message ERROR "If you already have, you need to manually edit the file."
+	fi
+fi
+
 # NOTE: keep here
 print_header "Exports"
 if [[ -f "$HOME/.exports" ]]; then
@@ -125,20 +147,6 @@ if [[ -f "$HOME/.paths" ]]; then
 else
 	log_message ERROR "Unable to find $HOME/.paths.\nSome functionality may not work properly."
 fi
-
-print_header "Local gitconfig"
-LOCAL_GIT="$HOME/.gitconfig.local"
-if [[ ! -f "$LOCAL_GIT" ]]; then
-	log_message ERROR "Unable to find $HOME/.gitconfig.local.\nEnsure you have ran 'bash install.sh'."
-else
-	log_message SUCCESS "~/.gitconfig.local already exists. Verifying..."
-	if grep -q "FIXME:" "$LOCAL_GIT"; then
-		log_message ERROR "Your ~/.gitconfig.local contains unresolved 'FIXME:' tags."
-		log_message ERROR "You must configure your GPG key, program, and credential helper before committing."
-		log_message ERROR "Run: \033[36m${EDITOR:-${VISUAL:-nano}} ${LOCAL_GIT}\033[0m to fix them.\n"
-	fi
-fi
-
 
 print_header "Local paths"
 if [[ -f "$HOME/.paths.local" ]]; then

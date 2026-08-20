@@ -83,6 +83,14 @@ if [ ! -d "$ZSH_DIR" ]; then
 	exit 1
 fi
 
+# template
+TEMPLATE_DIR="$DIR/template"
+if [ ! -d "$TEMPLATE_DIR" ]; then
+	printf "\033[31m[ERROR]\033[0m template directory not found: %s\n" "$TEMPLATE_DIR"
+	printf "Exiting...\n"
+	exit 1
+fi
+
 printf "\nInstalling config files...\n"
 # NOTE: keep BARE_FILES first
 for file in "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*; do
@@ -119,37 +127,59 @@ fi
 
 # FIXME: function
 LOCAL_ZSH="$HOME/.zshrc.local"
-if [[ ! -f "$LOCAL_ZSH" ]]; then
-	printf "\nCreating default ~/.zshrc.local...\n"
-	cat <<'EOF' >"$LOCAL_ZSH"
-#!/usr/bin/env zsh
-
-# --- Local Environment Overrides ---
-#ENABLE_PROFILING=true  # Enable profiling to analyze performance
-#DEBUG_MODE=true        # Only prints PROFILE, ERROR, and WARNING messages if not set
-EOF
+ZSH_TEMPLATE="./zshrc.local.template"
+if [[ -f "$LOCAL_ZSH" ]]; then
+    printf "$HOME/.zshrc.local already exists. Verifying...\n"
+    printf "TODO: ensure all default values present.\n"
 else
-	printf "\n~/.zshrc.local already exists. Verifying...\n"
-	printf "# TODO: ensure all default values present\n"
+    printf "Could not find ${LOCAL_ZSH}! Creating from template...\n"
+    
+    if [[ -f "$ZSH_TEMPLATE" ]]; then
+        cp "$ZSH_TEMPLATE" "$LOCAL_ZSH"
+    else
+        printf "Template file $ZSH_TEMPLATE not found!\n"
+    fi
 fi
 
 # FIXME: function
-LOCAL_GIT="$HOME/.gitconfig.local"
-if [[ ! -f "$LOCAL_GIT" ]]; then
-	printf "\nCreating default ~/.gitconfig.local...\n"
-	cat <<'EOF' >"$LOCAL_GIT"
-# --- Local Git Configuration Overrides ---
-[user]
-	name = pierce katai
-	email = 169690632+risingstarfish@users.noreply.github.com
-	signingKey = FIXME:
-[gpg]
-    program = FIXME:
-[credential]
-    helper = FIXME:
-EOF
+GIT_CONFIG="$HOME/.gitconfig"
+GIT_CONFIG_TEMPLATE="$TEMPLATE_DIR/gitconfig.template"
+if [[ ! -f "$GIT_CONFIG" ]]; then
+	printf "\nCreating default ~/.gitconfig...\n"
+	# FIXME: check if installed
+	cred_helper=""
+
+	if [[ "$OS" == "Windows_NT" ]]; then
+        cred_helper="git-credential-manager.exe"
+	else
+		case "$(uname -s)" in
+			Darwin*)
+				cred_helper="osxkeychain"
+				;;
+			Linux*)
+				if uname -r | grep -qi "microsoft"; then
+					cred_helper="git-credential-manager.exe"
+				else
+					cred_helper="libsecret"
+				fi            ;;
+			CYGWIN*|MINGW*|MSYS*)
+				cred_helper="git-credential-manager.exe" 
+				;;
+			*)
+				# fallback
+				cred_helper="FIXME:" 
+				;;
+		esac
+	fi
+
+	if [[ ! -f "$GIT_CONFIG_TEMPLATE" ]]; then
+        printf "Template file $GIT_CONFIG_TEMPLATE not found!\nExiting..."
+        return 1
+    fi
+
+	sed "s/{{CRED_HELPER}}/$cred_helper/g" "$GIT_CONFIG_TEMPLATE" > "$GIT_CONFIG"
 else
-	printf "\n~/.gitconfig.local already exists...\n"
+	printf "\n~/.gitconfig already exists...\n"
 fi
 
 source "$DIR/mode.sh" "$@"

@@ -1,0 +1,92 @@
+# --- Git Configuration ---
+[include]
+    path = ~/.gitconfig.local
+[user]
+	name = pierce katai
+	email = 169690632+risingstarfish@users.noreply.github.com
+	signingKey = ~/.ssh/id_ed25519.pub
+[gpg]
+    format = ssh
+[credential]
+    helper = {{CRED_HELPER}}
+[core]
+	editor = code -n --wait
+	excludesfile = ~/.gitignore
+	autocrlf = input
+	pager = diff-so-fancy | less --tabs=4 -RF
+	compression = 9
+	preloadIndex = true
+	whitespace = space-before-tab,trailing-space
+[commit]
+	gpgsign = true
+	verbose = true
+[status]
+	showUntrackedFiles = no
+	branch = true
+[init]
+	defaultBranch = main
+[pull]
+	rebase = true
+	ff = only
+[push]
+	autoSetupRemote = true
+	default = current
+	followTags = true
+[merge]
+	autoStash = true
+	ff = only
+	conflictStyle = zdiff3
+	summary = true
+	diffstat = true
+	log = 60
+	tool = code
+[mergetool "code"]
+	cmd = "code --wait --merge $REMOTE $LOCAL $BASE $MERGED"
+[color]
+	ui = 1
+[branch]
+	sort = -committerdate
+[alias]
+	root = rev-parse --show-toplevel
+[column]
+	ui = auto
+[tag]
+	sort = -version:refname
+[interactive]
+	diffFilter = diff-so-fancy --patch
+[diff]
+	algorithm = histogram
+	renames = copies
+	renameLimit = 2400
+	context = 5
+	tool = code
+[diff "code"]
+	cmd = "code --wait --diff $LOCAL $REMOTE"
+[maintenance]
+	auto = true
+	strategy = incremental
+[gc]
+	auto = 8000
+[pack]
+	threads = 0
+	depth = 20
+[rebase]
+	autoSquash = true
+	autoStash = true
+	missingCommitsCheck = error
+[rerere]
+	enabled = true
+	autoUpdate = true
+[log]
+	date = iso
+[transfer]
+	fsckObjects = true
+[fetch]
+	prune = true
+	pruneTags = true
+	fsckObjects = true
+[receive]
+	fsckObjects = true
+[help]
+	autoCorrect = 1
+# --- Do not edit above this line ---
