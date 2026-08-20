@@ -1,68 +1,86 @@
 #!/usr/bin/env bash
 # Toggle .zshrc.local environment overrides
 
-# define DIR if it has not been already set
-if [[ -z "${DIR:-}" ]]; then
-	DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || {
-		printf "\n\e[31m[ERROR]\e[0m Failed to resolve script directory. Exiting...\n"
-		exit 1
-	}
-	declare -r DIR
+if [[ -n "${__MODE_SH_INCLUDED__:-}" ]]; then
+	return 0
 fi
-
-cd "$DIR" || exit 1
-
-require_lib() {
-	local -r lib_name="$1"
-	local -r lib_path="$LIB_DIR/$lib_name"
-
-	if [[ ! -f "$lib_path" ]]; then
-		printf "\e[31m[ERROR]\e[0m Missing required dependency: %s is required by %s\n" "$lib_name" "$(basename "${BASH_SOURCE[1]}")" >&2
-		return 1
-	fi
-
-	# --- INCLUDE GUARD ---
-	# Determine a unique identifier function or variable for the library to check if it's loaded
-	case "$lib_name" in
-	log.sh)
-		# If log::error already exists, skip sourcing log.sh completely
-		declare -F log::error >/dev/null 2>&1 && return 0
-		;;
-	common.sh)
-		# If INVALID_TOKEN is already set, skip sourcing common.sh completely
-		[[ -n "${INVALID_TOKEN:-}" ]] && return 0
-		;;
-	filesystem.sh)
-		declare -F filesystem::symlink >/dev/null 2>&1 && return 0
-		;;
-	git.sh)
-		declare -F git::get_credential_helper >/dev/null 2>&1 && return 0
-		;;
-	template.sh)
-		declare -F template::install >/dev/null 2>&1 && return 0
-		;;
-	esac
-
-	source "$lib_path"
+readonly __MODE_SH_INCLUDED__=1
+###################
+# get the absolute directory path of this script
+# Source - https://stackoverflow.com/a/246128
+# Posted by dogbane, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-08-20, License - CC BY-SA 4.0
+get_script_dir() {
+	local SOURCE_PATH="${BASH_SOURCE[0]}"
+	local SYMLINK_DIR
+	local SCRIPT_DIR
+	# Resolve symlinks recursively
+	while [ -L "$SOURCE_PATH" ]; do
+		# Get symlink directory
+		SYMLINK_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" >/dev/null 2>&1 && pwd)"
+		# Resolve symlink target (relative or absolute)
+		SOURCE_PATH="$(readlink "$SOURCE_PATH")"
+		# Check if candidate path is relative or absolute
+		if [[ $SOURCE_PATH != /* ]]; then
+			# Candidate path is relative, resolve to full path
+			SOURCE_PATH=$SYMLINK_DIR/$SOURCE_PATH
+		fi
+	done
+	# Get final script directory path from fully resolved source path
+	SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" >/dev/null 2>&1 && pwd)"
+	# Return failure if the directory couldn't be resolved
+	[[ -z "$SCRIPT_DIR" ]] && return 1
+	printf "%s\n" "$SCRIPT_DIR"
 }
 
-require_lib "log.sh" || exit 1
-require_lib "common.sh" || exit 1
+if [[ -z "${ROOT_DIR:-}" ]]; then
+	ROOT_DIR="$(get_script_dir)" || {
+		printf "\n\e[31m[ERROR]\e[0m Failed to resolve script directory. Exiting...\n" >&2
+		exit 1
+	}
+	readonly ROOT_DIR
+fi
+
+unset -f get_script_dir
+
+cd "$ROOT_DIR" || {
+	printf "\e[31m[ERROR]\e[0m Failed to enter root directory: %s. Exiting...\n" "$ROOT_DIR" >&2
+	exit 1
+}
+###################
+# print banner
+if [[ -f "$ROOT_DIR/lib/banner.sh" ]]; then
+	source "$ROOT_DIR/lib/banner.sh"
+fi
+
+source "$ROOT_DIR/lib/bootstrap.sh" || {
+	printf "\n\e[31m[ERROR]\e[0m Failed to source bootstrap.sh. Exiting...\n" >&2
+	exit 1
+}
+
+source_deps "log.sh" || exit 1
+unset -f source_deps
 
 if [[ -z "${LOCAL_ZSH:-}" ]]; then
 	declare -r LOCAL_ZSH="$HOME/.zshrc.local"
 fi
 
 # validate input and check for help flag
-source "usage.sh" "$(basename "$0")" "$@"
+source "$ROOT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
+
+###############
+# main
+
+log::step "Validating environment"
 
 # Set default path if not already provided by an external script
 if [[ ! -f "$LOCAL_ZSH" ]]; then
 	log::error "$LOCAL_ZSH could not be found."
-	printf "Run \e[36m'bash install.sh'\e[0m first before attempting to change the mode/variables.\n"
+	printf "Run \e[36m'bash install.sh'\e[0m first before attempting to change the mode/variables.\n" >&2
 	exit 1
 fi
 
+log::success "Found local configuration: $LOCAL_ZSH"
 # Check if 'debug' was passed as the first argument
 ENABLE_DEBUG=false
 ENABLE_PROFILING=false
@@ -82,6 +100,8 @@ declare -a TOGGLES=(
 	"ENABLE_PROFILING:$ENABLE_PROFILING"
 )
 
+log::step "Applying configuration toggles"
+
 tmp_file=$(mktemp)
 cat "$LOCAL_ZSH" >"$tmp_file"
 
@@ -91,6 +111,7 @@ for toggle in "${TOGGLES[@]}"; do
 
 	old_content="$(cat "$tmp_file")"
 
+	echo ""
 	if [[ "$enabled" == true ]]; then
 		log::success "${var_name} enabled!"
 		# uncomment the line
@@ -110,7 +131,6 @@ for toggle in "${TOGGLES[@]}"; do
 		log::info "${var_name} was already in the requested state (no changes made)."
 	fi
 
-	# Clean up sed backup file if created
 	rm -f "${tmp_file}.bak"
 done
 

@@ -1,49 +1,83 @@
 #!/usr/bin/env bash
 
+if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
+	return 0
+fi
+readonly __INSTALL_SH_INCLUDED__=1
 ###################
 # get the absolute directory path of this script
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || {
-	printf "\n\e[31m[ERROR]\e[0m Failed to resolve script directory. Exiting...\n"
+# Source - https://stackoverflow.com/a/246128
+# Posted by dogbane, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-08-20, License - CC BY-SA 4.0
+get_script_dir() {
+	local SOURCE_PATH="${BASH_SOURCE[0]}"
+	local SYMLINK_DIR
+	local SCRIPT_DIR
+	# Resolve symlinks recursively
+	while [ -L "$SOURCE_PATH" ]; do
+		# Get symlink directory
+		SYMLINK_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" >/dev/null 2>&1 && pwd)"
+		# Resolve symlink target (relative or absolute)
+		SOURCE_PATH="$(readlink "$SOURCE_PATH")"
+		# Check if candidate path is relative or absolute
+		if [[ $SOURCE_PATH != /* ]]; then
+			# Candidate path is relative, resolve to full path
+			SOURCE_PATH=$SYMLINK_DIR/$SOURCE_PATH
+		fi
+	done
+	# Get final script directory path from fully resolved source path
+	SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" >/dev/null 2>&1 && pwd)"
+	# Return failure if the directory couldn't be resolved
+	[[ -z "$SCRIPT_DIR" ]] && return 1
+	printf "%s\n" "$SCRIPT_DIR"
+}
+
+ROOT_DIR="$(get_script_dir)" || {
+	printf "\n\e[31m[ERROR]\e[0m Failed to resolve script directory. Exiting...\n" >&2
+	exit 1
+}
+readonly ROOT_DIR
+
+unset -f get_script_dir
+
+cd "$ROOT_DIR" || {
+	printf "\e[31m[ERROR]\e[0m Failed to enter root directory: %s\n" "$ROOT_DIR" >&2
+	exit 1
+}
+###################
+# print banner
+if [[ -f "$ROOT_DIR/lib/banner.sh" ]]; then
+	source "$ROOT_DIR/lib/banner.sh"
+fi
+
+source "$ROOT_DIR/lib/bootstrap.sh" || {
+	printf "\n\e[31m[ERROR]\e[0m Failed to source bootstrap.sh. Exiting...\n" >&2
 	exit 1
 }
 
-declare -r DIR
-cd "$DIR" || exit 1
-
-declare -r -a LIBS=(
-	"log.sh"
-	"common.sh"
-	"filesystem.sh"
-	"git.sh"
-	"template.sh"
-)
-
-for lib in "${LIBS[@]}"; do
-	lib_path="$DIR/lib/$lib"
-	if [[ ! -f "$lib_path" ]]; then
-		printf "\e[31m[ERROR]\e[0m Required library missing: %s\n" "$lib" >&2
-		exit 1
-	fi
-	source "$lib_path"
-done
-
+source_deps "common.sh" "log.sh" "filesystem.sh" "git.sh" "template.sh" || exit 1
 ###################
 # initial checks
 # FIXME: move required checks here
 
+# validate input and check for help flag
+source "$ROOT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
+
 ###################
 # Main script
+printf '\n%b\n%b\n%b\n%b\n%b\n\n' \
+	'\e[36m╭───────────────────────────────────────────╮\e[0m' \
+	'\e[36m│                                           │\e[0m' \
+	'\e[36m│\e[0m           \e[1;36mSTARTING INSTALLATION\e[0m           \e[36m│\e[0m' \
+	'\e[36m│                                           │\e[0m' \
+	'\e[36m╰───────────────────────────────────────────╯\e[0m'
 
-filesystem::require_file "usage.sh" "Usage script" || {
-	log::error "You may need to RESET the git repo or create one yourself."
-	exit 1
-}
-# validate input and check for help flag
-source "usage.sh" "$(basename "$0")" "$@"
-
-log::info "Pulling latest changes from git..."
-git pull origin main || log::warning "Git pull failed, continuing with local files."
-
+log::step "Pulling latest changes from git..."
+if ! git_output=$(git pull origin main 2>&1); then
+	log::warning "Git pull failed, continuing with local files."
+	log::warning "Reason: $git_output"
+	common::prompt_continue
+fi
 # tell bash to include hidden files
 shopt -s dotglob
 
@@ -56,7 +90,7 @@ declare -a BARE_FILES=(".exports" ".paths" ".curlrc" ".wgetrc")
 declare -i missing_deps=0 # tracker
 
 echo ""
-log::info "Validating required files and directories..."
+log::step "Validating required files and directories"
 
 filesystem::require_directory "$GIT_DIR" "Git directory" || missing_deps=1
 filesystem::require_directory "$ZSH_DIR" "Zsh directory" || missing_deps=1
@@ -67,7 +101,7 @@ for file in "${BARE_FILES[@]}"; do
 done
 
 if ((missing_deps > 0)); then
-	echo ""
+	echo "" >&2
 	log::error "One or more required files or directories are missing."
 	log::error "Installation cannot proceed. Exiting..."
 	exit 1
@@ -75,12 +109,10 @@ fi
 
 log::success "All required files and directories are present."
 
-echo ""
-log::info "Symlinking config files..."
+log::step "Symlinking config files"
 filesystem::install_symlink "$HOME" "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*
 
-echo ""
-log::info "Setting up local configuration templates..."
+log::step "Setting up local configuration templates"
 
 declare -r LOCAL_ZSH="$HOME/.zshrc.local"
 declare -r ZSH_TEMPLATE="$TEMPLATE_DIR/.zshrc.template"
@@ -100,7 +132,7 @@ template::install "$LOCAL_GITCONFIG" "$GITCONFIG_TEMPLATE" "s/{{CRED_HELPER}}/$c
 template::validate "$LOCAL_GITCONFIG" "${INVALID_TOKEN}" || missing_deps=1
 
 if ((missing_deps > 0)); then
-	printf "\n"
+	printf "\n" >&2
 	log::error "One or more local configuration files are incomplete."
 	log::error "Please fix the unresolved tags mentioned above and run the script again."
 	exit 1
@@ -108,4 +140,10 @@ fi
 
 source "mode.sh" "$@"
 
-printf "\n\e[32mInstall complete!\e[0m Run \e[36m'exec zsh'\e[0m or restart your terminal to apply.\n"
+printf '\n%b\n%b\n%b\n%b\n%b\n%b\n\n' \
+	'\e[32m╭───────────────────────────────────────────╮\e[0m' \
+	'\e[32m│                                           │\e[0m' \
+	'\e[32m│\e[0m          \e[1;32mINSTALLATION COMPLETE!\e[0m           \e[32m│\e[0m' \
+	'\e[32m│                                           │\e[0m' \
+	'\e[32m│\e[0m  Run \e[1;36mexec zsh\e[0m to apply your changes.      \e[32m│\e[0m' \
+	'\e[32m╰───────────────────────────────────────────╯\e[0m'

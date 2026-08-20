@@ -1,10 +1,5 @@
-.vscode/
-build/
+!/lib/
 
-.clangd
 .cache/
-
-compile_commands.json
-
 
 configs/user.config.json

@@ -2,3 +2,6 @@ zshrc -> install
     p10k
     zim
     rbenv
+
+mix of ansi and 256
+reduce printf calls
