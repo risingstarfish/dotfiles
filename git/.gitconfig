@@ -1,5 +1,14 @@
+# --- Git Configuration ---
 [include]
     path = ~/.gitconfig.local
+[user]
+	name = pierce katai
+	email = 169690632+risingstarfish@users.noreply.github.com
+	signingKey = ~/.ssh/id_ed25519.pub
+[gpg]
+    format = ssh
+[credential]
+    helper = {{CRED_HELPER}}
 [core]
 	editor = code -n --wait
 	excludesfile = ~/.gitignore
