@@ -10,7 +10,7 @@
 [gpg "ssh"]
 	allowedSignersFile = ~/.ssh/allowed_signers
 [core]
-	editor = code -n --wait
+	editor = codium-insiders -n --wait
 	excludesfile = ~/.gitignore
 	autocrlf = input
 	pager = diff-so-fancy | less --tabs=4 -RF
@@ -39,9 +39,9 @@
 	summary = true
 	diffstat = true
 	log = 60
-	tool = code
-[mergetool "code"]
-	cmd = "code --wait --merge $REMOTE $LOCAL $BASE $MERGED"
+	tool = codium-insiders
+[mergetool "codium-insiders"]
+	cmd = "codium-insiders --wait --merge $REMOTE $LOCAL $BASE $MERGED"
 [color]
 	ui = 1
 [branch]
