@@ -32,8 +32,8 @@ for arg in "$@"; do
 		# continue
 		;;
 	*)
-		printf "\033[31m[ERROR]\033[0m Invalid parameter: %s\n" "$arg"
-		printf "Run 'bash %s --help' for valid options.\n" "$(basename "$0")"
+		printf "\e[31m[ERROR]\e[0m Invalid parameter: %s\n" "$arg"
+		printf "Run \e[36m'bash %s --help'\e[0m for valid options.\n" "$(basename "$0")"
 		exit 1
 		;;
 	esac

@@ -113,7 +113,7 @@ print_header "User gitconfig"
 GIT_CONFIG="$HOME/.gitconfig"
 if [[ ! -f "$GIT_CONFIG" ]]; then
 	log_message ERROR "Unable to find $HOME/.gitconfig.\nEnsure you have run \033[36m'bash install.sh'\033[0m."
-	
+
 	LOCAL_GIT="$HOME/.gitconfig.local"
 	if [[ -f "$LOCAL_GIT" ]]; then
 		log_message INFO "Found $LOCAL_GIT!"
@@ -122,13 +122,7 @@ if [[ ! -f "$GIT_CONFIG" ]]; then
 		touch "$LOCAL_GIT"
 	fi
 else
-	log_message SUCCESS "~/.gitconfig already exists. Verifying..."
-	if grep -q "FIXME:" "$GIT_CONFIG"; then
-		log_message ERROR "Your ~/.gitconfig contains unresolved 'FIXME:' tags."
-		log_message ERROR "You must configure your credential helper before committing."
-		log_message ERROR "Run: \033[36m'${EDITOR:-${VISUAL:-nano}} ${GIT_CONFIG}'\033[0m to fix them."
-		log_message ERROR "If you already have, you need to manually edit the file."
-	fi
+	log_message SUCCESS "~/.gitconfig already exists."
 fi
 
 # NOTE: keep here

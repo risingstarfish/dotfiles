@@ -1,18 +1,65 @@
 #!/usr/bin/env bash
 # Toggle .zshrc.local environment overrides
 
-# Get the absolute directory path of this script
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# define DIR if it has not been already set
+if [[ -z "${DIR:-}" ]]; then
+	DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" || {
+		printf "\n\e[31m[ERROR]\e[0m Failed to resolve script directory. Exiting...\n"
+		exit 1
+	}
+	declare -r DIR
+fi
+
 cd "$DIR" || exit 1
 
+require_lib() {
+	local -r lib_name="$1"
+	local -r lib_path="$LIB_DIR/$lib_name"
+
+	if [[ ! -f "$lib_path" ]]; then
+		printf "\e[31m[ERROR]\e[0m Missing required dependency: %s is required by %s\n" "$lib_name" "$(basename "${BASH_SOURCE[1]}")" >&2
+		return 1
+	fi
+
+	# --- INCLUDE GUARD ---
+	# Determine a unique identifier function or variable for the library to check if it's loaded
+	case "$lib_name" in
+	log.sh)
+		# If log::error already exists, skip sourcing log.sh completely
+		declare -F log::error >/dev/null 2>&1 && return 0
+		;;
+	common.sh)
+		# If INVALID_TOKEN is already set, skip sourcing common.sh completely
+		[[ -n "${INVALID_TOKEN:-}" ]] && return 0
+		;;
+	filesystem.sh)
+		declare -F filesystem::symlink >/dev/null 2>&1 && return 0
+		;;
+	git.sh)
+		declare -F git::get_credential_helper >/dev/null 2>&1 && return 0
+		;;
+	template.sh)
+		declare -F template::install >/dev/null 2>&1 && return 0
+		;;
+	esac
+
+	source "$lib_path"
+}
+
+require_lib "log.sh" || exit 1
+require_lib "common.sh" || exit 1
+
+if [[ -z "${LOCAL_ZSH:-}" ]]; then
+	declare -r LOCAL_ZSH="$HOME/.zshrc.local"
+fi
+
 # validate input and check for help flag
-source "$DIR/usage.sh" "$(basename "$0")" "$@"
+source "usage.sh" "$(basename "$0")" "$@"
 
 # Set default path if not already provided by an external script
-LOCAL_ZSH="$HOME/.zshrc.local"
 if [[ ! -f "$LOCAL_ZSH" ]]; then
-	printf "\033[31m[ERROR]\033[0m $LOCAL_ZSH could not be found.\n"
-	printf "Run \033[36m'bash install.sh'\033[0m first before attempting to change the mode/variables.\n"
+	log::error "$LOCAL_ZSH could not be found."
+	printf "Run \e[36m'bash install.sh'\e[0m first before attempting to change the mode/variables.\n"
 	exit 1
 fi
 
@@ -29,32 +76,42 @@ for arg in "$@"; do
 	fi
 done
 
-# --- Handle Local Overrides ---
-if [ ! "$ENABLE_DEBUG" = true ] && [ ! "$ENABLE_PROFILING" = true ]; then
-	printf "Local overrides disabled\n"
-fi
+# zsh toggles
+declare -a TOGGLES=(
+	"DEBUG_MODE:$ENABLE_DEBUG"
+	"ENABLE_PROFILING:$ENABLE_PROFILING"
+)
 
 tmp_file=$(mktemp)
 cat "$LOCAL_ZSH" >"$tmp_file"
 
-if [ "$ENABLE_DEBUG" = true ]; then
-	printf "\nDebug mode enabled!\n"
-	printf "\033[33mUncommenting DEBUG_MODE in ~/.zshrc.local...\033[0m\n"
-	# Removes '#' from the start of the line
-	sed 's/^# *DEBUG_MODE=true/DEBUG_MODE=true/' "$LOCAL_ZSH" >"$tmp_file"
-else
-	printf "\nDEBUG_MODE disabled locally.\n"
-	# Adds '#' to the start of the line
-	sed 's/^DEBUG_MODE=true/#DEBUG_MODE=true/' "$LOCAL_ZSH" >"$tmp_file"
-fi
+for toggle in "${TOGGLES[@]}"; do
+	var_name="${toggle%%:*}"
+	enabled="${toggle##*:}"
 
-if [ "$ENABLE_PROFILING" = true ]; then
-	printf "\nProfiling enabled!\n"
-	printf "\033[33mUncommenting ENABLE_PROFILING in ~/.zshrc.local...\033[0m\n"
-	sed 's/^# *ENABLE_PROFILING=true/ENABLE_PROFILING=true/' "$tmp_file" >"${tmp_file}.tmp" && mv "${tmp_file}.tmp" "$tmp_file"
-else
-	printf "\nENABLE_PROFILING disabled locally.\n"
-	sed 's/^ENABLE_PROFILING=true/#ENABLE_PROFILING=true/' "$tmp_file" >"${tmp_file}.tmp" && mv "${tmp_file}.tmp" "$tmp_file"
-fi
+	old_content="$(cat "$tmp_file")"
+
+	if [[ "$enabled" == true ]]; then
+		log::success "${var_name} enabled!"
+		# uncomment the line
+		sed -i.bak "s/^# *${var_name}=true/${var_name}=true/" "$tmp_file"
+	else
+		log::info "${var_name} disabled locally."
+		# comment out the line
+		sed -i.bak "s/^${var_name}=true/#${var_name}=true/" "$tmp_file"
+	fi
+
+	new_content="$(cat "$tmp_file")"
+
+	# Check if sed actually changed anything
+	if [[ "$old_content" != "$new_content" ]]; then
+		log::success "${var_name} successfully updated."
+	else
+		log::info "${var_name} was already in the requested state (no changes made)."
+	fi
+
+	# Clean up sed backup file if created
+	rm -f "${tmp_file}.bak"
+done
 
 mv "$tmp_file" "$LOCAL_ZSH"
