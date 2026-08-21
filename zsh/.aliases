@@ -55,4 +55,9 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 
 	# Lock the screen (when going AFK)
 	alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
+	# copy to clipboard
+	alias wl-copy='pbcopy'
+	# FIXME:
+elif [[ "$OSTYPE" == "linux" ]]; then
+	alias pbcopy='wl-copy'
 fi
