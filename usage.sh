@@ -54,6 +54,7 @@ print_usage() {
 	printf "Usage: bash %s [debug|profile]\n" "$target_script"
 	echo ""
 	printf "Options:\n"
+	printf "  -o, --os <type>          Force install for specific OS (mac, linux, windows, wsl)\n"
 	printf "  -d, --enable-debug       Enable debug mode\n"
 	printf "  -p, --enable-profiling   Enable profiling mode\n"
 	printf "  -h, --help               Show this help message\n"
@@ -74,18 +75,35 @@ fi
 SCRIPT_NAME="$1"
 shift # remove script_name from array
 
-# $@ potentially contains user's parameters
-for arg in "$@"; do
-	case "$arg" in
+# potentially contains user's parameters
+while [[ $# -gt 0 ]]; do
+	case "$1" in
 	-h | --help)
 		print_usage "$SCRIPT_NAME"
 		exit 0
 		;;
+	-o | --os)
+		if [[ -n "$2" && "$2" != -* ]]; then
+			case "$2" in
+			mac | linux | win | wsl)
+				readonly FORCE_OS_SUFFIX="$2"
+				shift 2 
+				;;
+			*)
+				printf "\e[31m[ERROR]\e[0m Invalid OS type: %s. Must be mac, linux, win, or wsl.\n" "$2" >&2
+				exit 1
+				;;
+			esac
+		else
+			printf "\e[31m[ERROR]\e[0m Missing value for %s. Example: --os mac\n" "$1" >&2
+			exit 1
+		fi
+		;;
 	-d | --enable-debug | -p | --enable-profiling)
-		# continue
+		shift
 		;;
 	*)
-		printf "\e[31m[ERROR]\e[0m Invalid parameter: %s\n" "$arg" >&2
+		printf "\e[31m[ERROR]\e[0m Invalid parameter: %s\n" "$1" >&2
 		printf "Run \e[36m'bash %s --help'\e[0m for valid options.\n" "$(basename "$0")" >&2
 		exit 1
 		;;

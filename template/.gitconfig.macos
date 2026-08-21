@@ -1,0 +1,6 @@
+# --- Local Git Configuration ---
+[credential]
+    helper = osxkeychain
+[gpg "ssh"]
+    program = /usr/bin/ssh-keygen
+# --- Do not edit this line or above ---

@@ -203,4 +203,132 @@ source_deps "common.sh" "log.sh" || exit 1
 
 		return 0
 	}
+
+	# Prompts the user with a yes/no question.
+	# Usage: filesystem::prompt_yes_no <prompt_text>
+	#
+	# Arguments:
+	#   $1 (prompt_text) : The question to display to the user.
+	#
+	# Returns:
+	#   0 on success (user answered yes).
+	#   1 on failure (user answered no).
+	#   2 on argument count mismatch.
+	filesystem::prompt_yes_no() {
+		common::assert_args "filesystem::prompt_yes_no" $# 1 || return $?
+
+		local prompt_text="$1"
+		local response
+		read -r -p "$prompt_text (y/N) " response
+		[[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]
+	}
+
+	# Extracts everything from line 1 down to the marker from a given file.
+	# Usage: filesystem::get_managed_area <target_file> <marker>
+	#
+	# Arguments:
+	#   $1 (target_file) : The configuration file to read from.
+	#   $2 (marker)      : The string marker delineating the end of the managed area.
+	#
+	# Returns:
+	#   0 on success.
+	#   2 on argument count mismatch.
+	filesystem::get_managed_area() {
+		common::assert_args "filesystem::get_managed_area" $# 2 || return $?
+
+		local target_file="$1"
+		local marker="$2"
+
+		sed -n "1,/${marker}/p" "$target_file"
+	}
+
+	# Extracts everything strictly below the marker from a given file (the user's additions).
+	# Usage: filesystem::get_user_area <target_file> <marker>
+	#
+	# Arguments:
+	#   $1 (target_file) : The configuration file to read from.
+	#   $2 (marker)      : The string marker delineating the start of the user area.
+	#
+	# Returns:
+	#   0 on success.
+	#   2 on argument count mismatch.
+	filesystem::get_user_area() {
+		common::assert_args "filesystem::get_user_area" $# 2 || return $?
+
+		local target_file="$1"
+		local marker="$2"
+
+		sed "1,/${marker}/d" "$target_file"
+	}
+
+	# Merges a template with an existing local config file, preserving user additions.
+	# Compares the managed area (above the marker) and prompts to update if different.
+	# Usage: filesystem::install_local <source_file> <dest_file> [marker_string]
+	#
+	# Arguments:
+	#   $1 (source_file)   : The template file containing the managed configuration.
+	#   $2 (dest_file)     : The target local configuration file to update.
+	#   $3 (marker_string) : (Optional) The boundary marker. Defaults to "# --- Do not edit this line or above ---".
+	#
+	# Returns:
+	#   0 on success (file installed, updated, or safely skipped).
+	#   1 on failure (source missing, or file operations failed).
+	#   2 on argument count mismatch.
+	filesystem::install_local() {
+		common::assert_args "filesystem::install_local" $# 2 3 || return $?
+
+		local source_file="$1"
+		local dest_file="$2"
+		local marker="${3:-# --- Do not edit this line or above ---}"
+
+		if [[ ! -f "$source_file" ]]; then
+			log::warning "Source file not found: %s\n" "$source_file"
+			return 1
+		fi
+
+		if [[ ! -f "$dest_file" ]]; then
+			cp "$source_file" "$dest_file" || return 1
+			log::success "Installed new %s\n" "$dest_file"
+			return 0
+		fi
+
+		# marker is missing
+		if ! grep -qF "$marker" "$dest_file"; then
+			log::warning "Marker missing in %s. Cannot safely merge.\n" "$dest_file"
+			if filesystem::prompt_yes_no "Back up this file and overwrite it completely with the template?"; then
+				cp "$dest_file" "${dest_file}.bak"
+				cp "$source_file" "$dest_file" || return 1
+				log::success "Backed up to .bak and overwrote %s.\n" "$dest_file"
+			else
+				log::info "Left %s unchanged.\n" "$dest_file"
+			fi
+			return 0
+		fi
+
+		# compare managed areas using process substitution
+		if cmp -s <(filesystem::get_managed_area "$source_file" "$marker") \
+			<(filesystem::get_managed_area "$dest_file" "$marker"); then
+			# match
+			return 0
+		fi
+
+		# managed areas differ
+		log::warning "The managed configuration in %s is outdated or modified.\n" "$dest_file"
+		if filesystem::prompt_yes_no "Overwrite the managed area with the latest template?"; then
+			local temp_final
+			temp_final="$(mktemp)"
+
+			# merge
+			filesystem::get_managed_area "$source_file" "$marker" >"$temp_final"
+			filesystem::get_user_area "$dest_file" "$marker" >>"$temp_final"
+
+			mv "$temp_final" "$dest_file" || return 1
+			log::success "Updated managed area of %s (preserved local additions).\n" "$dest_file"
+		else
+			log::info "Left %s unchanged.\n" "$dest_file"
+		fi
+
+		return 0
+	}
+
 }

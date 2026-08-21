@@ -167,4 +167,36 @@ source_deps "common.sh" "log.sh" || exit 1
 		printf "%s\n" "$INVALID_TOKEN"
 		return 1
 	}
+
+	# git pull with fallback on windows because git bash and openssh have path issues (for me)
+	git::pull() {
+		if git pull origin main 2>&1; then
+			return 0
+		fi
+
+		local git_output
+		git_output=$(git pull origin main 2>&1)
+
+		if [[ "${OS:-}" == "Windows_NT" ]] && command -v where >/dev/null 2>&1; then
+
+			local -r first_ssh="$(where ssh 2>/dev/null | head -n 1)"
+			local -r openssh_path="$(where ssh 2>/dev/null | grep -i "OpenSSH" | head -n 1)"
+
+			if [[ -n "$openssh_path" && "$first_ssh" != "$openssh_path" ]]; then
+				local -r windows_ssh="${openssh_path//\\//}"
+
+				printf "\n"
+				log::info "Git Bash ssh failed. Retrying explicitly with Windows OpenSSH..."
+
+				if GIT_SSH_COMMAND="$windows_ssh" git pull origin main 2>&1; then
+					log::success "Successfully pulled changes using Windows OpenSSH."
+					return 0
+				fi
+			fi
+		fi
+
+		printf "\n"
+		log::warning "Git pull failed. Reason: $git_output"
+		return 1
+	}
 }

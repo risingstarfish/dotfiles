@@ -1,6 +1,0 @@
-# --- Local Git Configuration ---
-[credential]
-    helper = {{CRED_HELPER}}
-[gpg "ssh"]
-    program = {{SSH_KEYGEN}}
-# --- Do not edit this line or above ---

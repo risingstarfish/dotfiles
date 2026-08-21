@@ -5,6 +5,34 @@ if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
 fi
 readonly __INSTALL_SH_INCLUDED__=1
 ###################
+# functions
+
+# Prompts the user to continue.
+# Exits the script if the user chooses No (n/N).
+# Usage: prompt_continue
+prompt_continue() {
+
+	local choice
+	while true; do
+		# Print a styled prompt (Yellow arrow, bold white text)
+		printf '\n\e[1;33m==>\e[0m \e[1;37mDo you want to continue anyway? [y/N]: \e[0m'
+		read -r choice
+
+		case "$choice" in
+		[yY])
+			return 0 # continue script
+			;;
+		[nN]) #| "") # 'Enter' key is no
+			printf '\n\e[1;31mAborting installation!\e[0m\n' >&2
+			exit 1
+			;;
+		*)
+			printf '\e[31mInvalid input. Please enter y or n.\e[0m\n'
+			;;
+		esac
+	done
+}
+
 # get the absolute directory path of this script
 # Source - https://stackoverflow.com/a/246128
 # Posted by dogbane, modified by community. See post 'Timeline' for change history
@@ -62,6 +90,42 @@ source_deps "common.sh" "log.sh" "filesystem.sh" "git.sh" "template.sh" || exit 
 
 # validate input and check for help flag
 source "$ROOT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
+# determine specific OS to source correct source file, output, etc.
+get_os_suffix() {
+	if [[ -n "${FORCE_OS_SUFFIX:-}" ]]; then
+		echo "${FORCE_OS_SUFFIX}"
+		return 0
+	fi
+
+	if [[ "$OS" == "Windows_NT" ]]; then
+		echo "windows"
+		return 0
+	fi
+	case "$(uname -s)" in
+	Darwin*) echo "mac" ;;
+	Linux*)
+		if uname -r | grep -qi "microsoft"; then
+			echo "wsl"
+		else
+			echo "linux"
+		fi
+		;;
+	CYGWIN* | MINGW* | MSYS*) echo "windows" ;;
+	*)
+		echo "unknown"
+		return 1
+		;;
+	esac
+	return 0
+}
+
+OS_SUFFIX="$(get_os_suffix)" || {
+	log::warning "To force install, run: \e[36m'bash %s --os <mac|linux|win|wsl>'\e[0m" "$0"
+	log::warning "Unknown OS. Cannot determine which configuration files to install."
+	prompt_continue
+}
+readonly OS_SUFFIX
+unset -f get_os_suffix
 
 ###################
 # Main script
@@ -72,15 +136,15 @@ printf '\n%b\n%b\n%b\n%b\n%b\n\n' \
 	'\e[36m│                                           │\e[0m' \
 	'\e[36m╰───────────────────────────────────────────╯\e[0m'
 
-log::step "Pulling latest changes from git..."
-if ! git_output=$(git pull origin main 2>&1); then
-	log::warning "Git pull failed, continuing with local files."
-	log::warning "Reason: $git_output"
-	common::prompt_continue
-fi
+log::step "Pulling latest changes from git"
+git::pull || {
+	prompt_continue
+}
+
 # tell bash to include hidden files
 shopt -s dotglob
 
+# FIXME: move to top
 declare -r GIT_DIR="git"
 declare -r ZSH_DIR="zsh"
 declare -r TEMPLATE_DIR="template"
@@ -114,34 +178,28 @@ filesystem::install_symlink "$HOME" "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*
 
 log::step "Setting up local configuration templates"
 
+# FIXME: platform specific
 declare -r LOCAL_ZSH="$HOME/.zshrc.local"
 declare -r ZSH_TEMPLATE="$TEMPLATE_DIR/.zshrc.template"
 
 declare -r LOCAL_GITCONFIG="$HOME/.gitconfig.local"
-declare -r GITCONFIG_TEMPLATE="$TEMPLATE_DIR/.gitconfig.template"
 
 template::install "$LOCAL_ZSH" "$ZSH_TEMPLATE" || missing_deps=1
 template::validate "$LOCAL_ZSH" "${INVALID_TOKEN}" || missing_deps=1
 
-echo ""
-cred_helper="$(git::get_credential_helper)"
-declare -r cred_helper
-git::verify_credential_helper "$cred_helper"
+if [[ "$os_suffix" != "unknown" ]]; then
+	gitconfig_src="$TEMPLATE_DIR/.gitconfig.${OS_SUFFIX}"
 
-ssh_keygen="$(git::find_ssh_keygen)"
-declare -r ssh_keygen
+	filesystem::install_local "$gitconfig_src" "$LOCAL_GITCONFIG" || missing_deps=1
+	#TODO: zsh
+fi
 
-template::install "$LOCAL_GITCONFIG" "$GITCONFIG_TEMPLATE" \
-	"s|{{CRED_HELPER}}/${cred_helper}|g" \
-	"s|{{SSH_KEYGEN}}/${ssh_keygen}|g" ||
-	missing_deps=1
-template::validate "$LOCAL_GITCONFIG" "${INVALID_TOKEN}" || missing_deps=1
-
+# FIXME: move to top
 if ((missing_deps > 0)); then
-	printf "\n" >&2
-	log::error "One or more local configuration files are incomplete."
-	log::error "Continue or fix the unresolved tags mentioned above and run the script again."
-	common::prompt_continue
+	echo "" >&2
+	log::warning "One or more local configuration files are incomplete."
+	log::warning "Continue or fix the unresolved tags mentioned above and run the script again."
+	prompt_continue
 fi
 
 source "mode.sh" "$@"

@@ -28,66 +28,120 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap.sh" || {
 
 {
 	# Output error message in red
-	# Usage: log::error <message> [stack_level]
+	# Usage: log::error [-l stack_level] <message_or_format> [args...]
+	#
+	# Options:
+	#   -l <level> : (Optional) The call stack depth to extract the source location from. Defaults to 1.
 	#
 	# Arguments:
-	#   $1 (message)     : The error message to display.
-	#   $2 (stack_level) : (Optional) The call stack depth to extract the source location from. Defaults to 1.
+	#   $1 (format) : The error message, or a printf-style format string.
+	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	log::error() {
-		local -r message="$1"
-		local -i level="${2:-1}"
+		local -i level=1
+
+		if [[ "$1" == "-l" ]]; then
+			level="$2"
+			shift 2
+		fi
+
 		local -i line_level=$((level - 1))
-		# similar to c++ source location
 		local -r caller_file="${BASH_SOURCE[$level]:-Unknown}"
 		local -r caller_line="${BASH_LINENO[$line_level]:-Unknown}"
 		local -r src_loc="[${caller_file}:${caller_line}]"
+
+		local message
+		if [[ $# -gt 1 ]]; then
+			printf -v message "$@"
+		else
+			message="$1"
+		fi
 
 		printf "%b\n" "${COLOUR_RED}[ERROR]${COLOUR_RESET}: ${src_loc} ${message}" >&2
 	}
 
 	# Output warning message in yellow
-	# Usage: log::warning <message> [stack_level]
+	# Usage: log::warning [-l stack_level] <message_or_format> [args...]
+	#
+	# Options:
+	#   -l <level> : (Optional) The call stack depth to extract the source location from. Defaults to 1.
 	#
 	# Arguments:
-	#   $1 (message)     : The warning message to display.
-	#   $2 (stack_level) : (Optional) The call stack depth to extract the source location from. Defaults to 1.
+	#   $1 (format) : The warning message, or a printf-style format string.
+	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	log::warning() {
-		local -r message="$1"
-		local -i level="${2:-1}"
-		local -i line_level=$((level - 1))
+		local -i level=1
 
+		if [[ "$1" == "-l" ]]; then
+			level="$2"
+			shift 2
+		fi
+
+		local -i line_level=$((level - 1))
 		local -r caller_file="${BASH_SOURCE[$level]:-Unknown}"
 		local -r caller_line="${BASH_LINENO[$line_level]:-Unknown}"
 		local -r src_loc="[${caller_file}:${caller_line}] "
+
+		local message
+		if [[ $# -gt 1 ]]; then
+			printf -v message "$@"
+		else
+			message="$1"
+		fi
 
 		printf "%b\n" "${COLOUR_YELLOW}[WARNING]${COLOUR_RESET}: ${src_loc}${message}" >&2
 	}
 
 	# Output informational message in cyan
-	# Usage: log::info <message>
+	# Usage: log::info <message_or_format> [args...]
 	#
 	# Arguments:
-	#   $1 (message) : The info message to display.
+	#   $1 (format) : The info message, or a printf-style format string.
+	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	log::info() {
-		local -r message="$1"
+		local message
+
+		if [[ $# -gt 1 ]]; then
+			printf -v message "$@"
+		else
+			message="$1"
+		fi
 
 		printf "%b\n" "${COLOUR_CYAN}[INFO]${COLOUR_RESET}: ${message}"
 	}
 
 	# Output success message in green
-	# Usage: log::success <message>
+	# Usage: log::success <message_or_format> [args...]
 	#
 	# Arguments:
-	#   $1 (message) : The success message to display.
+	#   $1 (format) : The success message, or a printf-style format string.
+	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	log::success() {
-		local -r message="$1"
+		local message
+
+		if [[ $# -gt 1 ]]; then
+			printf -v message "$@"
+		else
+			message="$1"
+		fi
 
 		printf "%b\n" "${COLOUR_GREEN}[SUCCESS]${COLOUR_RESET}: ${message}"
 	}
 
 	# Prints a major phase header
-	# Usage: log::step "Setting up configuration files"
+	# Usage: log::step <message_or_format> [args...]
+	#
+	# Arguments:
+	#   $1 (format) : The step message, or a printf-style format string.
+	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	log::step() {
-		printf '\n\e[1;35m==>\e[0m \e[1;37m%s\e[0m\n' "$1"
+		local message
+
+		if [[ $# -gt 1 ]]; then
+			printf -v message "$@"
+		else 
+			message="$1"
+		fi
+
+		printf '\n\e[1;35m==>\e[0m \e[1;37m%s\e[0m\n' "${message}"
 	}
 }

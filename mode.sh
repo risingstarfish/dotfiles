@@ -76,7 +76,7 @@ log::step "Validating environment"
 # Set default path if not already provided by an external script
 if [[ ! -f "$LOCAL_ZSH" ]]; then
 	log::error "$LOCAL_ZSH could not be found."
-	printf "Run \e[36m'bash install.sh'\e[0m first before attempting to change the mode/variables.\n" >&2
+	log::error "Run \e[36m'bash install.sh'\e[0m first before attempting to change the mode/variables."
 	exit 1
 fi
 

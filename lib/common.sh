@@ -63,31 +63,4 @@ source_deps "log.sh" || exit 1
 		log::error "$err_msg" 2
 		return 2
 	}
-
-	# Prompts the user to continue.
-	# Exits the script if the user chooses No (n/N).
-	# Usage: common::prompt_continue
-	common::prompt_continue() {
-		common::assert_args "common::find_program" $# 0 || return $?
-
-		local choice
-		while true; do
-			# Print a styled prompt (Yellow arrow, bold white text)
-			printf '\n\e[1;33m==>\e[0m \e[1;37mDo you want to continue anyway? [y/N]: \e[0m'
-			read -r choice
-
-			case "$choice" in
-			[yY])
-				return 0 # continue script
-				;;
-			[nN]) #| "") # 'Enter' key is no
-				printf '\n\e[1;31mAborting installation!\e[0m\n' >&2
-				exit 1
-				;;
-			*)
-				printf '\e[31mInvalid input. Please enter y or n.\e[0m\n'
-				;;
-			esac
-		done
-	}
 } # common

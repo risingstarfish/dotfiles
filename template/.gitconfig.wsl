@@ -1,0 +1,8 @@
+# --- Local Git Configuration ---
+[credential]
+    helper = libsecret
+[gpg "ssh"]
+    program = /mnt/C/Windows/System32/OpenSSH/ssh-keygen.exe
+[core]
+    sshCommand = /mnt/C/Windows/System32/OpenSSH/ssh.exe
+# --- Do not edit this line or above ---
