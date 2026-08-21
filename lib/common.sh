@@ -68,6 +68,8 @@ source_deps "log.sh" || exit 1
 	# Exits the script if the user chooses No (n/N).
 	# Usage: common::prompt_continue
 	common::prompt_continue() {
+		common::assert_args "common::find_program" $# 0 || return $?
+
 		local choice
 		while true; do
 			# Print a styled prompt (Yellow arrow, bold white text)

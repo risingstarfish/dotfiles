@@ -111,4 +111,60 @@ source_deps "common.sh" "log.sh" || exit 1
 		log::warning "You may need to install or configure it manually." 2
 		return 1
 	}
+
+	# Locates the ssh-keygen executable on the system.
+	# Usage: git::find_ssh_keygen
+	#
+	# Returns:
+	#   0 on success (outputs the path to the executable).
+	#   1 on failure (executable not found).
+	#   2 on argument count mismatch.
+	git::find_ssh_keygen() {
+		common::assert_args "git::find_ssh_keygen" $# 0 || return $?
+
+		local bin_name="ssh-keygen"
+
+		if [[ "$OS" == "Windows_NT" ]]; then
+			bin_name="ssh-keygen.exe"
+		else
+			case "$(uname -s)" in
+			Darwin*)
+				bin_name="ssh-keygen"
+				;;
+			Linux*)
+				# WSL check: favor .exe if on Microsoft/WSL kernel, otherwise standard
+				if uname -r | grep -qi "microsoft"; then
+					bin_name="ssh-keygen.exe"
+				else
+					bin_name="ssh-keygen"
+				fi
+				;;
+			CYGWIN* | MINGW* | MSYS*)
+				bin_name="ssh-keygen.exe"
+				;;
+			*)
+				bin_name="ssh-keygen"
+				;;
+			esac
+		fi
+
+		# verification
+		local bin_path
+		# Look for the target executable in PATH
+		if bin_path=$(command -v "$bin_name" 2>/dev/null); then
+			printf "%s\n" "$bin_path"
+			return 0
+		fi
+
+		if [[ "$bin_name" == "ssh-keygen.exe" ]]; then
+			if bin_path=$(command -v "ssh-keygen" 2>/dev/null); then
+				printf "%s\n" "$bin_path"
+				return 0
+			fi
+		fi
+
+		log::warning "Application '${bin_name}' could not be found in PATH." 2
+		printf "%s\n" "$INVALID_TOKEN"
+		return 1
+	}
 }

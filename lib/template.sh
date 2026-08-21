@@ -48,29 +48,34 @@ source_deps "common.sh" "log.sh" "filesystem.sh" || exit 1
 	# Arguments:
 	#   $1 (dest_file)       : The path where the new file should be created.
 	#   $2 (template_file)   : The path to the source template file.
-	#   $3 (sed_replacement) : (Optional) A sed expression to apply during the copy.
+	#   $@ (sed_replacements): (Optional) Any number of sed expressions to apply during the copy.	#
 	#
 	# Returns:
 	#   0 on success (file exists or was successfully created).
 	#   1 on failure (template missing, or copy/sed operation failed).
 	#   2 on argument count mismatch.
 	template::install() {
-		common::assert_args "template::install" $# 2 3 || return $?
+		common::assert_args "template::install" $# 2 999 || return $?
 		local -r dest_file="$1"
 		local -r template_file="$2"
-		local -r sed_replacement="${3:-}"
+		shift 2
 
 		if [[ -f "$dest_file" ]]; then
 			log::info "${dest_file} already exists."
 			return 0
 		fi
 
-		log::info "Creating ${dest_file} from template..."
+		log::info "Creating ${dest_file} from template"
 		filesystem::require_readable "$template_file" "Template" || return 1
 
-		# Catch the exit codes of the file generation commands
-		if [[ -n "$sed_replacement" ]]; then
-			if ! sed "$sed_replacement" "$template_file" >"$dest_file"; then
+		if (($# > 0)); then
+			# Build an array of -e arguments for sed
+			local sed_args=()
+			for expr in "$@"; do
+				sed_args+=("-e" "$expr")
+			done
+
+			if ! sed "${sed_args[@]}" "$template_file" >"$dest_file"; then
 				log::error "Failed to generate ${dest_file} using sed." 2
 				return 1
 			fi
