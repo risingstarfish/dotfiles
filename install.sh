@@ -85,7 +85,7 @@ declare -r GIT_DIR="git"
 declare -r ZSH_DIR="zsh"
 declare -r TEMPLATE_DIR="template"
 # NOTE: keep .exports first
-declare -a BARE_FILES=(".exports" ".paths" ".curlrc" ".wgetrc")
+declare -a BARE_FILES=(".exports" ".paths" ".curlrc" ".wgetrc" ".bashrc")
 
 declare -i missing_deps=0 # tracker
 
@@ -128,14 +128,20 @@ cred_helper="$(git::get_credential_helper)"
 declare -r cred_helper
 git::verify_credential_helper "$cred_helper"
 
-template::install "$LOCAL_GITCONFIG" "$GITCONFIG_TEMPLATE" "s/{{CRED_HELPER}}/$cred_helper/g" || missing_deps=1
+ssh_keygen="$(git::find_ssh_keygen)"
+declare -r ssh_keygen
+
+template::install "$LOCAL_GITCONFIG" "$GITCONFIG_TEMPLATE" \
+	"s|{{CRED_HELPER}}/${cred_helper}|g" \
+	"s|{{SSH_KEYGEN}}/${ssh_keygen}|g" ||
+	missing_deps=1
 template::validate "$LOCAL_GITCONFIG" "${INVALID_TOKEN}" || missing_deps=1
 
 if ((missing_deps > 0)); then
 	printf "\n" >&2
 	log::error "One or more local configuration files are incomplete."
-	log::error "Please fix the unresolved tags mentioned above and run the script again."
-	exit 1
+	log::error "Continue or fix the unresolved tags mentioned above and run the script again."
+	common::prompt_continue
 fi
 
 source "mode.sh" "$@"
