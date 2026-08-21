@@ -4,4 +4,4 @@ zshrc -> install
     rbenv
 
 mix of ansi and 256
-reduce printf calls 
+reduce printf calls  
