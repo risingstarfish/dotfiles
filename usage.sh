@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# usage.sh
+
+set -euo pipefail
 
 if [[ -n "${__USAGE_SH_INCLUDED__:-}" ]]; then
 	return 0
@@ -54,7 +57,7 @@ print_usage() {
 	printf "Usage: bash %s [debug|profile]\n" "$target_script"
 	echo ""
 	printf "Options:\n"
-	printf "  -o, --os <type>          Force install for specific OS (linux, win-bash, mac, wsl)\n"
+	#printf "  -o, --os <type>          Force install for specific OS (linux, win-bash, mac, wsl)\n"
 	printf "  -d, --enable-debug       Enable debug mode\n"
 	printf "  -p, --enable-profiling   Enable profiling mode\n"
 	printf "  -h, --help               Show this help message\n"
@@ -81,23 +84,6 @@ while [[ $# -gt 0 ]]; do
 	-h | --help)
 		print_usage "$SCRIPT_NAME"
 		exit 0
-		;;
-	-o | --os)
-		if [[ -n "$2" && "$2" != -* ]]; then
-			case "$2" in
-			mac | linux | win | wsl)
-				readonly FORCE_OS_SUFFIX="$2"
-				shift 2
-				;;
-			*)
-				printf "\e[31m[ERROR]\e[0m Invalid OS type: %s. Must be mac, linux, win, or wsl.\n" "$2" >&2
-				exit 1
-				;;
-			esac
-		else
-			printf "\e[31m[ERROR]\e[0m Missing value for %s. Example: --os mac\n" "$1" >&2
-			exit 1
-		fi
 		;;
 	-d | --enable-debug | -p | --enable-profiling)
 		shift

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
+# mode.sh
+
 # Toggle .zshrc.local environment overrides
+
+set -euo pipefail
 
 if [[ -n "${__MODE_SH_INCLUDED__:-}" ]]; then
 	return 0
