@@ -4,19 +4,3 @@
 [gpg "ssh"]
     program = /usr/bin/ssh-keygen
 # --- Do not edit this line or above ---
-
-
-# --- Local Git Configuration ---
-[credential]
-    helper = libsecret
-[gpg "ssh"]
-    program = /usr/bin/ssh-keygen
- <- extra line
-# --- Do not edit this line or above ---
-
-
-# --- Local Git Configuration ---
-[credential]
-    helper = libsecret
-# --- Do not edit this line or above ---
-wawdaw <- random text
