@@ -5,3 +5,4 @@
 #DEBUG_MODE=true        # Only prints PROFILE, ERROR, and WARNING messages if not set
 
 # --- Do not edit this line or above ---
+# FIXME: change DEBUG_MODE to LOG_LEVEL
