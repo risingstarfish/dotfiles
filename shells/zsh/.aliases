@@ -40,6 +40,9 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
+# shellcheck
+alias shellcheck='shellcheck --color=always -a -x'
+
 # Enable aliases to be sudo’ed
 alias sudo='sudo '
 
