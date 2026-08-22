@@ -613,7 +613,7 @@ if ((missing_deps > 0)); then
 	log::error "Installation cannot proceed. Exiting..."
 	exit 1
 fi
-
+ 
 log::success "All required files and directories are present."
 
 log::step "Symlinking config files"
