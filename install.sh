@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # install.sh
 
 if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
