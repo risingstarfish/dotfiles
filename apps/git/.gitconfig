@@ -5,6 +5,7 @@
 	name = pierce katai
 	email = 169690632+risingstarfish@users.noreply.github.com
 	signingKey = ~/.ssh/id_ed25519_github_sign.pub
+	useConfigOnly = true
 [gpg]
     format = ssh
 [gpg "ssh"]
