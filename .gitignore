@@ -3,3 +3,5 @@
 .cache/
 
 configs/user.config.json
+
+tmp/
