@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# install.sh
+
 if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
 	return 0
 fi
@@ -613,7 +615,7 @@ if ((missing_deps > 0)); then
 	log::error "Installation cannot proceed. Exiting..."
 	exit 1
 fi
- 
+
 log::success "All required files and directories are present."
 
 log::step "Symlinking config files"
