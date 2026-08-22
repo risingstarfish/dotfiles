@@ -11,49 +11,49 @@ readonly __MODE_SH_INCLUDED__=1
 # Posted by dogbane, modified by community. See post 'Timeline' for change history
 # Retrieved 2026-08-20, License - CC BY-SA 4.0
 get_script_dir() {
-	local SOURCE_PATH="${BASH_SOURCE[0]}"
-	local SYMLINK_DIR
-	local SCRIPT_DIR
+	local source_path="${BASH_SOURCE[0]}"
+	local symlink_dir
+	local script_dir
 	# Resolve symlinks recursively
-	while [ -L "$SOURCE_PATH" ]; do
+	while [ -L "$source_path" ]; do
 		# Get symlink directory
-		SYMLINK_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" >/dev/null 2>&1 && pwd)"
+		symlink_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 		# Resolve symlink target (relative or absolute)
-		SOURCE_PATH="$(readlink "$SOURCE_PATH")"
+		source_path="$(readlink "$source_path")"
 		# Check if candidate path is relative or absolute
-		if [[ $SOURCE_PATH != /* ]]; then
+		if [[ $source_path != /* ]]; then
 			# Candidate path is relative, resolve to full path
-			SOURCE_PATH=$SYMLINK_DIR/$SOURCE_PATH
+			source_path=$symlink_dir/$source_path
 		fi
 	done
 	# Get final script directory path from fully resolved source path
-	SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE_PATH")" >/dev/null 2>&1 && pwd)"
+	script_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 	# Return failure if the directory couldn't be resolved
-	[[ -z "$SCRIPT_DIR" ]] && return 1
-	printf "%s\n" "$SCRIPT_DIR"
+	[[ -z "$script_dir" ]] && return 1
+	printf "%s\n" "$script_dir"
 }
 
-if [[ -z "${ROOT_DIR:-}" ]]; then
-	ROOT_DIR="$(get_script_dir)" || {
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+	SCRIPT_DIR="$(get_script_dir)" || {
 		printf "\n\e[31m[ERROR]\e[0m Failed to resolve script directory. Exiting...\n" >&2
 		exit 1
 	}
-	readonly ROOT_DIR
+	readonly SCRIPT_DIR
 fi
 
 unset -f get_script_dir
 
-cd "$ROOT_DIR" || {
-	printf "\e[31m[ERROR]\e[0m Failed to enter root directory: %s. Exiting...\n" "$ROOT_DIR" >&2
+cd "$SCRIPT_DIR" || {
+	printf "\e[31m[ERROR]\e[0m Failed to enter root directory: %s. Exiting...\n" "$SCRIPT_DIR" >&2
 	exit 1
 }
 ###################
 # print banner
-if [[ -f "$ROOT_DIR/lib/banner.sh" ]]; then
-	source "$ROOT_DIR/lib/banner.sh"
+if [[ -f "$SCRIPT_DIR/lib/banner.sh" ]]; then
+	source "$SCRIPT_DIR/lib/banner.sh"
 fi
 
-source "$ROOT_DIR/lib/bootstrap.sh" || {
+source "$SCRIPT_DIR/lib/bootstrap.sh" || {
 	printf "\n\e[31m[ERROR]\e[0m Failed to source bootstrap.sh. Exiting...\n" >&2
 	exit 1
 }
@@ -66,7 +66,7 @@ if [[ -z "${LOCAL_ZSH:-}" ]]; then
 fi
 
 # validate input and check for help flag
-source "$ROOT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
+source "$SCRIPT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
 
 ###############
 # main

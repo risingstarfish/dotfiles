@@ -1,5 +1,0 @@
-#!/usr/bin/env zsh
-
-# --- Local Path Overrides ---
-# bloomberg-clang
-export PATH="~/opt/clang-p2996/bin:${PATH}"

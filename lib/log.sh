@@ -51,6 +51,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap.sh" || {
 
 		local message
 		if [[ $# -gt 1 ]]; then
+			# shellcheck disable=SC2059
 			printf -v message "$@"
 		else
 			message="$1"
@@ -138,7 +139,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap.sh" || {
 
 		if [[ $# -gt 1 ]]; then
 			printf -v message "$@"
-		else 
+		else
 			message="$1"
 		fi
 
