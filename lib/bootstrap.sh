@@ -14,8 +14,8 @@ source_deps() {
 	local lib
 
 	for lib in "${required_libs[@]}"; do
-		if [[ ! -f "$_LIB_DIR/$lib" ]]; then
-			missing_deps+=("$lib")
+		if [[ ! -f "${_LIB_DIR}/${lib}" ]]; then
+			missing_deps+=("${lib}")
 		fi
 	done
 
@@ -28,6 +28,6 @@ source_deps() {
 	fi
 
 	for lib in "${required_libs[@]}"; do
-		source "$_LIB_DIR/$lib"
+		source "${_LIB_DIR}/${lib}"
 	done
 }
