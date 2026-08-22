@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# bootstrap.sh
+
+set -euo pipefail
 
 if [[ -n "${__BOOTSTRAP_SH_INCLUDED__:-}" ]]; then
 	return 0
