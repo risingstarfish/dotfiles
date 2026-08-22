@@ -1,65 +1,93 @@
 #!/usr/bin/env zsh
+# .aliases
 
-# System
-alias ez='exec zsh'
-alias c='clear'
-alias path='echo $PATH | tr -s ":" "\n"'
-# Display formatted history (yyy-mm-dd HH:MM)
-alias history='history -i'
-
-if command -v bat >/dev/null 2>&1; then
-	# keep using bat
-elif command -v batcat >/dev/null 2>&1; then
-	alias bat='batcat'
-else
-	alias bat='cat'
+if [[ -n "${__ALIASES_INCLUDED__:-}" ]]; then
+	return 0
 fi
+readonly __ALIASES_INCLUDED__=1
+################
+# utility
+alias ez='exec zsh'                       # restart zsh shell
+alias paths='echo $PATH | tr -s ":" "\n"' # print $PATH newline separated
+alias sudo='sudo '                        # Enable aliases to be sudo’ed
 
 # Navigation
-alias ..='cd ..'
-alias ...='cd ../..'
-alias ....="cd ../../.."
-alias .....="cd ../../../.."
-alias -- -='cd -'
+alias ..='cd ..'             # back 1 directory
+alias ...='cd ../..'         # back 2
+alias ....='cd ../../..'     # 3
+alias .....='cd ../../../..' # 4
+alias -- -='cd -'            # revert directories
 alias H='cd ~'
+alias dev='cd ~/opt'
+alias star='cd ~/repos/risingstarfish'
 
-# eza package
-alias ls='eza --icons --group-directories-first'
-alias ll='eza -l --icons --no-user --group-directories-first  --time-style long-iso'
-alias la='eza -la --icons --no-user --group-directories-first  --time-style long-iso'
-alias ld='eza -ld --icons --no-user --time-style long-iso'
-
-# Code
-alias code='codium-insiders'
-alias c.='code .'
-alias fmt='clang-format -i *.cpp *.hpp *.h'
-alias tidy='clang-tidy -i *.cpp *.hpp *.h'
-
-# Grep
+# grep
 alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-# shellcheck
+# ssh
+alias ssh-keygen-init='ssh-keygen -t ed25519 -C'
+alias ssh-git='ssh -T git@github.com'
+
+# clang-tools-extra
+alias fmt='clang-format -i *.cpp *.hpp *.h'
+alias tidy='clang-tidy -i *.cpp *.hpp *.h'
+
 alias shellcheck='shellcheck --color=always -a -x'
 
-# Enable aliases to be sudo’ed
-alias sudo='sudo '
+if [[ -n "$ZSH_VERSION" ]]; then
+	alias history='history -i' # display formatted history (yyy-mm-dd HH:MM)
+elif [[ -n "$BASH_VERSION" ]]; then
+	export HISTTIMEFORMAT="%Y-%m-%d %H:%M " # setting this makes 'history' command print the date
+fi
 
-# Platform Specific
+# eza package
+if command -v eza &>/dev/null; then
+	export EZA_COLORS="${EZA_COLORS:-da=1;34:gm=1;34:Su=1;34}"
+	# base
+	alias ls='eza --icons --group-directories-first --time-style long-iso'
+
+	if eza --git /dev/null &>/dev/null; then
+		alias ll='ls -l --git' # Long format, git status
+	else
+		alias ll='ls -l' # Long format
+	fi
+
+	alias l='ll -a'  # Long format, all files
+	alias lr='ll -T' # Long format, tree view
+	alias ld='ll -d' # Long format, directories only
+	# sorting
+	alias lx='ll --sort=extension' # Sort by extension
+	alias lk='ll --sort=size'      # Sort by size (largest last)
+	alias lt='ll --sort=modified'  # Sort by modified time (newest last)
+	alias lc='ll --sort=changed'   # Sort by changed time (newest last)
+fi
+
+# vscode
+if command -v codium-insiders &>/dev/null ||
+	command -v codium &>/dev/null; then
+	if command -v codium-insiders &>/dev/null; then
+		alias code='codium-insiders'
+	else
+		alias code='codium'
+	fi
+
+	alias c.='code .'         # open current directory in new window
+	alias cdiff='code --diff' # open two files side by side
+	alias cr='code -r'        # open input path in current window
+	alias cr.='cr .'          # open current directory in current window
+fi
+
+# --- Platform Specific ---
 
 case "$(uname -s)" in
 Darwin*)
-	if ! command -v brew >/dev/null 2>&1; then
-		print -P "%F{yellow}[WARNING]%f 'brew' is not installed."
-	else
-		alias brewup='brew update && brew upgrade && brew cleanup'
-	fi
+	alias brewup='brew update && brew upgrade && brew cleanup'
 
 	# Lock the screen (when going AFK)
 	alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
 
-	# copy to clipboard
 	alias wl-copy='pbcopy'
 	;;
 
