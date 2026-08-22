@@ -8,7 +8,30 @@ readonly __INSTALL_SH_INCLUDED__=1
 ###################
 # utility
 {
-	# Output detailed error message in red
+	# colours
+	{
+		readonly COLOUR_RESET="\e[0m"
+		readonly COLOUR_GREY="\e[90m"
+		readonly COLOUR_BLACK="\e[30m"
+		readonly COLOUR_RED="\e[91m"
+		readonly COLOUR_GREEN="\e[92m"
+		readonly COLOUR_YELLOW="\e[93m"
+		readonly COLOUR_BLUE="\e[94m"
+		readonly COLOUR_MAGENTA="\e[95m"
+		readonly COLOUR_CYAN="\e[96m"
+		readonly COLOUR_WHITE="\e[97m"
+
+		readonly COLOUR_BOLD_GREY="\e[1;90m"
+		readonly COLOUR_BOLD_BLACK="\e[1;30m"
+		readonly COLOUR_BOLD_RED="\e[1;91m"
+		readonly COLOUR_BOLD_GREEN="\e[1;92m"
+		readonly COLOUR_BOLD_YELLOW="\e[1;93m"
+		readonly COLOUR_BOLD_BLUE="\e[1;94m"
+		readonly COLOUR_BOLD_MAGENTA="\e[1;95m"
+		readonly COLOUR_BOLD_CYAN="\e[1;96m"
+		readonly COLOUR_BOLD_WHITE="\e[1;97m"
+	}
+	# Output detailed error message in COLOUR_RED
 	# Usage: dev_error <message_or_format> [args...]
 	#
 	# Arguments:
@@ -32,9 +55,6 @@ readonly __INSTALL_SH_INCLUDED__=1
 
 		local -r base_file="${caller_file##*/}"
 
-		local -r bold_red='\e[1;31m'
-		local -r reset='\e[0m'
-
 		local message
 		if [[ $# -gt 1 ]]; then
 			local format="$1"
@@ -46,7 +66,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 		fi
 
 		printf "%b[ DEV_ERROR ]%b file: %s(%s) \`%s()\`: %b\n" \
-			"${bold_red}" "${reset}" \
+			"${COLOUR_BOLD_RED}" "${COLOUR_RESET}" \
 			"${base_file}" "${caller_line}" "${caller_func}" \
 			"${message}" >&2
 	}
@@ -59,12 +79,6 @@ readonly __INSTALL_SH_INCLUDED__=1
 	#   $1 (format) : (Optional) The warning message, or a printf-style format string.
 	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	prompt_continue() {
-		local -r bold_yellow='\e[1;33m'
-		local -r bold_white='\e[1;37m'
-		local -r bold_red='\e[1;31m'
-		local -r red='\e[31m'
-		local -r reset='\e[0m'
-
 		local message
 		if [[ $# -gt 1 ]]; then
 			# shellcheck disable=SC2059
@@ -80,8 +94,8 @@ readonly __INSTALL_SH_INCLUDED__=1
 		local choice
 		while true; do
 			printf "\n%b==>%b %bDo you want to continue anyway? [y/N]: %b" \
-				"${bold_yellow}" "${reset}" \
-				"${bold_white}" "${reset}" >&2
+				"${COLOUR_BOLD_YELLOW}" "${COLOUR_RESET}" \
+				"${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
 
 			read -r choice
 
@@ -90,11 +104,11 @@ readonly __INSTALL_SH_INCLUDED__=1
 				return 0
 				;;
 			[nN] | "") # 'Enter' key defaults to no
-				printf "\n%bAborting installation!%b\n" "${bold_red}" "${reset}" >&2
+				printf "\n%bAborting installation!%b\n" "${COLOUR_BOLD_RED}" "${COLOUR_RESET}" >&2
 				exit 1
 				;;
 			*)
-				printf "%bInvalid input. Please enter y or n.%b\n" "${red}" "${reset}" >&2
+				printf "%bInvalid input. Please enter y or n.%b\n" "${COLOUR_RED}" "${COLOUR_RESET}" >&2
 				;;
 			esac
 		done
@@ -246,10 +260,6 @@ readonly __INSTALL_SH_INCLUDED__=1
 	# Executes the PowerShell handoff and exits the bash script.
 	# Never returns to the caller if successful (exits with PowerShell's exit code).
 	exec_powershell_handoff() {
-		local -r bold_blue='\e[1;34m'
-		local -r bold_green='\e[1;32m'
-		local -r reset='\e[0m'
-
 		local ps_script="$SCRIPT_DIR/install.ps1"
 
 		if [[ ! -f "${ps_script}" ]]; then
@@ -265,68 +275,79 @@ readonly __INSTALL_SH_INCLUDED__=1
 			ps_exe="powershell.exe"
 		fi
 
-		printf "\n%b==>%b Handing off execution to %b%s%b...\n" \
-			"${bold_blue}" "${reset}" "${bold_green}" "${ps_exe}" "${reset}"
+		local is_elevated=0
+		if [[ "$EUID" -eq 0 || -n "${SUDO_USER:-}" ]]; then
+			is_elevated=1
+		fi
 
-		"$ps_exe" -NoProfile -ExecutionPolicy Bypass -File "$ps_script"
+		if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]] && net session >/dev/null 2>&1; then
+			is_elevated=1
+		fi
+
+		local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script")
+
+		if [[ $is_elevated -eq 1 ]]; then
+			ps_args+=("-IsElevated")
+		fi
+
+		printf "\n%b==>%b Handing off execution to %b%s%b...\n" \
+			"${COLOUR_BOLD_BLUE}" "${COLOUR_RESET}" "${COLOUR_BOLD_GREEN}" "${ps_exe}" "${COLOUR_RESET}"
+
+		"$ps_exe" "${ps_args[@]}"
 		exit $?
 	}
 
 	# Checks if running on Windows (Git Bash or Unknown) and prompts user to switch to PowerShell.
 	prompt_windows_handoff() {
-		# If not on Windows at all, return immediately
 		if [[ "${TARGET_OS}" != "${OS_WINDOWS}" ]]; then
 			return 0
 		fi
 
-		local -r bold_yellow='\e[1;33m'
-		local -r bold_white='\e[1;37m'
-		local -r bold_blue='\e[1;34m'
-		local -r red='\e[31m'
-		local -r reset='\e[0m'
-
-		if [[ "${TARGET_ENV}" == "${ENV_GIT_BASH}" ]]; then
+		if [[ "${TARGET_ENV}" == "${ENV_GITBASH}" ]]; then
 			printf "\n%b==>%b %bWindows Git Bash environment detected.%b\n" \
-				"${bold_blue}" "${reset}" "${bold_white}" "${reset}" >&2
+				"${COLOUR_BOLD_BLUE}" "${COLOUR_RESET}" "${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
 
-			printf "%b==>%b %b(Note: If you are not actually running Git Bash, this could be an error)%b\n\n" \
-				"${bold_yellow}" "${reset}" "${bold_white}" "${reset}" >&2
+			printf "%b==>%b %b(Note: If you are not actually running Git Bash, something went wrong)%b\n" \
+				"${COLOUR_BOLD_YELLOW}" "${COLOUR_RESET}" "${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
 
 		elif [[ "${TARGET_ENV}" == "${ENV_NATIVE}" ]]; then
 			printf "\n%b==>%b %bUnknown Windows Bash environment detected.%b\n" \
-				"${bold_yellow}" "${reset}" "${bold_white}" "${reset}" >&2
+				"${COLOUR_BOLD_YELLOW}" "${COLOUR_RESET}" "${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
 
-			printf "    %bBash scripts may fail to configure native Windows settings properly.%b\n\n" \
-				"${bold_white}" "${reset}" >&2
+			printf "    %bBash scripts may fail to configure native Windows settings properly.%b\n" \
+				"${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
 		else
 			return 0
 		fi
 
+		printf "    %bCertain functionality such as symlinking will ask for permissions if this script was not run with sudo FIXME: check for sudo/developer mode.%b\n" \
+			"${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
+		# export MSYS=winsymlinks:nativestrict
 		local choice
 		while true; do
 			printf "%b==>%b %bSwitch to the native PowerShell installer (install.ps1)? [Y/n]: %b" \
-				"${bold_yellow}" "${reset}" "${bold_white}" "${reset}" >&2
+				"${COLOUR_BOLD_YELLOW}" "${COLOUR_RESET}" "${COLOUR_BOLD_WHITE}" "${COLOUR_RESET}" >&2
 
 			read -r choice
 
 			case "$choice" in
 			[yY])
-				execute_powershell_handoff
+				exec_powershell_handoff
 				;;
 			[nN])
 				printf "\n%b==>%b Continuing with Bash installer on Windows...\n" \
-					"${bold_blue}" "${reset}"
+					"${COLOUR_BOLD_BLUE}" "${COLOUR_RESET}"
 				return 0
 				;;
 			*)
-				printf "\n%bInvalid input. Please enter y or n.%b\n" "${red}" "${reset}" >&2
+				printf "\n%bInvalid input. Please enter y or n.%b\n" "${COLOUR_RED}" "${COLOUR_RESET}" >&2
 				;;
 			esac
 		done
 	}
 
 	prompt_windows_handoff
-	unset -f prompt_windows_handoff execute_powershell_handoff
+	unset -f exec_powershell_handoff prompt_windows_handoff
 }
 
 # required paths for installation
@@ -345,9 +366,6 @@ readonly __INSTALL_SH_INCLUDED__=1
 		local -r -a paths=("$@")
 		local -a missing_paths=()
 
-		local -r bold_red='\e[1;31m'
-		local -r reset='\e[0m'
-
 		local prefix=""
 		if [[ -n "${SCRIPT_DIR:-}" ]]; then
 			prefix="${SCRIPT_DIR}/"
@@ -365,7 +383,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 			for missing in "${missing_paths[@]}"; do
 				# '[ DEV_ERROR ] ' 14 chars
 				#       vvv 16 chars vvv
-				printf "  %b✗%b %s\n" "${bold_red}" "${reset}" "${missing}" >&2
+				printf "  %b✗%b %s\n" "${COLOUR_BOLD_RED}" "${COLOUR_RESET}" "${missing}" >&2
 			done
 
 			echo "" >&2
@@ -519,7 +537,7 @@ if [[ -f "$SCRIPT_DIR/lib/banner.sh" ]]; then
 fi
 
 # FIXME:
-prompt_continue "Script not finished"
+prompt_continue "Script not finished. Will exit anyway."
 exit 1
 
 source "$SCRIPT_DIR/lib/bootstrap.sh" || {

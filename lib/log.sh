@@ -13,6 +13,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap.sh" || {
 # source_deps """ || exit 1
 
 {
+	#FIXME: also defined in install
 	# Ansi-256 Colours
 	readonly COLOUR_RESET="\e[0m"
 	readonly COLOUR_GREY="\e[38;5;8m"
