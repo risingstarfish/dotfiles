@@ -429,7 +429,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 		"${SHELL_DIR}/zsh/.zimrc"
 		"${SHELL_DIR}/zsh/.zsh_options"
 		"${SHELL_DIR}/zsh/.zshrc"
-		"${SHELL_DIR}/zsh/.zshrc.local"
+		"${SHELL_DIR}/zsh/.zshrc.toggles"
 		"${SHELL_DIR}/zsh/.zstyles"
 		"${SHELL_DIR}/zsh/.paths"
 	)
