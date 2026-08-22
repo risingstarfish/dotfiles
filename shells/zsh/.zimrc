@@ -14,7 +14,6 @@ zmodule ssh
 zmodule git-info
 zmodule duration-info
 zmodule prompt-pwd
-zmodule exa
 zmodule magic-enter
 
 # --- Platform Specific Modules ---
