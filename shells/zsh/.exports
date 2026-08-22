@@ -1,8 +1,8 @@
 #!/usr/bin/env zsh
 
-# Make vim the default editor.
-export EDITOR='nvim'
-export VISUAL='nvim'
+# Make nano the default editor.
+export EDITOR='nano'
+export VISUAL='nano'
 
 # Prefer US English and use UTF-8.
 export LANG='en_US.UTF-8'
@@ -25,3 +25,6 @@ fi
 #export ANTHROPIC_MODEL="kvstorm1"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=0
 export DISABLE_TELEMETRY=0
+
+# git
+export GITHUB_PUBLIC_EMAIL="169690632+risingstarfish@users.noreply.github.com"
