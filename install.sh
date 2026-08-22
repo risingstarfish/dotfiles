@@ -8,19 +8,26 @@ if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
 fi
 readonly __INSTALL_SH_INCLUDED__=1
 ###################
-# script requires bash >=4.0
-if ((BASH_VERSINFO[0] < 4)); then
-	printf "\e[31m[ ERROR ]\e[0m This script requires Bash 4.0 or newer. You are running \e[33m%s\e[0m\n" "${BASH_VERSION}" >&2
-
-	if [[ "$(uname -s)" == "Darwin" ]]; then
-		printf "\nOn macOS, the default Bash is severely outdated (v3.2).\n" >&2
-		printf "Please install modern Bash via Homebrew by running:\n" >&2
-		printf "  \e[1;32mbrew install bash\e[0m\n\n" >&2
-		printf "Then, restart your terminal and run this script again using the new Bash.\n" >&2
-	fi
+if [ -z "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
+	printf 'Error: the install instructions explicitly say to pipe the install script to `bash`; please follow them' >&2
 	exit 1
+else
+	# script requires bash >=4.0
+	if ((BASH_VERSINFO[0] < 4)); then
+		printf "Error: This script requires Bash 4.0 or newer. You are running \e[33m%s\e[0m\n" "${BASH_VERSION}" >&2
+
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			printf "\nOn macOS, the default Bash is severely outdated (v3.2).\n" >&2
+			printf "Please install modern Bash via Homebrew by running:\n" >&2
+			printf "  brew install bash\n\n" >&2
+			printf "Then, restart your terminal and run this script again using the new Bash.\n" >&2
+		fi
+		exit 1
+	fi
 fi
 
+# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
+# https://github.com/nvm-sh/nvm/blob/master/install.sh
 ###################
 # colour constants
 {
@@ -163,12 +170,10 @@ fi
 
 # detect script directory
 {
-	SCRIPT_DIR=""  # source directory of script
-	SCRIPT_FILE="" # current file
-
+	SRC_DIR="" # source directory of script
 	# set the absolute directory path of this script
 	# Source - https://stackoverflow.com/a/246128
-	set_script() {
+	set_src_dir() {
 		local source_path="${BASH_SOURCE[0]}"
 		local symlink_dir
 		# Resolve symlinks recursively
@@ -184,22 +189,19 @@ fi
 			fi
 		done
 		# Get final script directory path from fully resolved source path
-		SCRIPT_DIR="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
-		readonly SCRIPT_DIR
-
-		SCRIPT_FILE="${SCRIPT_DIR}/$(basename "$source_path")"
-		readonly SCRIPT_FILE
-
-		if [[ -z "$SCRIPT_DIR" || -z "$SCRIPT_FILE" ]]; then
-			printf "%b[ FATAL ]%b Failed to resolve script paths.\n" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" >&2
-			exit 1
-		fi
+		printf "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)" #FIXME:
 	}
-	set_script
-	unset -f set_script
+	SRC_DIR="$(set_src_dir)"
+	unset -f set_src_dir
+	readonly SRC_DIR
 
-	cd "$SCRIPT_DIR" || {
-		printf "%b[ FATAL ]%b Failed to enter root directory: %s." "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$SCRIPT_DIR" >&2
+	if [[ -z "${SRC_DIR}" ]]; then
+		printf "Error: unable to resolve source directory.\n" >&2
+		exit 1
+	fi
+
+	cd "$SRC_DIR" || {
+		printf "%b[ FATAL ]%b Failed to enter root directory: %s." "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$SRC_DIR" >&2
 		exit 1
 	}
 }
@@ -339,37 +341,39 @@ fi
 # usage, banners, large text
 {
 	print_banner() {
-		echo ""
-		printf '\n%b%s%b\n' \
-			"${COLOUR["BOLD_CYAN"]}" '  ____        _    __ _ _           ' "${COLOUR["RESET"]}" \
-			"${COLOUR["BOLD_CYAN"]}" ' |  _ \  ___ | |_ / _(_) | ___  ___ ' "${COLOUR["RESET"]}" \
-			"${COLOUR["BOLD_CYAN"]}" ' | | | |/ _ \| __| |_| | |/ _ \/ __|' "${COLOUR["RESET"]}" \
-			"${COLOUR["BOLD_CYAN"]}" ' | |_| | (_) | |_|  _| | |  __/\__ \' "${COLOUR["RESET"]}" \
-			"${COLOUR["BOLD_CYAN"]}" ' |____/ \___/ \__|_| |_|_|\___||___/' "${COLOUR["RESET"]}" \
-			"${COLOUR["GREY"]}" ' -----------------------------------' "${COLOUR["RESET"]}" \
-			"" '   Automated Environment Setup' "" \
-			"${COLOUR["GREY"]}" ' -----------------------------------' "${COLOUR["RESET"]}"
+		cat <<EOF
 
-		printf '\n'
-		printf '\e[90m  Target : \e[0m%s\n\e[90m  System : \e[0m%s\n\n' "$HOME" "$(uname -sm)"
+${COLOUR["BOLD_CYAN"]}  ____        _    __ _ _           ${COLOUR["RESET"]}
+${COLOUR["BOLD_CYAN"]} |  _ \  ___ | |_ / _(_) | ___  ___ ${COLOUR["RESET"]}
+${COLOUR["BOLD_CYAN"]} | | | |/ _ \| __| |_| | |/ _ \/ __|${COLOUR["RESET"]}
+${COLOUR["BOLD_CYAN"]} | |_| | (_) | |_|  _| | |  __/\__ \${COLOUR["RESET"]}
+${COLOUR["BOLD_CYAN"]} |____/ \___/ \__|_| |_|_|\___||___/${COLOUR["RESET"]}
+${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
+   Automated Environment Setup
+${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
+
+EOF
 	}
 
 	print_usage() {
 		print_banner
 
-		printf "Usage: %b'bash %s [options]'%b\n\n" "${COLOUR["CYAN"]}" "$(basename "$0")" "${COLOUR["RESET"]}"
-		printf "Options:\n"
-		printf "  -f, --force              Overwrite existing dotfiles without prompting\n"
-		printf "  -n, --dry-run            Simulate installation without making actual changes\n"
-		printf "  -l, --log-level <level>  Set verbosity ('info', 'success', 'warning', 'error', 'quiet')\n"
-		printf "						   (default: 'info')\n"
-		printf "						   (env: DOTFILES_LOG_LEVEL)\n"
-		printf "  -q, --quiet              Suppress all output except errors (same as --log-level=error)\n"
-		printf "  -o, --log-file <path>    Specify a custom path for the log file\n"
-		printf "						   (default: %s/tmp/install.log)\n" "${SCRIPT_DIR}"
-		printf "                           (env: DOTFILES_LOG_FILE)\n"
-		printf "      --no-log             Disable writing to a log file\n"
-		printf "  -h, --help               Print this help message\n"
+		cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Options:
+  -f, --force              		Overwrite existing dotfiles without prompting
+  -n, --dry-run            		Simulate installation without making actual changes
+  -l, --log-level <level>  		Set verbosity ('info', 'success', 'warning', 'error', 'quiet')
+                           		(default: 'info')
+                           		(env: DOTFILES_LOG_LEVEL)
+  -q, --quiet              		Suppress all output except errors (same as --log-level=error)
+  -o, --log-file <path>    		Specify a custom path for the log file
+                           		(default: ${SRC_DIR}/tmp/install.log)
+                           		(env: DOTFILES_LOG_FILE)
+      --no-log             		Disable writing to a log file
+  -h, --help               		Show this help message
+EOF
 	}
 }
 
@@ -498,7 +502,7 @@ fi
 	DISABLE_LOG_FILE=0
 	FORCE_INSTALL=0
 	DRY_RUN=0
-	INSTALL_LOG_FILE="${DOTFILES_LOG_FILE:-${SCRIPT_DIR}/tmp/install.log}"
+	INSTALL_LOG_FILE="${DOTFILES_LOG_FILE:-${SRC_DIR}/tmp/install.log}"
 	user_log_level="${DOTFILES_LOG_LEVEL:-info}"
 
 	# parse args
@@ -554,7 +558,7 @@ fi
 			;;
 		*)
 			printf "%b[ ERROR ]%b Invalid parameter: %s\n" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$1"
-			printf "Run %b'bash %s --help'%b for valid options.\n" "${COLOUR["CYAN"]}" "$(basename "$0")" "${COLOUR["RESET"]}" >&2 >&2
+			printf "Run %b%s --help%b for valid options.\n" "${COLOUR["CYAN"]}" "$(basename "$0")" "${COLOUR["RESET"]}" >&2 >&2
 			exit 1
 			;;
 		esac
@@ -670,7 +674,7 @@ fi
 	# Executes PowerShell handoff and exits the bash script.
 	# Never returns to the caller if successful (exits with PowerShell's exit code).
 	windows_handoff() {
-		local ps_script="$SCRIPT_DIR/install.ps1"
+		local ps_script="$SRC_DIR/install.ps1"
 		if [[ ! -f "${ps_script}" ]]; then
 			log::dev_fatal "Unable to find install.ps1."
 		fi
@@ -756,8 +760,8 @@ fi
 				windows_handoff
 			fi
 			;;
-		*)
-			;;
+		*) ;;
+
 		esac
 	fi
 	unset -f prompt_windows_handoff windows_handoff
@@ -766,18 +770,18 @@ fi
 # required paths for installation
 {
 	# base directory constants
-	readonly LIB_DIR="${SCRIPT_DIR}/lib"
-	readonly OS_DIR="${SCRIPT_DIR}/os"
-	readonly RUNTIME_DIR="${SCRIPT_DIR}/runtime"
-	readonly SHELL_DIR="${SCRIPT_DIR}/shells"
-	readonly APP_DIR="${SCRIPT_DIR}/apps"
+	readonly LIB_DIR="${SRC_DIR}/lib"
+	readonly OS_DIR="${SRC_DIR}/os"
+	readonly RUNTIME_DIR="${SRC_DIR}/runtime"
+	readonly SHELL_DIR="${SRC_DIR}/shells"
+	readonly APP_DIR="${SRC_DIR}/apps"
 
 	# paths
 	{
 		# dev
 		declare -r -a dev_files=(
-			"${SCRIPT_DIR}/mode.sh"
-			"${SCRIPT_DIR}/usage.sh"
+			"${SRC_DIR}/mode.sh"
+			"${SRC_DIR}/usage.sh"
 		)
 		# lib
 		declare -r -a lib_files=(
@@ -929,8 +933,8 @@ fi
 		local -a missing_paths=()
 
 		local prefix=""
-		if [[ -n "${SCRIPT_DIR:-}" ]]; then
-			prefix="${SCRIPT_DIR}/"
+		if [[ -n "${SRC_DIR:-}" ]]; then
+			prefix="${SRC_DIR}/"
 		fi
 
 		for path in "${paths[@]}"; do
@@ -975,7 +979,7 @@ source_deps "common.sh" "log.sh" "filesystem.sh" "git.sh" "template.sh" || exit 
 # FIXME: move required checks here
 
 # validate input and check for help flag
-source "$SCRIPT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
+source "$SRC_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
 # determine specific OS to source correct source file, output, etc.
 get_os_suffix() {
 	if [[ -n "${FORCE_RUNTIME_SUFFIX:-}" ]]; then
