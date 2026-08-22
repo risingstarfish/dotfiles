@@ -7,7 +7,6 @@ zmodule Aloxaf/fzf-tab
 zmodule shanwker1223/zim-alias-finder
 zmodule hlissner/zsh-autopair
 zmodule kiesman99/zim-zoxide
-zmodule joke/zim-github-cli
 
 zmodule fzf
 zmodule ssh
