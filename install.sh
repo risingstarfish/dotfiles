@@ -29,7 +29,36 @@ fi
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
 ###################
-# colour constants
+# set the absolute directory path of this script
+# Source - https://stackoverflow.com/a/246128
+get_src_dir() {
+	local source_path="${BASH_SOURCE[0]}"
+	local symlink_dir
+	# Resolve symlinks recursively
+	while [ -L "$source_path" ]; do
+		# Get symlink directory
+		symlink_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
+		# Resolve symlink target (relative or absolute)
+		source_path="$(readlink "$source_path")"
+		# Check if candidate path is relative or absolute
+		if [[ $source_path != /* ]]; then
+			# Candidate path is relative, resolve to full path
+			source_path=$symlink_dir/$source_path
+		fi
+	done
+	# Get final script directory path from fully resolved source path
+	printf "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)" #FIXME:
+}
+# constants
+{
+	readonly SRC_DIR="$(get_src_dir)"#FIXME:
+	readonly CLONE_DIR="${CLONE_DIR:-$SRC_DIR}"
+	readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+	readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles"
+	readonly -a AUR_LIST=("yay")
+	readonly -a SHELL_LIST=("zsh")
+}
+# colours
 {
 	COLOUR_DEPTH="16"
 	declare -A COLOUR
@@ -173,7 +202,7 @@ fi
 	SRC_DIR="" # source directory of script
 	# set the absolute directory path of this script
 	# Source - https://stackoverflow.com/a/246128
-	set_src_dir() {
+	get_src_dir() {
 		local source_path="${BASH_SOURCE[0]}"
 		local symlink_dir
 		# Resolve symlinks recursively
@@ -191,8 +220,8 @@ fi
 		# Get final script directory path from fully resolved source path
 		printf "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)" #FIXME:
 	}
-	SRC_DIR="$(set_src_dir)"
-	unset -f set_src_dir
+	SRC_DIR="$(get_src_dir)"
+	unset -f get_src_dir
 	readonly SRC_DIR
 
 	if [[ -z "${SRC_DIR}" ]]; then
@@ -201,7 +230,7 @@ fi
 	fi
 
 	cd "$SRC_DIR" || {
-		printf "%b[ FATAL ]%b Failed to enter root directory: %s." "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$SRC_DIR" >&2
+		printf "Error: unable to enter root directory: %s\n.""$SRC_DIR" >&2
 		exit 1
 	}
 }
@@ -355,24 +384,39 @@ ${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
 EOF
 	}
 
-	print_usage() {
-		print_banner
+	get_help() {
+		local -r program="$(basename "$0")"
 
 		cat <<EOF
-Usage: $(basename "$0") [OPTIONS]
+OVERVIEW: Installs and synchronizes dotfiles, shell configuration, and optional packages.
 
-Options:
-  -f, --force              		Overwrite existing dotfiles without prompting
-  -n, --dry-run            		Simulate installation without making actual changes
-  -l, --log-level <level>  		Set verbosity ('info', 'success', 'warning', 'error', 'quiet')
-                           		(default: 'info')
-                           		(env: DOTFILES_LOG_LEVEL)
-  -q, --quiet              		Suppress all output except errors (same as --log-level=error)
-  -o, --log-file <path>    		Specify a custom path for the log file
-                           		(default: ${SRC_DIR}/tmp/install.log)
-                           		(env: DOTFILES_LOG_FILE)
-      --no-log             		Disable writing to a log file
-  -h, --help               		Show this help message
+USAGE: ${program} [options]
+
+OPTIONS:
+  -n, --dry-run, --test     Simulate installation without making actual changes
+  -f, --force              	Overwrite existing dotfiles without prompting
+							(env: DOTFILES_FORCE_OVERWRITE)
+      --no-backup        	Do not create backups for preexisting files
+      --no-confirm       	Do not prompt for confirmation
+  -c, --colour <mode>       Set colour mode: auto | always | never
+							(default: auto)
+	  						(env: DOTFILES_COLOUR)
+  -l, --log-level <level>  	Set verbosity ('debug', 'info', 'success', 'warning', 'error', 'quiet')
+                           	(default: 'info')
+  -q, --quiet              	Suppress all output except errors (same as --log-level=error)
+  -o, --log-file <path>    	Write log to path
+                           	(default: ${SRC_DIR}/tmp/install.log)
+                           	(env: DOTFILES_LOG_FILE)
+      --no-log             	Disable writing to a log file
+  -i, --install-packages  	Install base/recommended packages
+  -p, --packages-only     	Install packages only
+      --defaults          	Use default package choices without prompts
+      --no-packages       	Skip package installation
+      --version				Display the version of this program
+  -h, --help               	Show this help message
+
+EXAMPLE:
+
 EOF
 	}
 }
@@ -509,7 +553,7 @@ EOF
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		-h | --help)
-			print_usage
+			get_help
 			exit 0
 			;;
 		-f | --force)
