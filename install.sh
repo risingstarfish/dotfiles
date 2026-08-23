@@ -26,6 +26,9 @@ else
 	fi
 fi
 
+readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
+readonly FALLBACK_CLONE_DIR="${HOME}"
+
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
 ###################
@@ -51,12 +54,11 @@ get_src_dir() {
 }
 # constants
 {
-	readonly SRC_DIR="$(get_src_dir)"#FIXME:
+	readonly SRC_DIR="$(get_src_dir)" #FIXME:
 	readonly CLONE_DIR="${CLONE_DIR:-$SRC_DIR}"
 	readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 	readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles"
 	readonly -a AUR_LIST=("yay")
-	readonly -a SHELL_LIST=("zsh")
 }
 # colours
 {
