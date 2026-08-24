@@ -1,27 +1,49 @@
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true, Position = 0)]
     [string]$ModelFilePath,
 
-    [int]$NgL = 999,
-    [int]$CtxSize = 131072,
-    
-    [ValidateSet("xhigh", "medium", "low")]
-    [string]$Reasoning = "xhigh"
-)
+    [string]$llamaBinary = "llama-server",
 
+    [int]$NgL = 999,
+    [int]$CtxSize = 262144,
+
+    [ValidateSet("xhigh", "medium", "low")]
+    [string]$Reasoning = "medium"
+)
 # clamp 
 if ($NgL -lt 0) { $NgL = 0 } elseif ($NgL -gt 999) { $NgL = 999 }
 if ($CtxSize -lt 32768) { $CtxSize = 32768 } elseif ($CtxSize -gt 262144) { $CtxSize = 262144 }
 
-# env
-$RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
 
 Write-Host "=================================================" -ForegroundColor Cyan
 Write-Host "                 llama-launcher                  " -ForegroundColor Cyan
 Write-Host "=================================================" -ForegroundColor Cyan
+
+
+# --- Binary detection ---
+if ([string]::IsNullOrWhiteSpace($llamaBinary)) {
+    # auto-detect from PATH: prefer ik-llama-server, fall back to llama-server
+    $llamaBinary = (Get-Command "ik-llama-server" -ErrorAction SilentlyContinue)?.Source
+    if (-not $llamaBinary) {
+        $llamaBinary = (Get-Command "llama-server" -ErrorAction SilentlyContinue)?.Source
+    }
+    if (-not $llamaBinary) {
+        Write-Host "`e[1;91m[ ERROR ]`e[0m Neither 'ik-llama-server' nor 'llama-server' found in PATH." -ForegroundColor Red
+        Write-Host "Specify explicitly:  llama-launcher <model.gguf> <path-to-binary>" -ForegroundColor DarkGray
+        exit 1
+    } 
+}
+
+$isIkLlama = $llamaBinary -match '^ik-llama-server$'
+
+
+Write-Host "  Binary : `e[1;36m$llamaBinary`e[0m" -ForegroundColor Cyan
+Write-Host "  Model  : $ModelFilePath" -ForegroundColor Cyan
 Write-Host "`n"
 
+# env
+$RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
 function Check-EnvVars {
     param(
         [Parameter(Mandatory = $true)]
@@ -77,7 +99,10 @@ function Get-LLamaArgs {
         [switch]$DisableContBatching,
         [switch]$DisableMetrics,
         [switch]$DisableCachePrompt,
-        [switch]$DisableJinja
+        [switch]$DisableJinja,
+
+        [Parameter(Mandatory = $true)]
+        [switch]$isIkLlama
     )
 
     $argsList = @(
@@ -89,19 +114,38 @@ function Get-LLamaArgs {
         "--parallel", $Parallel
     )
 
+    # --- Speculative decoding flags (binary-specific) ---
+    if ($isIkLlama) {
+        # ik-llama-server flags
+        $argsList += "--chat-template-file", "C:\Users\tiger\opt\ai_models\Qwen3.5_chat_template.jinja"
+        $argsList += "--spec-type", "mtp:n_max=3,p_min=0.75"
+    }
+    else {
+        # standard llama-server flags
+        $argsList += "--chat-template-file", "C:\Users\tiger\opt\ai_models\Qwen3.5_chat_template.jinja"
+        $argsList += "--spec-type", "draft-mtp"
+        $argsList += "--spec-draft-n-max", "3"
+        
+        if (-not [string]::IsNullOrWhiteSpace($CorsOrigins)) { 
+            $argsList += "--cors-origins", $CorsOrigins
+            $argsList += "--cors-credentials"
+        }
+        if (-not $DisableCachePrompt) { $argsList += "--cache-prompt" }
+
+    }
+
+    # --- KV cache quantisation (shared) ---
+    $argsList += "--cache-type-k", "q8_0"
+    $argsList += "--cache-type-v", "q8_0"
+
     if (-not [string]::IsNullOrWhiteSpace($Alias)) { 
         $argsList += "--alias", $Alias 
     }
-    
-    if (-not [string]::IsNullOrWhiteSpace($CorsOrigins)) { 
-        $argsList += "--cors-origins", $CorsOrigins
-        $argsList += "--cors-credentials"
-    }
+
     
     if (-not $DisableFlashAttn) { $argsList += "--flash-attn", "on" }
     if (-not $DisableContBatching) { $argsList += "--cont-batching" }
     if (-not $DisableMetrics) { $argsList += "--metrics" }
-    if (-not $DisableCachePrompt) { $argsList += "--cache-prompt" }
     if (-not $DisableJinja) { $argsList += "--jinja" }
 
     return $argsList
@@ -166,8 +210,15 @@ else {
 }
 
 # build args
-$serverArgs = Get-LLamaArgs -ModelPath $ModelFilePath -Context $CtxSize -NgL $NgL
+$serverArgs = Get-LLamaArgs -ModelPath $ModelFilePath -Context $CtxSize -NgL $NgL -isIkLlama:$isIkLlama
 $llamaArgs = $serverArgs + $modelArgs
+
+Write-Host "`n`e[1;32m[ Binary ]`e[0m $llamaBinary" -ForegroundColor Cyan
+Write-Host "`e[1;32m[ Model  ]`e[0m $ModelFilePath" -ForegroundColor Cyan
+Write-Host "`e[1;32m[ Ctx    ]`e[0m $CtxSize" -ForegroundColor Cyan
+Write-Host "`e[1;32m[ GPU-L  ]`e[0m $NgL" -ForegroundColor Cyan
+Write-Host "`e[1;32m[ Mode   ]`e[0m $(if ($Choice -eq '1') { 'Thinking' } else { 'Instruct'})" -ForegroundColor Cyan
+Write-Host "`n"
 
 $maxRetries = 5
 $retryCount = 0
@@ -176,7 +227,7 @@ $success = $false
 
 $logDir = if ($env:LLAMA_LAUNCHER_LOG_DIR) { $env:LLAMA_LAUNCHER_LOG_DIR } else { "$env:USERPROFILE\.config\llama-launcher" }
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
-$logFile = Join-Path $logDir "llama-server_crash_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+$logFile = Join-Path $logDir "($binaryName)_crash_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 
 
 # launch and restart
@@ -205,14 +256,14 @@ $success = $false
 $minUptimeSeconds = 5 # min seconds it must run to be successful
 
 while ($retryCount -lt $maxRetries -and -not $success) {
-    Write-Host "`nStarting llama-server (Attempt $($retryCount + 1) of $displayMax)..." -ForegroundColor Green
-    Write-Host "Command: llama-server $($llamaArgs -join ' ')" -ForegroundColor White
+    Write-Host "`nStarting $llamaBinary (Attempt $($retryCount + 1) of $displayMax)..." -ForegroundColor Green
+    Write-Host "Command: $llamaBinary $($llamaArgs -join ' ')" -ForegroundColor White
     Write-Host "==================================================" -ForegroundColor Cyan
 
     $startTime = Get-Date
 
     # have to extract raw text since 2>&1 in powershell wraps in ErrorRecord object
-    & llama-server @llamaArgs 2>&1 | ForEach-Object { $_.ToString() } | Tee-Object -FilePath $logFile -Append
+    & $llamaBinary @llamaArgs 2>&1 | ForEach-Object { $_.ToString() } | Tee-Object -FilePath $logFile -Append
 
     $endTime = Get-Date
     $runTime = $endTime - $startTime
