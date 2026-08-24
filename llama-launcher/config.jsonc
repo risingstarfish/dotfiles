@@ -1,0 +1,386 @@
+{
+  "$schema": "TODO:risingstarfish.llama-launcher.schema.json",
+  "version": 1.0,
+  "general": {
+    // Name of the llama-server binary to use.
+    // Resolved from PATH unless it is an absolute path.
+    "binary": "llama-server",
+    // Base directory for model files
+    // Profile model paths are resolved relative to this directory
+    // unless they are absolute. Supports ~ expansion.
+    "model_dir": "~/ai_models",
+    // Directory for server log files.
+    "log_dir": "~/.config/llama-launcher/logs",
+    // Directory for server cache files
+    "cache_dir": "~/.cache/llama-launcher",
+    // Automatically stop the old server when switching to a different backend (default: true).
+    // Set to false to allow multiple servers to run simultaneously.
+    "auto_stop_server": true,
+    // Automatically unload the current model when loading a different one on the same
+    // server (default: true). Set to false to keep multiple models loaded at once.
+    "auto_unload": true,
+    // Automatically delete log files older than N days on server start.
+    // Logs of running servers are never deleted. 0 or unset disables cleanup.
+    "log_retention_day": 7,
+    // How many times to retry starting an instance after a launch failure.
+    "max_retries": 5,
+    // Minimum seconds an instance must stay alive before a crash is treated
+    // as a startup failure rather than a later runtime crash.
+    "min_uptime_sec": 10
+  },
+  "network": {
+    // Default endpoint used when an instance does not specify network_slot.
+    "default": {
+      "host": "127.0.0.1",
+      "port": 8080
+    },
+    // Named endpoints.
+    // Each slot is one complete host + port pair.
+    "slots": {
+      "x": {
+        "host": "127.0.0.1",
+        "port": 8080
+      },
+      "y": {
+        "host": "127.0.0.1",
+        "port": 8081
+      },
+      "z": {
+        "host": "127.0.0.1",
+        "port": 8082
+      }
+    }
+  },
+  "ui": {
+    // Controls the colour output mode for the llama-launcher UI (default: auto).
+    // Valid options: auto, truecolor, xterm, ansi, always, never
+    //
+    //   auto      : Automatically detects and applies the highest colour mode your terminal supports.
+    //   truecolor : Forces 24-bit RGB output (16.7 million colours). Most modern terminals support this.
+    //   xterm     : Forces 8-bit output (256 colours). A safe fallback for older terminal emulators.
+    //   ansi      : Forces 4-bit output (16 standard colours). Maximum compatibility across all systems.
+    //   always    : Bypasses detection and forces basic colour output, even if not explicitly supported.
+    //   never     : Disables all colours, rendering the UI in plain monochrome text.colour: auto
+    "colour": "auto",
+    // Display the llama-launcher UI centered in the terminal (default: false)
+    "display_centered": false,
+    // Close the launcher after selecting a menu action (default: true).
+    // Set to false to keep the interactive menu open after each action.
+    "auto_close": true,
+    // Sort profiles alphabetically (favourites first, then by server, then by name)
+    // in menus and `list` output (default: true). Set to false to list profiles in
+    // the order they appear under `profiles:` below.
+    "sort_alphabetically": true,
+    // How often (seconds) the interactive menu polls the servers. Drives the
+    // server / loaded-model status lines and how quickly the menu picks up
+    // background changes — a model loaded or unloaded from another terminal
+    // rebuilds the menu on the next tick. The memory readout below refreshes
+    // on its own fixed 1-second tick, independent of this value.
+    // Minimum 1 second; values below 1 are clamped. Default: 10.
+    "refresh_seconds": 10,
+    // Show a memory + swap readout in the status header (default: true).
+    // Refreshes every second while the menu is open, independent of
+    // refresh_duration; the underlying sysctl / vm_stat / ioreg shell-outs
+    // are cached just below that tick.
+    "memory_status": {
+      // Enable the memory readout.
+      "enabled": true,
+      // Template for the memory readout. Placeholders are substituted with
+      // humanised byte values (e.g. "12.4GB") or rounded integer percentages
+      // (e.g. "38%"). Unknown placeholders are passed through literally.
+      // Available placeholders:
+      //   {free_ram}        — available memory (free + inactive + speculative + purgeable)
+      //   {used_ram}        — total_ram - free_ram
+      //   {total_ram}       — physical RAM reported by hw.memsize
+      //   {compressed_ram}  — bytes held by the kernel's memory compressor
+      //   {swap_used}       — swap currently in use
+      //   {swap_total}      — total swap allocated
+      //   {free_swap}       — swap_total - swap_used
+      //   {free_ram_pct}    — free_ram / total_ram as rounded integer percentage
+      //   {used_ram_pct}    — used_ram / total_ram as rounded integer percentage
+      //   {swap_used_pct}   — swap_used / swap_total as rounded integer percentage
+      //                       (0% when swap is disabled)
+      //   {gpu_util_pct}    — GPU "Device Utilization %" from ioreg (Apple Silicon only)
+      //   {gpu_used_ram}    — unified RAM currently held by the GPU (Apple Silicon only)
+      //   {gpu_alloc_ram}   — unified RAM allocated to the GPU (Apple Silicon only)
+      // GPU values read 0 on Intel Macs or when ioreg is unavailable.
+      //
+      // Style tags colour any span of the line:
+      //   {black} {red} {green} {yellow} {blue} {magenta} {cyan} {white} {gray}
+      //   {bright-red} {bright-green} {bright-yellow} {bright-blue}
+      //   {bright-magenta} {bright-cyan} {bright-white}
+      //   {bold} {dim} {reset}
+      //   {0} … {255}  — 256-colour palette index, e.g. {208}
+      //   {//rrggbb}    — exact 24-bit colour, e.g. {//7aa2f7} (short {//rgb} works too)
+      // Named colours are rendered by your terminal theme, so their exact shade
+      // varies between setups; palette-index and hex colours look the same
+      // everywhere. A template without style tags or bars keeps the classic dim
+      // rendering; as soon as it contains one, you control all styling yourself
+      // and {reset} returns to the terminal's default style.
+      //
+      // Percentage placeholders can render as a value-less bar graph instead:
+      //   {used_ram_pct:bar}                    — defaults from memory_status_bar below
+      //   {used_ram_pct:bar:WIDTH:COLOUR:BG}     — per-bar overrides, trailing parts
+      //                                           optional ({swap_used_pct:bar:6:yellow})
+      // Bars fill with block glyphs in COLOUR on a solid BG background — one
+      // continuous strip, no gap; eighth-block glyphs (▏▎▍▌▋▊▉) give 8 fill
+      // levels per cell. COLOUR and BG accept the same three forms as style tags
+      // (name, palette index, //hex). Width is clamped to 1–40.
+      // Unknown or malformed tokens are passed through literally.
+      // format: "{bold}Free RAM:{reset} {yellow}{free_ram} {bright-blue}{free_ram_pct}{reset} {used_ram_pct:bar} ✦ {bold}Swap:{reset} {yellow}{swap_used}{reset} ✦ {bold}GPU:{reset} {gpu_util_pct:bar}"
+      //
+      // Plain alternative (no styling — rendered all-dim like older versions):
+      // format: "RAM: {free_ram} free · Swap: {swap_used} used"
+      "format": "{bold}Free RAM:{reset} {yellow}{free_ram} {bright-blue}{free_ram_pct}{reset} {used_ram_pct:bar} ✦ {bold}Swap:{reset} {yellow}{swap_used}{reset} ✦ {bold}GPU:{reset} {gpu_util_pct:bar}",
+      // Default geometry and colours for {..._pct:bar} tokens. Inline parts on a
+      // token override these per bar. Colors accept a name, a 256-colour palette
+      // index ("240"), or a hex value ("//7aa2f7").
+      "bar": {
+        // Bar width in terminal cells.
+        "width": 10,
+        // Colour of the filled portion of the bar.
+        "colour": "green",
+        // Colour of the empty portion of the bar.
+        "background": "gray"
+      }
+    }
+  },
+  "runtime": {
+    // Shared by all profiles. Per-profile values override these.
+    "defaults": {
+      "gpu_layers": 99,
+      "threads": 8,
+      "threads_batch": 8,
+      "batch_size": 512,
+      "context_size": 32768,
+      // "host": "127.0.0.1",
+      // "port": 8080,
+      "flash_attn": true,
+      "cont_batching": true,
+      "parallel": 1,
+      "mlock": false,
+      "no_mmap": false,
+      "embedding": false,
+      "jinja": false,
+      "sampling": {
+        "temperature": 0.7,
+        "repeat_penalty": 1.1,
+        "top_k": 40,
+        "top_p": 0.95,
+        "min_p": 0.05
+      }
+    },
+    // Reusable runtime templates.
+    // These are global building blocks, not per-profile objects.
+    // Profiles / instances reference them by name.
+    "templates": {
+      "chat": {
+        "context_size": 8192,
+        "jinja": true,
+        "sampling": {
+          "temperature": 0.7,
+          "top_p": 0.95
+        }
+      },
+      "coding": {
+        "context_size": 16384,
+        "jinja": true,
+        "batch_size": 1024,
+        "sampling": {
+          "temperature": 0.2,
+          "top_k": 20,
+          "top_p": 0.9
+        }
+      },
+      "low_memory": {
+        "context_size": 4096,
+        "batch_size": 256
+      }
+    }
+  },
+  // Environment variable configuration.
+  //
+  //   env.defaults        -> applied to every instance
+  //   env.presets         -> named reusable groups
+  //   profile.shared.env  -> shared by all instances in a profile
+  //   instance.env        -> instance-specific override
+  //   instance > profile > presets > defaults
+  "env": {
+    // Environment variables applied to every instance by default.
+    // Keep this small. Use presets for common groups.
+    "defaults": {
+      // Example:
+      // "GGML_DEBUG": "0"
+    },
+    // Named reusable environment groups.
+    // Reference these from profiles / instances using "env_presets".
+    "presets": {
+      // Debug logging preset.
+      "debug": {
+        "GGML_DEBUG": "1",
+        "LLAMA_DEBUG": "1"
+      },
+      // Expose only CUDA device 0 to the server process.
+      "cuda0": {
+        "CUDA_VISIBLE_DEVICES": "0"
+      },
+      // Expose only CUDA device 1 to the server process.
+      "cuda1": {
+        "CUDA_VISIBLE_DEVICES": "1"
+      },
+      // Expose only ROCm/HSA device 0 to the server process.
+      "rocm0": {
+        "HSA_VISIBLE_DEVICES": "0"
+      }
+    },
+    // Optional ENV files to import.
+    // Later entries override earlier entries.
+    // Each file should use simple KEY=VALUE lines.
+    "files": []
+  },
+  // Named model registry.
+  // Profiles reference models by key instead of repeating paths.
+  "models": {
+    "modelx": {
+      // Human-readable label.
+      "title": "Model X",
+      // GGUF file path.
+      // Resolved relative to general.model_dir unless absolute.
+      "path": "modelx.gguf",
+      // Freeform tags for UI filtering / grouping.
+      "tags": ["chat"]
+    },
+    "modely": {
+      "title": "Model Y",
+      "path": "modely.gguf",
+      "tags": ["chat"]
+    },
+    "modelz": {
+      "title": "Model Z",
+      "path": "modelz.gguf",
+      "tags": ["chat"]
+    }
+  },
+  // Optional multi-GPU section.
+  // If not defined, your launcher can fall back to auto-detection.
+  "hardware": {
+    "devices": {
+      // Named devices.
+      "gpu0": {
+        // Backend device index.
+        "index": 0
+      },
+      "gpu1": {
+        "index": 1
+      }
+    },
+    // Named GPU placement presets.
+    "placements": {
+      // Pin one instance to gpu0.
+      "gpu0-only": {
+        // Devices used by this placement.
+        "devices": ["gpu0"],
+        // Main device.
+        // Optional; can default to the first entry in "devices".
+        "main_device": "gpu0",
+        // Relative tensor split across the listed devices.
+        "tensor_split": [1.0],
+        // Split mode.
+        // Use a value your llama.cpp build supports, e.g. layer, row, or tensor.
+        "split_mode": "layer"
+      },
+      // Examples:
+      "gpu1-only": {
+        "device": "gpu1",
+        "main_device": "gpu1",
+        "tensor_split": [1.0],
+        "split_mode": "layer"
+      },
+      "gpu0-gpu1-balanced": {
+        "devices": ["gpu0", "gpu1"],
+        "tensor_split": [0.5, 0.5],
+        "split_mode": "layer"
+      },
+      "gpu0-gpu1-heavy": {
+        "devices": ["gpu0", "gpu1"],
+        "tensor_split": [0.7, 0.3],
+        "split_mode": "tensor"
+      }
+    }
+  },
+  // Each profile starts one or more instances together.
+  "profiles": {
+    // Single-instance example.
+    "example-modelx-gpu0": {
+      // Menu title.
+      "title": "Model X on GPU0",
+      // Longer description.
+      "description": "Single instance",
+      // Pin to favourites.
+      "favourite": false,
+      // Settings shared by all instances in this profile.
+      "shared": {
+        // Environment presets applied to every instance in this profile.
+        "env_presets": ["debug"],
+        // Literal environment variables applied to every instance in this profile.
+        // These override env_presets at the same level.
+        "env": {
+          "EXAMPLE_SHARED_VAR": "1"
+        }
+      },
+      // One or more llama-server instances started together.
+      "instances": [
+        {
+          // Unique instance id.
+          // Used for logs, PIDs, status, cleanup.
+          "id": "modelx-gpu0",
+          // Model key from "models".
+          "model": "modelx",
+          // Hardware placement key from "hardware.placements".
+          "placement": "gpu0-only",
+          // Runtime template key from "runtime.templates".
+          // This overrides shared.template if present.
+          "template": "chat",
+          // Network endpoint key from "network.slots".
+          "network_slot": "x",
+          // Instance-specific environment presets.
+          // Applied after shared.env_presets.
+          "env_presets": ["cuda0"],
+          // Instance-specific environment variables.
+          // Highest-priority literal env source.
+          "env": {
+            "EXAMPLE_INSTANCE_VAR": "1"
+          },
+          // Extra raw CLI args appended to llama-server.
+          "extra_args": []
+        }
+      ]
+    },
+    // Multi-instance example:
+    "modelx-gpu0-modelz-gpu1": {
+      "title": "Model X on GPU0 + Model Z on GPU1",
+      "description": "Same as above, but modelz on GPU1",
+      "favourite": true,
+      "shared": {
+        "template": "chat",
+        "env_presets": ["debug"]
+      },
+      "instances": [
+        {
+          "id": "modelx-gpu0",
+          "model": "modelx",
+          "placement": "gpu0-only",
+          "network_slot": "x",
+          "env_presets": ["cuda0"]
+        },
+        {
+          "id": "modelz-gpu1",
+          "model": "modelz",
+          "placement": "gpu1-only",
+          "network_slot": "z",
+          "env_presets": ["cuda1"]
+        }
+      ]
+    }
+  }
+}
