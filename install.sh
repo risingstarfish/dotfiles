@@ -52,14 +52,17 @@ get_src_dir() {
 	# Get final script directory path from fully resolved source path
 	printf "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)" #FIXME:
 }
-# constants
-{
-	readonly SRC_DIR="$(get_src_dir)" #FIXME:
-	readonly CLONE_DIR="${CLONE_DIR:-$SRC_DIR}"
-	readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
-	readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles"
-	readonly -a AUR_LIST=("yay")
-}
+readonly SRC_DIR="$(get_src_dir)"
+readonly CLONE_DIR="${CLONE_DIR:-$SRC_DIR}"
+readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
+readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles"
+
+unset -f get_src_dir
+if [[ -z "${SRC_DIR}" ]]; then
+	printf "Error: unable to resolve source directory.\n" >&2
+	exit 1
+fi
+
 # colours
 {
 	COLOUR_DEPTH="16"
@@ -107,134 +110,96 @@ get_src_dir() {
 
 	case "${COLOUR_DEPTH}" in
 	"none")
-		COLOUR["RESET"]=""
-		COLOUR["BLACK"]=""
-		COLOUR["GREY"]=""
-		COLOUR["RED"]=""
-		COLOUR["GREEN"]=""
-		COLOUR["YELLOW"]=""
-		COLOUR["BLUE"]=""
-		COLOUR["MAGENTA"]=""
-		COLOUR["CYAN"]=""
-		COLOUR["WHITE"]=""
+		COLOUR["RESET"]=$''
+		COLOUR["BLACK"]=$''
+		COLOUR["GREY"]=$''
+		COLOUR["RED"]=$''
+		COLOUR["GREEN"]=$''
+		COLOUR["YELLOW"]=$''
+		COLOUR["BLUE"]=$''
+		COLOUR["MAGENTA"]=$''
+		COLOUR["CYAN"]=$''
+		COLOUR["WHITE"]=$''
 
-		COLOUR["BOLD_BLACK"]=""
-		COLOUR["BOLD_GREY"]=""
-		COLOUR["BOLD_RED"]=""
-		COLOUR["BOLD_GREEN"]=""
-		COLOUR["BOLD_YELLOW"]=""
-		COLOUR["BOLD_BLUE"]=""
-		COLOUR["BOLD_MAGENTA"]=""
-		COLOUR["BOLD_CYAN"]=""
-		COLOUR["BOLD_WHITE"]=""
+		COLOUR["BOLD_BLACK"]=$''
+		COLOUR["BOLD_GREY"]=$''
+		COLOUR["BOLD_RED"]=$''
+		COLOUR["BOLD_GREEN"]=$''
+		COLOUR["BOLD_YELLOW"]=$''
+		COLOUR["BOLD_BLUE"]=$''
+		COLOUR["BOLD_MAGENTA"]=$''
+		COLOUR["BOLD_CYAN"]=$''
+		COLOUR["BOLD_WHITE"]=$''
 		;;
 	"16")
-		COLOUR["RESET"]="\e[0m"
-		COLOUR["BLACK"]="\e[30m"
-		COLOUR["GREY"]="\e[90m"
-		COLOUR["RED"]="\e[91m"
-		COLOUR["GREEN"]="\e[92m"
-		COLOUR["YELLOW"]="\e[93m"
-		COLOUR["BLUE"]="\e[94m"
-		COLOUR["MAGENTA"]="\e[95m"
-		COLOUR["CYAN"]="\e[96m"
-		COLOUR["WHITE"]="\e[97m"
+		COLOUR["RESET"]=$'\e[0m'
+		COLOUR["BLACK"]=$'\e[30m'
+		COLOUR["GREY"]=$'\e[90m'
+		COLOUR["RED"]=$'\e[91m'
+		COLOUR["GREEN"]=$'\e[92m'
+		COLOUR["YELLOW"]=$'\e[93m'
+		COLOUR["BLUE"]=$'\e[94m'
+		COLOUR["MAGENTA"]=$'\e[95m'
+		COLOUR["CYAN"]=$'\e[96m'
+		COLOUR["WHITE"]=$'\e[97m'
 
-		COLOUR["BOLD_BLACK"]="\e[1;30m"
-		COLOUR["BOLD_GREY"]="\e[1;90m"
-		COLOUR["BOLD_RED"]="\e[1;91m"
-		COLOUR["BOLD_GREEN"]="\e[1;92m"
-		COLOUR["BOLD_YELLOW"]="\e[1;93m"
-		COLOUR["BOLD_BLUE"]="\e[1;94m"
-		COLOUR["BOLD_MAGENTA"]="\e[1;95m"
-		COLOUR["BOLD_CYAN"]="\e[1;96m"
-		COLOUR["BOLD_WHITE"]="\e[1;97m"
+		COLOUR["BOLD_BLACK"]=$'\e[1;30m'
+		COLOUR["BOLD_GREY"]=$'\e[1;90m'
+		COLOUR["BOLD_RED"]=$'\e[1;91m'
+		COLOUR["BOLD_GREEN"]=$'\e[1;92m'
+		COLOUR["BOLD_YELLOW"]=$'\e[1;93m'
+		COLOUR["BOLD_BLUE"]=$'\e[1;94m'
+		COLOUR["BOLD_MAGENTA"]=$'\e[1;95m'
+		COLOUR["BOLD_CYAN"]=$'\e[1;96m'
+		COLOUR["BOLD_WHITE"]=$'\e[1;97m'
 		;;
 	"256")
-		COLOUR["RESET"]="\e[0m"
-		COLOUR["BLACK"]="\e[38;5;0m"
-		COLOUR["GREY"]="\e[38;5;8m"
-		COLOUR["RED"]="\e[38;5;9m"
-		COLOUR["GREEN"]="\e[38;5;10m"
-		COLOUR["YELLOW"]="\e[38;5;11m"
-		COLOUR["BLUE"]="\e[38;5;12m"
-		COLOUR["MAGENTA"]="\e[38;5;13m"
-		COLOUR["CYAN"]="\e[38;5;14m"
-		COLOUR["WHITE"]="\e[38;5;15m"
+		COLOUR["RESET"]=$'\e[0m'
+		COLOUR["BLACK"]=$'\e[38;5;0m'
+		COLOUR["GREY"]=$'\e[38;5;8m'
+		COLOUR["RED"]=$'\e[38;5;9m'
+		COLOUR["GREEN"]=$'\e[38;5;10m'
+		COLOUR["YELLOW"]=$'\e[38;5;11m'
+		COLOUR["BLUE"]=$'\e[38;5;12m'
+		COLOUR["MAGENTA"]=$'\e[38;5;13m'
+		COLOUR["CYAN"]=$'\e[38;5;14m'
+		COLOUR["WHITE"]=$'\e[38;5;15m'
 
-		COLOUR["BOLD_BLACK"]="\e[1;38;5;0m"
-		COLOUR["BOLD_GREY"]="\e[1;38;5;8m"
-		COLOUR["BOLD_RED"]="\e[1;38;5;9m"
-		COLOUR["BOLD_GREEN"]="\e[1;38;5;10m"
-		COLOUR["BOLD_YELLOW"]="\e[1;38;5;11m"
-		COLOUR["BOLD_BLUE"]="\e[1;38;5;12m"
-		COLOUR["BOLD_MAGENTA"]="\e[1;38;5;13m"
-		COLOUR["BOLD_CYAN"]="\e[1;38;5;14m"
-		COLOUR["BOLD_WHITE"]="\e[1;38;5;15wm"
+		COLOUR["BOLD_BLACK"]=$'\e[1;38;5;0m'
+		COLOUR["BOLD_GREY"]=$'\e[1;38;5;8m'
+		COLOUR["BOLD_RED"]=$'\e[1;38;5;9m'
+		COLOUR["BOLD_GREEN"]=$'\e[1;38;5;10m'
+		COLOUR["BOLD_YELLOW"]=$'\e[1;38;5;11m'
+		COLOUR["BOLD_BLUE"]=$'\e[1;38;5;12m'
+		COLOUR["BOLD_MAGENTA"]=$'\e[1;38;5;13m'
+		COLOUR["BOLD_CYAN"]=$'\e[1;38;5;14m'
+		COLOUR["BOLD_WHITE"]=$'\e[1;38;5;15wm'
 		;;
 	"truecolor")
-		COLOUR["RESET"]="\e[0m"
-		COLOUR["BLACK"]="\e[38;2;0;0;0m"
-		COLOUR["GREY"]="\e[38;2;128;128;128m"
-		COLOUR["RED"]="\e[38;2;255;0;0m"
-		COLOUR["GREEN"]="\e[38;2;0;255;0m"
-		COLOUR["YELLOW"]="\e[38;2;255;255;0m"
-		COLOUR["BLUE"]="\e[38;2;0;0;255m"
-		COLOUR["MAGENTA"]="\e[38;2;255;0;255m"
-		COLOUR["CYAN"]="\e[38;2;0;255;255m"
-		COLOUR["WHITE"]="\e[38;2;255;255;255m"
+		COLOUR["RESET"]=$'\e[0m'
+		COLOUR["BLACK"]=$'\e[38;2;0;0;0m'
+		COLOUR["GREY"]=$'\e[38;2;128;128;128m'
+		COLOUR["RED"]=$'\e[38;2;255;0;0m'
+		COLOUR["GREEN"]=$'\e[38;2;0;255;0m'
+		COLOUR["YELLOW"]=$'\e[38;2;255;255;0m'
+		COLOUR["BLUE"]=$'\e[38;2;0;0;255m'
+		COLOUR["MAGENTA"]=$'\e[38;2;255;0;255m'
+		COLOUR["CYAN"]=$'\e[38;2;0;255;255m'
+		COLOUR["WHITE"]=$'\e[38;2;255;255;255m'
 
-		COLOUR["BOLD_BLACK"]="\e[1;38;2;0;0;0m"
-		COLOUR["BOLD_GREY"]="\e[1;38;2;128;128;128m"
-		COLOUR["BOLD_RED"]="\e[1;38;2;255;0;0m"
-		COLOUR["BOLD_GREEN"]="\e[1;38;2;0;255;0m"
-		COLOUR["BOLD_YELLOW"]="\e[1;38;2;255;255;0m"
-		COLOUR["BOLD_BLUE"]="\e[1;38;2;0;0;255m"
-		COLOUR["BOLD_MAGENTA"]="\e[1;38;2;255;0;255m"
-		COLOUR["BOLD_CYAN"]="\e[1;38;2;0;255;255m"
-		COLOUR["BOLD_WHITE"]="\e[1;38;2;255;255;255m"
+		COLOUR["BOLD_BLACK"]=$'\e[1;38;2;0;0;0m'
+		COLOUR["BOLD_GREY"]=$'\e[1;38;2;128;128;128m'
+		COLOUR["BOLD_RED"]=$'\e[1;38;2;255;0;0m'
+		COLOUR["BOLD_GREEN"]=$'\e[1;38;2;0;255;0m'
+		COLOUR["BOLD_YELLOW"]=$'\e[1;38;2;255;255;0m'
+		COLOUR["BOLD_BLUE"]=$'\e[1;38;2;0;0;255m'
+		COLOUR["BOLD_MAGENTA"]=$'\e[1;38;2;255;0;255m'
+		COLOUR["BOLD_CYAN"]=$'\e[1;38;2;0;255;255m'
+		COLOUR["BOLD_WHITE"]=$'\e[1;38;2;255;255;255m'
 		;;
 	esac
 
 	readonly -A COLOUR
-}
-
-# detect script directory
-{
-	SRC_DIR="" # source directory of script
-	# set the absolute directory path of this script
-	# Source - https://stackoverflow.com/a/246128
-	get_src_dir() {
-		local source_path="${BASH_SOURCE[0]}"
-		local symlink_dir
-		# Resolve symlinks recursively
-		while [ -L "$source_path" ]; do
-			# Get symlink directory
-			symlink_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
-			# Resolve symlink target (relative or absolute)
-			source_path="$(readlink "$source_path")"
-			# Check if candidate path is relative or absolute
-			if [[ $source_path != /* ]]; then
-				# Candidate path is relative, resolve to full path
-				source_path=$symlink_dir/$source_path
-			fi
-		done
-		# Get final script directory path from fully resolved source path
-		printf "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)" #FIXME:
-	}
-	SRC_DIR="$(get_src_dir)"
-	unset -f get_src_dir
-	readonly SRC_DIR
-
-	if [[ -z "${SRC_DIR}" ]]; then
-		printf "Error: unable to resolve source directory.\n" >&2
-		exit 1
-	fi
-
-	cd "$SRC_DIR" || {
-		printf "Error: unable to enter root directory: %s\n.""$SRC_DIR" >&2
-		exit 1
-	}
 }
 
 # OS and Runtime
@@ -377,10 +342,10 @@ get_src_dir() {
 ${COLOUR["BOLD_CYAN"]}  ____        _    __ _ _           ${COLOUR["RESET"]}
 ${COLOUR["BOLD_CYAN"]} |  _ \  ___ | |_ / _(_) | ___  ___ ${COLOUR["RESET"]}
 ${COLOUR["BOLD_CYAN"]} | | | |/ _ \| __| |_| | |/ _ \/ __|${COLOUR["RESET"]}
-${COLOUR["BOLD_CYAN"]} | |_| | (_) | |_|  _| | |  __/\__ \${COLOUR["RESET"]}
+${COLOUR["BOLD_CYAN"]} | |_| | (_) | |_|  _| | |  __/\__ \\${COLOUR["RESET"]}
 ${COLOUR["BOLD_CYAN"]} |____/ \___/ \__|_| |_|_|\___||___/${COLOUR["RESET"]}
 ${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
-   Automated Environment Setup
+     Automated Environment Setup      
 ${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
 
 EOF
@@ -413,13 +378,13 @@ OPTIONS:
   -c, --colour <mode>       Set colour mode: auto | truecolor | xterm | ansi |
   							always | never
 							(default: auto)
-	  						(env: DOTFILES_FORCE_COLOUR)
+	  						(env: DOTFILES_COLOUR)
   -l, --log-level <level>  	Set verbosity ('debug', 'info', 'success', 'warning', 'error', 'quiet')
                            	(default: 'info')
   -q, --quiet              	Suppress all output except errors (same as --log-level=error)
   -o, --log-dir <path>    	Write log to file
                            	(default: ~/.config/dotfiles/logs)
-                           	(env: DOTFILES_LOG_FILE)
+                           	(env: DOTFILES_LOG_DIR)
 	  --cache-dir <path>    Write cache to file
 	  						(default: ~/.cache/dotfiles)
       --no-log             	Disable writing to a log file
@@ -840,10 +805,8 @@ EOF
 		)
 		# lib
 		declare -r -a lib_files=(
-			"${LIB_DIR}/banner.sh"
 			"${LIB_DIR}/bootstrap.sh"
 			"${LIB_DIR}/common.sh"
-			"${LIB_DIR}/log.sh"
 			"${LIB_DIR}/filesystem.sh"
 			"${LIB_DIR}/git.sh"
 			"${LIB_DIR}/template.sh"
@@ -999,14 +962,14 @@ EOF
 		done
 
 		if [[ ${#missing_paths[@]} -gt 0 ]]; then
-			local log::error
-
-			printf -v log::error "Missing %d path(s):" "${#missing_paths[@]}"
+			local msg="Missing ${#missing_paths[@]} path(s):"
 			for missing in "${missing_paths[@]}"; do
-				printf -v log::error "%s\n  %b✗%b %s" "$log::error" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "${missing}"
+				# '[ DEV_ERROR ]  ' 15 chars
+				#       vvv indent 2 		 15 chars vvv
+				printf -v msg "%s\n%b✗%b %s" "${msg}" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "${missing}"
 			done
 
-			log::dev_fatal "%s" "$log::error"
+			log::dev_fatal "%s" "${msg}"
 		fi
 
 		return 0
@@ -1017,7 +980,7 @@ EOF
 
 ###################
 # print banner
-source_file "${LIB_DIR}/banner.sh"
+print_banner
 source_file "${LIB_DIR}/bootstrap.sh"
 
 {
