@@ -388,6 +388,14 @@ EOF
 
 	get_help() {
 		local -r program="$(basename "$0")"
+		# Controls the colour output mode for the llama-launcher UI (default: auto).
+		# Valid options: auto, truecolor, xterm, ansi, always, never
+		#   auto      : Automatically detects and applies the highest colour mode your terminal supports.
+		#   truecolor : Forces 24-bit RGB output (16.7 million colours). Most modern terminals support this.
+		#   xterm     : Forces 8-bit output (256 colours). A safe fallback for older terminal emulators.
+		#   ansi      : Forces 4-bit output (16 standard colours). Maximum compatibility across all systems.
+		#   always    : Bypasses detection and forces basic colour output, even if not explicitly supported.
+		#   never     : Disables all colours, rendering the UI in plain monochrome text.colour: auto
 
 		cat <<EOF
 OVERVIEW: Installs and synchronizes dotfiles, shell configuration, and optional packages.
@@ -395,25 +403,26 @@ OVERVIEW: Installs and synchronizes dotfiles, shell configuration, and optional 
 USAGE: ${program} [options]
 
 OPTIONS:
+  -i, --install <module>	TODO: impl
   -n, --dry-run, --test     Simulate installation without making actual changes
   -f, --force              	Overwrite existing dotfiles without prompting
 							(env: DOTFILES_FORCE_OVERWRITE)
       --no-backup        	Do not create backups for preexisting files
       --no-confirm       	Do not prompt for confirmation
-  -c, --colour <mode>       Set colour mode: auto | always | never
+  -s, --status				Compare local configuration with upstream/current
+  -c, --colour <mode>       Set colour mode: auto | truecolor | xterm | ansi |
+  							always | never
 							(default: auto)
-	  						(env: DOTFILES_COLOUR)
+	  						(env: DOTFILES_FORCE_COLOUR)
   -l, --log-level <level>  	Set verbosity ('debug', 'info', 'success', 'warning', 'error', 'quiet')
                            	(default: 'info')
   -q, --quiet              	Suppress all output except errors (same as --log-level=error)
-  -o, --log-file <path>    	Write log to path
-                           	(default: ${SRC_DIR}/tmp/install.log)
+  -o, --log-dir <path>    	Write log to file
+                           	(default: ~/.config/dotfiles/logs)
                            	(env: DOTFILES_LOG_FILE)
+	  --cache-dir <path>    Write cache to file
+	  						(default: ~/.cache/dotfiles)
       --no-log             	Disable writing to a log file
-  -i, --install-packages  	Install base/recommended packages
-  -p, --packages-only     	Install packages only
-      --defaults          	Use default package choices without prompts
-      --no-packages       	Skip package installation
       --version				Display the version of this program
   -h, --help               	Show this help message
 
@@ -550,7 +559,7 @@ EOF
 	DRY_RUN=0
 	INSTALL_LOG_FILE="${DOTFILES_LOG_FILE:-${SRC_DIR}/tmp/install.log}"
 	user_log_level="${DOTFILES_LOG_LEVEL:-info}"
-
+	# FIXME: update
 	# parse args
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
