@@ -134,9 +134,7 @@ function Get-LLamaArgs {
 
     }
 
-    # --- KV cache quantisation (shared) ---
-    $argsList += "--cache-type-k", "q8_0"
-    $argsList += "--cache-type-v", "q8_0"
+    $argsList += "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"
 
     if (-not [string]::IsNullOrWhiteSpace($Alias)) { 
         $argsList += "--alias", $Alias 
