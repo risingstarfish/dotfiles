@@ -7,27 +7,87 @@ if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
 	return 0
 fi
 readonly __INSTALL_SH_INCLUDED__=1
+#######
+dotfiles::println() {
+	if [[ $# -gt 1 ]]; then
+		# format
+		command printf "$1\n" "${@:2}"
+	else
+		# single string
+		command printf '%s\n' "${1:-}"
+	fi
+}
 ###################
-if [ -z "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
-	printf 'Error: the install instructions explicitly say to pipe the install script to `bash`; please follow them' >&2
-	exit 1
-else
-	# script requires bash >=4.0
-	if ((BASH_VERSINFO[0] < 4)); then
-		printf "Error: This script requires Bash 4.0 or newer. You are running \e[33m%s\e[0m\n" "${BASH_VERSION}" >&2
-
-		if [[ "$(uname -s)" == "Darwin" ]]; then
-			printf "\nOn macOS, the default Bash is severely outdated (v3.2).\n" >&2
-			printf "Please install modern Bash via Homebrew by running:\n" >&2
-			printf "  brew install bash\n\n" >&2
-			printf "Then, restart your terminal and run this script again using the new Bash.\n" >&2
-		fi
+dotfiles::bash_version_check() {
+	if [ -z "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
+		dotfiles::println 'Error: the install instructions explicitly say to pipe the install script to `bash`; please follow them.' >&2
 		exit 1
 	fi
-fi
+	# script requires bash >=4.0
+	if ((BASH_VERSINFO[0] < 4)); then
+		local msg="Error: This script requires Bash 4.0 or newer. You are running ${BASH_VERSION}."
 
-readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
-readonly FALLBACK_CLONE_DIR="${HOME}"
+		if [[ "$(uname -s)" == "Darwin" ]]; then
+			msg+=$'\n
+  On macOS, the default Bash is severely outdated.
+  Please install modern Bash.
+  via Homebrew:
+    brew install bash
+  or via MacPorts:
+    port install bash
+
+  Then restart your terminal and run this script again using the new bash.'
+		fi
+
+		dotfiles::println "${msg}" >&2
+		exit 1
+	fi
+}
+
+dotfiles::install_from_git() {
+	local -r repo_url="https://github.com/${DOTFILES_GITHUB_REPO:-risingstarfish/dotfiles}.git"
+	local -r install_dir="${DOTFILES_DIR:-${HOME}/dotfiles}"
+	local -r ref="${DOTFILES_REF:-main}"
+
+	# already cloned
+	if [[ -d "${install_dir}/.git" ]]; then
+		dotfiles::println '=> Updating dotfiles in %s' "${install_dir}"
+		command git -C "${install_dir}" fetch origin --depth=1 "$ref" || {
+			dotfiles::println '=> Error: Fetch failed for %s (ref: %s). Check your network or repo URL.' "${repo_url}" "${ref}" >&2
+			exit 1
+		}
+		command git -C "${install_dir}" checkout -f FETCH_HEAD || {
+			dotfiles::println '=> Error: Checkout of %s failed in %s' "${ref}" "${install_dir}" >&2
+			exit 1
+		}
+	else
+		if [[ -e "${install_dir}" && ! -d "${install_dir}/.git" ]]; then
+			dotfiles::println '=> Warning: %s exists but is not a git repo. Backing up.' "${install_dir}"
+			mv "${install_dir}" "${install_dir}.bak.$(date +%s)"
+		fi
+
+		dotfiles::println '=> Cloning %s (ref: %s) to %s' "${repo_url}" "${ref}" "${install_dir}"
+		command git clone --depth=1 -b "$ref" "$repo_url" "${install_dir}" || {
+			dotfiles::println '=> Error: Clone failed for %s (ref: %s)' "${repo_url}" "${ref}" >&2
+			exit 1
+		}
+	fi
+
+	git -C "${install_dir}" reflog expire --expire=now --all 2>/dev/null || true
+	git -C "${install_dir}" gc --auto --prune=now 2>/dev/null || true
+}
+
+############
+# get src dir
+# TODO: bootstrap # move deps to bootstrap
+# env
+
+# argparse
+# logging
+# windows prompt powershell handoff
+# check_exists
+# main()
+#
 
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
@@ -37,20 +97,17 @@ readonly FALLBACK_CLONE_DIR="${HOME}"
 get_src_dir() {
 	local source_path="${BASH_SOURCE[0]}"
 	local symlink_dir
-	# Resolve symlinks recursively
+
 	while [ -L "$source_path" ]; do
-		# Get symlink directory
 		symlink_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
-		# Resolve symlink target (relative or absolute)
 		source_path="$(readlink "$source_path")"
-		# Check if candidate path is relative or absolute
+
 		if [[ $source_path != /* ]]; then
-			# Candidate path is relative, resolve to full path
 			source_path=$symlink_dir/$source_path
 		fi
 	done
-	# Get final script directory path from fully resolved source path
-	printf "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)" #FIXME:
+
+	printf '%s\n' "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 }
 readonly SRC_DIR="$(get_src_dir)"
 readonly CLONE_DIR="${CLONE_DIR:-$SRC_DIR}"
@@ -65,12 +122,15 @@ fi
 
 # colours
 {
-	COLOUR_DEPTH="16"
 	declare -A COLOUR
 
-	# Detects the maximum supported colour depth of the terminal.
-	# Usage: detect_colour_support
-	# Returns string via stdout: "none", "16", "256", or "truecolor"
+	#
+	# Detect the maximum supported colour depth of the *environment*.
+	# This does NOT check whether a specific stream is a TTY — that's
+	# done at emit time (see log::detail::emit). This function answers:
+	# "what is the terminal *capable* of?"
+	#
+	# Returns via stdout: "none", "16", "256", or "truecolor"
 	detect_colour_support() {
 		if [[ -n "${NO_COLOR:-}" ]] || [[ "${TERM:-}" == "dumb" ]]; then
 			printf "none"
@@ -173,7 +233,7 @@ fi
 		COLOUR["BOLD_BLUE"]=$'\e[1;38;5;12m'
 		COLOUR["BOLD_MAGENTA"]=$'\e[1;38;5;13m'
 		COLOUR["BOLD_CYAN"]=$'\e[1;38;5;14m'
-		COLOUR["BOLD_WHITE"]=$'\e[1;38;5;15wm'
+		COLOUR["BOLD_WHITE"]=$'\e[1;38;5;15m'
 		;;
 	"truecolor")
 		COLOUR["RESET"]=$'\e[0m'
@@ -314,7 +374,7 @@ fi
 
 	# Determine which PowerShell binary to use and set PWSH_CMD to it
 	set_pwsh_cmd() {
-		if [[ "${TARGET_OS}" == "OS_WINDOWS" ]]; then
+		if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
 			if PWSH_CMD=$(command -v pwsh.exe 2>/dev/null); then
 				readonly PWSH_CMD
 			elif PWSH_CMD=$(command -v powershell.exe 2>/dev/null); then
@@ -339,14 +399,14 @@ fi
 	print_banner() {
 		cat <<EOF
 
-${COLOUR["BOLD_CYAN"]}  ____        _    __ _ _           ${COLOUR["RESET"]}
-${COLOUR["BOLD_CYAN"]} |  _ \  ___ | |_ / _(_) | ___  ___ ${COLOUR["RESET"]}
-${COLOUR["BOLD_CYAN"]} | | | |/ _ \| __| |_| | |/ _ \/ __|${COLOUR["RESET"]}
-${COLOUR["BOLD_CYAN"]} | |_| | (_) | |_|  _| | |  __/\__ \\${COLOUR["RESET"]}
-${COLOUR["BOLD_CYAN"]} |____/ \___/ \__|_| |_|_|\___||___/${COLOUR["RESET"]}
-${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
+  ____        _    __ _ _           
+ |  _ \  ___ | |_ / _(_) | ___  ___ 
+ | | | |/ _ \| __| |_| | |/ _ \/ __|
+ | |_| | (_) | |_|  _| | |  __/\__ \
+ |____/ \___/ \__|_| |_|_|\___||___/
+ -----------------------------------
      Automated Environment Setup      
-${COLOUR["GREY"]} -----------------------------------${COLOUR["RESET"]}
+ -----------------------------------
 
 EOF
 	}
@@ -369,7 +429,7 @@ USAGE: ${program} [options]
 
 OPTIONS:
   -i, --install <module>	TODO: impl
-  -n, --dry-run, --test     Simulate installation without making actual changes
+  -n, --dry-run, 		    Simulate installation without making actual changes
   -f, --force              	Overwrite existing dotfiles without prompting
 							(env: DOTFILES_FORCE_OVERWRITE)
       --no-backup        	Do not create backups for preexisting files
@@ -407,30 +467,48 @@ EOF
 	readonly LOG_LEVEL_FATAL=5
 
 	log::detail::format() {
-		local -n args="$1"
-		shift
 		if [[ $# -gt 1 ]]; then
-			local format="$1"
-			shift
 			# shellcheck disable=SC2059
-			printf -v args "$format" "$@"
+			printf "$1" "${@:2}"
 		else
-			args="${1:-}"
+			printf '%s' "${1:-}"
 		fi
 	}
 
 	# handles colors for terminal, plain text for file.
 	log::detail::emit() {
 		local level_name="$1"
-		local color_code="$2"
-		local stream="$3"
-		local msg="$4"
+		local stream="$2"
+		local msg="$3"
 
-		# terminal
+		local color_code=""
+		local reset_code=""
+		if [[ "${COLOUR_DEPTH}" != "none" ]]; then
+			# colour if the *actual* stream is a terminal
+			if [[ "$stream" -eq 2 ]] && [[ -t 2 ]]; then
+				: # stderr is a TTY
+			elif [[ "$stream" -eq 1 ]] && [[ -t 1 ]]; then
+				: # stdout is a TTY
+			else
+				return_after_file=1 # skip colour, still write to file
+			fi
+		fi
+
+		if [[ -z "$return_after_file" ]]; then
+			case "$level_name" in
+			DEBUG) color_code="${COLOUR[BOLD_GREY]}" ;;
+			INFO) color_code="${COLOUR[BOLD_BLUE]}" ;;
+			SUCCESS) color_code="${COLOUR[BOLD_GREEN]}" ;;
+			WARNING) color_code="${COLOUR[BOLD_YELLOW]}" ;;
+			ERROR | FATAL | DEVELOPER) color_code="${COLOUR[BOLD_RED]}" ;;
+			esac
+			reset_code="${COLOUR[RESET]}"
+		fi
+		# terminal output
 		if [[ "$stream" -eq 2 ]]; then
-			printf "%b[ %s ]%b %s\n" "$color_code" "$level_name" "${COLOUR["RESET"]}" "$msg" >&2
+			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}" >&2
 		else
-			printf "%b[ %s ]%b %s\n" "$color_code" "$level_name" "${COLOUR["RESET"]}" "$msg"
+			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}"
 		fi
 
 		# file
@@ -441,45 +519,38 @@ EOF
 		fi
 	}
 
-	log::debug() {
-		((ACTIVE_LOG_LEVEL > LOG_LEVEL_DEBUG)) && return 0
-		local msg
-		log::detail::format msg "$@"
-		log::detail::emit "DEBUG" "${COLOUR["BOLD_GREY"]}" 1 "$msg"
-	}
-
 	log::info() {
 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_INFO)) && return 0
 		local msg
-		log::detail::format msg "$@"
-		log::detail::emit "INFO" "${COLOUR["BOLD_BLUE"]}" 1 "$msg"
+		msg="$(log::detail::format "$@")"
+		log::detail::emit "INFO" 1 "$msg"
 	}
 
 	log::success() {
 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_SUCCESS)) && return 0
 		local msg
-		log::detail::format msg "$@"
-		log::detail::emit "SUCCESS" "${COLOUR["BOLD_GREEN"]}" 1 "$msg"
+		msg="$(log::detail::format "$@")"
+		log::detail::emit "SUCCESS" 1 "$msg"
 	}
 
 	log::warning() {
 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_WARNING)) && return 0
 		local msg
-		log::detail::format msg "$@"
-		log::detail::emit "WARNING" "${COLOUR["BOLD_YELLOW"]}" 2 "$msg"
+		msg="$(log::detail::format "$@")"
+		log::detail::emit "WARNING" 2 "$msg"
 	}
 
 	log::error() {
 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_ERROR)) && return 0
 		local msg
-		log::detail::format msg "$@"
-		log::detail::emit "ERROR" "${COLOUR["BOLD_RED"]}" 2 "$msg"
+		msg="$(log::detail::format "$@")"
+		log::detail::emit "ERROR" 2 "$msg"
 	}
 
-	log::fatal() {
+	og::fatal() {
 		local msg
-		log::detail::format msg "$@"
-		log::detail::emit "FATAL" "${COLOUR["BOLD_RED"]}" 2 "$msg"
+		msg="$(log::detail::format "$@")"
+		log::detail::emit "FATAL" 2 "$msg"
 		exit 1
 	}
 
@@ -506,11 +577,11 @@ EOF
 		local -r base_file="${caller_file##*/}"
 
 		local msg
-		log::detail::format msg "$@"
+		msg="$(log::detail::format "$@")"
 		msg="${msg:-Uh oh! An unspecified developer error occurred.}"
 
 		local -r trace_msg="file: ${base_file}(${caller_line}) \`${caller_func}()\`: ${msg}"
-		log::detail::emit "DEVELOPER" "${COLOUR["BOLD_RED"]}" 2 "$trace_msg"
+		log::detail::emit "DEVELOPER" 2 "$trace_msg"
 
 		exit 1
 	}
@@ -524,6 +595,8 @@ EOF
 	DRY_RUN=0
 	INSTALL_LOG_FILE="${DOTFILES_LOG_FILE:-${SRC_DIR}/tmp/install.log}"
 	user_log_level="${DOTFILES_LOG_LEVEL:-info}"
+
+	operations=()
 	# FIXME: update
 	# parse args
 	while [[ $# -gt 0 ]]; do
