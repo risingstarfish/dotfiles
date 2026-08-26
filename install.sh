@@ -18,23 +18,27 @@ dotfiles::println() {
 	fi
 }
 ###################
+# NOTE: required commands:
+# all: git
+# mac: bash
+
+# TODO: maybe install package mac
 dotfiles::bash_version_check() {
 	if [ -z "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
-		dotfiles::println 'Error: the install instructions explicitly say to pipe the install script to `bash`; please follow them.' >&2
+		dotfiles::println 'Error: the install instructions explicitly say to use the install script with bash; please follow them.' >&2
 		exit 1
 	fi
 	# script requires bash >=4.0
 	if ((BASH_VERSINFO[0] < 4)); then
-		local msg="Error: This script requires Bash 4.0 or newer. You are running ${BASH_VERSION}."
+		local msg="Error: This script requires bash v4.0 or newer. You are running ${BASH_VERSION}."
 
 		if [[ "$(uname -s)" == "Darwin" ]]; then
 			msg+=$'\n
-  On macOS, the default Bash is severely outdated.
-  Please install modern Bash.
-  via Homebrew:
+  On macOS, the default bash is severely outdated (v3.2).
+  Please install modern bash via Homebrew:
     brew install bash
   or via MacPorts:
-    port install bash
+    sudo port install bash
 
   Then restart your terminal and run this script again using the new bash.'
 		fi
@@ -44,60 +48,70 @@ dotfiles::bash_version_check() {
 	fi
 }
 
+###################
 dotfiles::install_from_git() {
-	local -r repo_url="https://github.com/${DOTFILES_GITHUB_REPO:-risingstarfish/dotfiles}.git"
-	local -r install_dir="${DOTFILES_DIR:-${HOME}/dotfiles}"
-	local -r ref="${DOTFILES_REF:-main}"
-
-	# already cloned
-	if [[ -d "${install_dir}/.git" ]]; then
-		dotfiles::println '=> Updating dotfiles in %s' "${install_dir}"
-		command git -C "${install_dir}" fetch origin --depth=1 "$ref" || {
-			dotfiles::println '=> Error: Fetch failed for %s (ref: %s). Check your network or repo URL.' "${repo_url}" "${ref}" >&2
+# FIXME:
+	if ! [ -d "${NVM_DIR}" ]; then
+		if [ -e "${NVM_DIR}" ]; then
+			nvm_echo >&2 "File \"${NVM_DIR}\" has the same name as installation directory."
 			exit 1
-		}
-		command git -C "${install_dir}" checkout -f FETCH_HEAD || {
-			dotfiles::println '=> Error: Checkout of %s failed in %s' "${ref}" "${install_dir}" >&2
-			exit 1
-		}
-	else
-		if [[ -e "${install_dir}" && ! -d "${install_dir}/.git" ]]; then
-			dotfiles::println '=> Warning: %s exists but is not a git repo. Backing up.' "${install_dir}"
-			mv "${install_dir}" "${install_dir}.bak.$(date +%s)"
 		fi
 
-		dotfiles::println '=> Cloning %s (ref: %s) to %s' "${repo_url}" "${ref}" "${install_dir}"
-		command git clone --depth=1 -b "$ref" "$repo_url" "${install_dir}" || {
-			dotfiles::println '=> Error: Clone failed for %s (ref: %s)' "${repo_url}" "${ref}" >&2
+		if [ "${NVM_DIR}" = "$(nvm_default_install_dir)" ]; then
+			mkdir "${NVM_DIR}" || {
+				nvm_echo >&2 "Failed to create directory '${NVM_DIR}'"
+				exit 2
+			}
+		else
+			nvm_echo >&2 "You have \$NVM_DIR set to \"${NVM_DIR}\", but that directory does not exist. Check your profile files and environment."
 			exit 1
-		}
+		fi
 	fi
+
+	repo_url="https://github.com/${DOTFILES_GITHUB_REPO:-risingstarfish/dotfiles}.git"
+	install_dir="${DOTFILES_DIR:-${HOME}}"
+	ref="${DOTFILES_REF:-main}"
+
+if [[ -n "${DOTFILES_DIR:-}" ]]; then
+	
+fi
+
+
+	if [[ -e "${install_dir}" ]]; then
+		if [[ ! -d "${install_dir}" ]]; then
+			dotfiles::println 'Error: file "%s" has the same name as installation directory.' "${install_dir}" >&2
+			exit 1
+		fi
+		# check for git
+		if [[ ! -d "${install_dir}/.git" ]]; then
+			dotfiles::println 'Error: directory "%s" already exists but is not a git repo.' "${install_dir}" >&2
+			exit 1
+		fi
+	fi
+
+	dotfiles::println '=> Cloning %s (ref: %s) to %s' "${repo_url}" "${ref}" "${install_dir}"
+	command git clone --depth=1 -b "$ref" "$repo_url" "${install_dir}" || {
+		dotfiles::println 'Error: Clone failed for %s (ref: %s)' "${repo_url}" "${ref}" >&2
+		exit 1
+	}
 
 	git -C "${install_dir}" reflog expire --expire=now --all 2>/dev/null || true
 	git -C "${install_dir}" gc --auto --prune=now 2>/dev/null || true
+
+	dotfiles::println "=> Restarting script"
 }
 
 ############
-# get src dir
-# TODO: bootstrap # move deps to bootstrap
-# env
-
-# argparse
-# logging
-# windows prompt powershell handoff
-# check_exists
-# main()
-#
-
-# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
-# https://github.com/nvm-sh/nvm/blob/master/install.sh
-###################
 # set the absolute directory path of this script
 # Source - https://stackoverflow.com/a/246128
-get_src_dir() {
+dotfiles::src_path() {
 	local source_path="${BASH_SOURCE[0]}"
-	local symlink_dir
+	# piped to bash
+	if [[ -z "${source_path}" ]]; then
+		return
+	fi
 
+	local symlink_dir
 	while [ -L "$source_path" ]; do
 		symlink_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 		source_path="$(readlink "$source_path")"
@@ -109,16 +123,183 @@ get_src_dir() {
 
 	printf '%s\n' "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 }
-readonly SRC_DIR="$(get_src_dir)"
-readonly CLONE_DIR="${CLONE_DIR:-$SRC_DIR}"
-readonly CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
-readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles"
 
-unset -f get_src_dir
-if [[ -z "${SRC_DIR}" ]]; then
-	printf "Error: unable to resolve source directory.\n" >&2
-	exit 1
-fi
+# TODO: bootstrap # move deps to bootstrap
+# env
+
+# argparse
+# logging
+# windows prompt powershell handoff
+# check_exists
+# main()
+#
+dotfiles::update() {
+	dotfiles::println '=> Updating dotfiles in %s' "${install_dir}"
+	command git -C "${install_dir}" fetch origin --depth=1 "$ref" || {
+		dotfiles::println 'Error: Fetch failed for %s (ref: %s). Check your network or repo URL.' "${repo_url}" "${ref}" >&2
+		exit 1
+	}
+	command git -C "${install_dir}" checkout -f FETCH_HEAD || {
+		dotfiles::println 'Error: Checkout of %s failed in %s' "${ref}" "${install_dir}" >&2
+		exit 1
+	}
+}
+
+# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/version.sh
+dotfiles::print_version() {
+	dotfiles_clone_branch=$(git rev-parse --show-toplevel)
+	dotfiles_branch=$(git rev-parse --abbrev-ref HEAD)
+	dotfiles_remote=$(git config --get remote.origin.url)
+	dotfiles_version=$(git describe --tags --always)
+	dotfiles_commit_hash=$(git rev-parse HEAD)
+	dotfiles_version_commit_msg=$(git log -1 --pretty=%B)
+	dotfiles_version_last_checked=$(date +%Y-%m-%d\ %H:%M:%S\ %Z)
+
+	cat <<EOF
+dotfiles ${dotfiles_version} built from branch ${dotfiles_branch} at commit ${dotfiles_commit_hash:0:12} ($dotfiles_version_commit_msg)'
+Date: ${dotfiles_version_last_checked}
+Repository: ${dotfiles_clone_branch}
+Remote: ${dotfiles_remote}
+
+EOF
+}
+
+dotfiles::print_status() {
+	#TODO: calculate
+	echo ""
+}
+
+dotfiles::print_help() {
+	cat <<EOF
+OVERVIEW: Installs and synchronizes dotfiles, shell configuration, TODO: and optional packages.
+
+USAGE: ${program} [options]
+
+OPTIONS:
+  -i, --install <module>	TODO: impl
+  -n, --dry-run, 		    Simulate installation without making actual changes
+  -f, --force              	Overwrite existing dotfiles without prompting
+							(env: DOTFILES_FORCE_OVERWRITE)
+      --no-backup        	Do not create backups for preexisting files
+      --no-confirm       	Do not prompt for confirmation
+  -u, --update				Update repository before installing
+  							(default: false)
+  -s, --status				Compare local configuration with upstream/current
+  -c, --colour <mode>       Set colour mode: auto | truecolor | xterm | ansi |
+  							always | never
+							(default: auto)
+	  						(env: DOTFILES_COLOUR)
+  -l, --log-level <level>  	Set verbosity ('debug', 'info', 'success', 'warning', 'error', 'quiet')
+                           	(default: 'info')
+  -q, --quiet              	Suppress all output except errors (same as --log-level=error)
+  -o, --log-dir <path>    	Write log to file
+                           	(default: ~/.config/dotfiles/logs)
+                           	(env: DOTFILES_LOG_DIR)
+	  --cache-dir <path>    Write cache to file
+	  						(default: ~/.cache/dotfiles)
+      --no-log             	Disable writing to a log file
+      --version				Display the version and git information of this program
+  -h, --help               	Show this help message
+
+EOF
+}
+
+dotfiles::argparse() {
+	arguments=()
+	installs=()
+	excludes=()
+
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		-h | --help)
+			dotfiles::print_help
+			exit 0
+			;;
+		--version)
+			dotfiles::print_version
+			exit 0
+			;;
+		# -s | --status)
+		# 	dotfiles::print_version
+		# 	dotfiles::print_status
+		# 	exit 0
+		# 	;;
+		-u | --update)
+			arguments+=("update")
+			shift
+			;;
+		-n | --dry-run)
+			arguments+=("dry-run")
+			shift
+			;;
+		# -f | --force)
+		# 	arguments+=("force")
+		# 	shift
+		# 	;;
+		# -q | --quiet)
+		# 	user_log_level="error"
+		# 	shift
+		# 	;;
+		# --no-log)
+		# 	DISABLE_LOG_FILE=1
+		# 	shift
+		# 	;;
+		# -o | --log-file)
+		# 	if [[ -n "${2:-}" && "$2" != -* ]]; then
+		# 		INSTALL_LOG_FILE="$2"
+		# 		shift 2
+		# 	else
+		# 		printf "Error: Missing argument for %s\n" "$1" >&2
+		# 		exit 1
+		# 	fi
+		# 	;;
+		# --log-file=*)
+		# 	INSTALL_LOG_FILE="${1#*=}"
+		# 	shift
+		# 	;;
+		# -l | --log-level)
+		# 	# --log-level warning
+		# 	if [[ -n "${2:-}" && "$2" != -* ]]; then
+		# 		user_log_level="$2"
+		# 		shift 2
+		# 	else
+		# 		printf "Error: Missing argument for %s\n" "$1" >&2
+		# 		exit 1
+		# 	fi
+		# 	;;
+		# --log-level=*)
+		# 	# --log-level=warning
+		# 	user_log_level="${1#*=}"
+		# 	shift
+		# 	;;
+		*)
+			dotfiles::println "Error: Invalid parameter %s\n" "$1"
+			dotfiles::println "Run %s --help for valid options.\n" "$(basename "$0")" >&2
+			exit 1
+			;;
+		esac
+	done
+}
+
+dotfiles::main() {
+	program="$(basename "$0")"
+
+	dotfiles::bash_version_check
+	src_path="$(dotfiles::src_path)"
+	# piped to bash
+	if [[ -z "$src_path" ]]; then
+		dotfiles::install_from_git
+	fi
+
+	dotfiles::argparse "$@"
+}
+# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
+# https://github.com/nvm-sh/nvm/blob/master/install.sh
+###################
+
+dotfiles::main "$@"
+echo "fin"
+exit 0
 
 # colours
 {
@@ -353,7 +534,7 @@ fi
 		return 0
 	}
 	set_env || {
-		printf "%b[ FATAL ]%b Unable to detect TARGET_OS and TARGET_RUNTIME." "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" >&2
+		printf "[ FATAL ] Unable to detect TARGET_OS and TARGET_RUNTIME." >&2
 	}
 	unset -f set_env
 
@@ -395,9 +576,8 @@ fi
 }
 
 # usage, banners, large text
-{
-	print_banner() {
-		cat <<EOF
+print_banner() {
+	cat <<EOF
 
   ____        _    __ _ _           
  |  _ \  ___ | |_ / _(_) | ___  ___ 
@@ -409,52 +589,6 @@ fi
  -----------------------------------
 
 EOF
-	}
-
-	get_help() {
-		local -r program="$(basename "$0")"
-		# Controls the colour output mode for the llama-launcher UI (default: auto).
-		# Valid options: auto, truecolor, xterm, ansi, always, never
-		#   auto      : Automatically detects and applies the highest colour mode your terminal supports.
-		#   truecolor : Forces 24-bit RGB output (16.7 million colours). Most modern terminals support this.
-		#   xterm     : Forces 8-bit output (256 colours). A safe fallback for older terminal emulators.
-		#   ansi      : Forces 4-bit output (16 standard colours). Maximum compatibility across all systems.
-		#   always    : Bypasses detection and forces basic colour output, even if not explicitly supported.
-		#   never     : Disables all colours, rendering the UI in plain monochrome text.colour: auto
-
-		cat <<EOF
-OVERVIEW: Installs and synchronizes dotfiles, shell configuration, and optional packages.
-
-USAGE: ${program} [options]
-
-OPTIONS:
-  -i, --install <module>	TODO: impl
-  -n, --dry-run, 		    Simulate installation without making actual changes
-  -f, --force              	Overwrite existing dotfiles without prompting
-							(env: DOTFILES_FORCE_OVERWRITE)
-      --no-backup        	Do not create backups for preexisting files
-      --no-confirm       	Do not prompt for confirmation
-  -s, --status				Compare local configuration with upstream/current
-  -c, --colour <mode>       Set colour mode: auto | truecolor | xterm | ansi |
-  							always | never
-							(default: auto)
-	  						(env: DOTFILES_COLOUR)
-  -l, --log-level <level>  	Set verbosity ('debug', 'info', 'success', 'warning', 'error', 'quiet')
-                           	(default: 'info')
-  -q, --quiet              	Suppress all output except errors (same as --log-level=error)
-  -o, --log-dir <path>    	Write log to file
-                           	(default: ~/.config/dotfiles/logs)
-                           	(env: DOTFILES_LOG_DIR)
-	  --cache-dir <path>    Write cache to file
-	  						(default: ~/.cache/dotfiles)
-      --no-log             	Disable writing to a log file
-      --version				Display the version of this program
-  -h, --help               	Show this help message
-
-EXAMPLE:
-
-EOF
-	}
 }
 
 # logging
@@ -547,7 +681,7 @@ EOF
 		log::detail::emit "ERROR" 2 "$msg"
 	}
 
-	og::fatal() {
+	log::fatal() {
 		local msg
 		msg="$(log::detail::format "$@")"
 		log::detail::emit "FATAL" 2 "$msg"
@@ -602,7 +736,7 @@ EOF
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		-h | --help)
-			get_help
+			dotfiles::print_help
 			exit 0
 			;;
 		-f | --force)
@@ -626,7 +760,7 @@ EOF
 				INSTALL_LOG_FILE="$2"
 				shift 2
 			else
-				printf "%b[ ERROR ]%b Missing argument for %s\n" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$1" >&2
+				printf "Error: Missing argument for %s\n" "$1" >&2
 				exit 1
 			fi
 			;;
@@ -640,7 +774,7 @@ EOF
 				user_log_level="$2"
 				shift 2
 			else
-				printf "%b[ ERROR ]%b Missing argument for %s\n" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$1" >&2
+				printf "Error: Missing argument for %s\n" "$1" >&2
 				exit 1
 			fi
 			;;
@@ -650,7 +784,7 @@ EOF
 			shift
 			;;
 		*)
-			printf "%b[ ERROR ]%b Invalid parameter: %s\n" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "$1"
+			printf "Error: Invalid parameter: %s\n" "$1"
 			printf "Run %b%s --help%b for valid options.\n" "${COLOUR["CYAN"]}" "$(basename "$0")" "${COLOUR["RESET"]}" >&2 >&2
 			exit 1
 			;;
@@ -1039,7 +1173,7 @@ EOF
 			for missing in "${missing_paths[@]}"; do
 				# '[ DEV_ERROR ]  ' 15 chars
 				#       vvv indent 2 		 15 chars vvv
-				printf -v msg "%s\n%b✗%b %s" "${msg}" "${COLOUR["BOLD_RED"]}" "${COLOUR["RESET"]}" "${missing}"
+				printf -v msg "%s\n✗ %s" "${msg}" "${missing}"
 			done
 
 			log::dev_fatal "%s" "${msg}"
