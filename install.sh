@@ -49,46 +49,35 @@ dotfiles::bash_version_check() {
 }
 
 ###################
+dotfiles::default_install_dir() {
+	printf "%s" "${HOME}"
+}
+
+dotfiles::install_dir() {
+	if [[ -n "${DOTFILES_DIR}" ]]; then
+	printf "%s" "${DOTFILES_DIR}"
+	else
+	dotfiles::default_install_dir
+fi
+}
+
 dotfiles::install_from_git() {
-# FIXME:
-	if ! [ -d "${NVM_DIR}" ]; then
-		if [ -e "${NVM_DIR}" ]; then
-			nvm_echo >&2 "File \"${NVM_DIR}\" has the same name as installation directory."
-			exit 1
-		fi
-
-		if [ "${NVM_DIR}" = "$(nvm_default_install_dir)" ]; then
-			mkdir "${NVM_DIR}" || {
-				nvm_echo >&2 "Failed to create directory '${NVM_DIR}'"
-				exit 2
-			}
-		else
-			nvm_echo >&2 "You have \$NVM_DIR set to \"${NVM_DIR}\", but that directory does not exist. Check your profile files and environment."
-			exit 1
-		fi
-	fi
-
 	repo_url="https://github.com/${DOTFILES_GITHUB_REPO:-risingstarfish/dotfiles}.git"
-	install_dir="${DOTFILES_DIR:-${HOME}}"
 	ref="${DOTFILES_REF:-main}"
 
-if [[ -n "${DOTFILES_DIR:-}" ]]; then
-	
+
+
+
+
+if [[ -e "${install_dir}" && ! -d "${install_dir}" ]]; then
+    dotfiles::println 'Error: path "%s" is not a directory.' "${install_dir}" >&2
+    exit 1
+elif [[ ! -e "${install_dir}" ]]; then
+    dotfiles::println 'Error: path "%s" does not exist.' "${install_dir}" >&2
+    exit 1
+else # valid
+
 fi
-
-
-	if [[ -e "${install_dir}" ]]; then
-		if [[ ! -d "${install_dir}" ]]; then
-			dotfiles::println 'Error: file "%s" has the same name as installation directory.' "${install_dir}" >&2
-			exit 1
-		fi
-		# check for git
-		if [[ ! -d "${install_dir}/.git" ]]; then
-			dotfiles::println 'Error: directory "%s" already exists but is not a git repo.' "${install_dir}" >&2
-			exit 1
-		fi
-	fi
-
 	dotfiles::println '=> Cloning %s (ref: %s) to %s' "${repo_url}" "${ref}" "${install_dir}"
 	command git clone --depth=1 -b "$ref" "$repo_url" "${install_dir}" || {
 		dotfiles::println 'Error: Clone failed for %s (ref: %s)' "${repo_url}" "${ref}" >&2
@@ -99,6 +88,7 @@ fi
 	git -C "${install_dir}" gc --auto --prune=now 2>/dev/null || true
 
 	dotfiles::println "=> Restarting script"
+	# TODO: restart
 }
 
 ############
@@ -292,6 +282,7 @@ dotfiles::main() {
 	fi
 
 	dotfiles::argparse "$@"
+	# TODO: if sudo, install execs/add to path
 }
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
