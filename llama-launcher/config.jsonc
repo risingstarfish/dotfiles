@@ -26,30 +26,30 @@
     "max_retries": 5,
     // Minimum seconds an instance must stay alive before a crash is treated
     // as a startup failure rather than a later runtime crash.
-    "min_uptime_sec": 10
+    "min_uptime_sec": 10,
   },
   "network": {
     // Default endpoint used when an instance does not specify network_slot.
     "default": {
       "host": "127.0.0.1",
-      "port": 8080
+      "port": 8080,
     },
     // Named endpoints.
     // Each slot is one complete host + port pair.
     "slots": {
       "x": {
         "host": "0.0.0.0",
-        "port": 8080
+        "port": 8080,
       },
       "y": {
         "host": "127.0.0.1",
-        "port": 8081
+        "port": 8081,
       },
       "z": {
         "host": "127.0.0.1",
-        "port": 8082
-      }
-    }
+        "port": 8082,
+      },
+    },
   },
   "ui": {
     // Controls the colour output mode for the llama-launcher UI (default: auto).
@@ -141,9 +141,9 @@
         // Colour of the filled portion of the bar.
         "colour": "green",
         // Colour of the empty portion of the bar.
-        "background": "gray"
-      }
-    }
+        "background": "gray",
+      },
+    },
   },
   "runtime": {
     // Shared by all profiles. Per-profile values override these.
@@ -167,8 +167,8 @@
         "repeat_penalty": 1.1,
         "top_k": 40,
         "top_p": 0.95,
-        "min_p": 0.05
-      }
+        "min_p": 0.05,
+      },
     },
     // Reusable runtime templates.
     // These are global building blocks, not per-profile objects.
@@ -179,8 +179,8 @@
         "jinja": true,
         "sampling": {
           "temperature": 0.7,
-          "top_p": 0.95
-        }
+          "top_p": 0.95,
+        },
       },
       "coding": {
         "context_size": 16384,
@@ -189,14 +189,14 @@
         "sampling": {
           "temperature": 0.2,
           "top_k": 20,
-          "top_p": 0.9
-        }
+          "top_p": 0.9,
+        },
       },
       "low_memory": {
         "context_size": 4096,
-        "batch_size": 256
-      }
-    }
+        "batch_size": 256,
+      },
+    },
   },
   // Environment variable configuration.
   //
@@ -218,25 +218,25 @@
       // Debug logging preset.
       "debug": {
         "GGML_DEBUG": "1",
-        "LLAMA_DEBUG": "1"
+        "LLAMA_DEBUG": "1",
       },
       // Expose only CUDA device 0 to the server process.
       "cuda0": {
-        "CUDA_VISIBLE_DEVICES": "0"
+        "CUDA_VISIBLE_DEVICES": "0",
       },
       // Expose only CUDA device 1 to the server process.
       "cuda1": {
-        "CUDA_VISIBLE_DEVICES": "1"
+        "CUDA_VISIBLE_DEVICES": "1",
       },
       // Expose only ROCm/HSA device 0 to the server process.
       "rocm0": {
-        "HSA_VISIBLE_DEVICES": "0"
-      }
+        "HSA_VISIBLE_DEVICES": "0",
+      },
     },
     // Optional ENV files to import.
     // Later entries override earlier entries.
     // Each file should use simple KEY=VALUE lines.
-    "files": []
+    "files": [],
   },
   // Named model registry.
   // Profiles reference models by key instead of repeating paths.
@@ -248,18 +248,18 @@
       // Resolved relative to general.model_dir unless absolute.
       "path": "modelx.gguf",
       // Freeform tags for UI filtering / grouping.
-      "tags": ["chat"]
+      "tags": ["chat"],
     },
     "modely": {
       "title": "Model Y",
       "path": "modely.gguf",
-      "tags": ["chat"]
+      "tags": ["chat"],
     },
     "modelz": {
       "title": "Model Z",
       "path": "modelz.gguf",
-      "tags": ["chat"]
-    }
+      "tags": ["chat"],
+    },
   },
   // Optional multi-GPU section.
   // If not defined, your launcher can fall back to auto-detection.
@@ -268,11 +268,13 @@
       // Named devices.
       "gpu0": {
         // Backend device index.
-        "index": 0
+        "index": 0,
+        // TODO: "overclock"
       },
       "gpu1": {
-        "index": 1
-      }
+        "index": 1,
+        // TODO: "overclock"
+      },
     },
     // Named GPU placement presets.
     "placements": {
@@ -287,26 +289,26 @@
         "tensor_split": [1.0],
         // Split mode.
         // Use a value your llama.cpp build supports, e.g. layer, row, or tensor.
-        "split_mode": "layer"
+        "split_mode": "layer",
       },
       // Examples:
       "gpu1-only": {
         "device": "gpu1",
         "main_device": "gpu1",
         "tensor_split": [1.0],
-        "split_mode": "layer"
+        "split_mode": "layer",
       },
       "gpu0-gpu1-balanced": {
         "devices": ["gpu0", "gpu1"],
         "tensor_split": [0.5, 0.5],
-        "split_mode": "layer"
+        "split_mode": "layer",
       },
       "gpu0-gpu1-heavy": {
         "devices": ["gpu0", "gpu1"],
         "tensor_split": [0.7, 0.3],
-        "split_mode": "tensor"
-      }
-    }
+        "split_mode": "tensor",
+      },
+    },
   },
   // Each profile starts one or more instances together.
   "profiles": {
@@ -325,8 +327,8 @@
         // Literal environment variables applied to every instance in this profile.
         // These override env_presets at the same level.
         "env": {
-          "EXAMPLE_SHARED_VAR": "1"
-        }
+          "EXAMPLE_SHARED_VAR": "1",
+        },
       },
       // One or more llama-server instances started together.
       "instances": [
@@ -349,12 +351,12 @@
           // Instance-specific environment variables.
           // Highest-priority literal env source.
           "env": {
-            "EXAMPLE_INSTANCE_VAR": "1"
+            "EXAMPLE_INSTANCE_VAR": "1",
           },
           // Extra raw CLI args appended to llama-server.
-          "extra_args": []
-        }
-      ]
+          "extra_args": [],
+        },
+      ],
     },
     // Multi-instance example:
     "modelx-gpu0-modelz-gpu1": {
@@ -363,7 +365,7 @@
       "favourite": true,
       "shared": {
         "template": "chat",
-        "env_presets": ["debug"]
+        "env_presets": ["debug"],
       },
       "instances": [
         {
@@ -371,16 +373,16 @@
           "model": "modelx",
           "placement": "gpu0-only",
           "network_slot": "x",
-          "env_presets": ["cuda0"]
+          "env_presets": ["cuda0"],
         },
         {
           "id": "modelz-gpu1",
           "model": "modelz",
           "placement": "gpu1-only",
           "network_slot": "z",
-          "env_presets": ["cuda1"]
-        }
-      ]
-    }
-  }
+          "env_presets": ["cuda1"],
+        },
+      ],
+    },
+  },
 }
