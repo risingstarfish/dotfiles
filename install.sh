@@ -108,15 +108,6 @@ dotfiles::src_path() {
 	printf '%s\n' "$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 }
 
-# TODO: bootstrap # move deps to bootstrap
-# env
-
-# argparse
-# logging
-# windows prompt powershell handoff
-# check_exists
-# main()
-#
 dotfiles::update() {
 	dotfiles::println '=> Updating dotfiles in %s' "${install_dir}"
 	command git -C "${install_dir}" fetch origin --depth=1 "$ref" || {
@@ -189,10 +180,6 @@ EOF
 }
 
 dotfiles::argparse() {
-	arguments=()
-	installs=()
-	excludes=()
-
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		-h | --help)
@@ -209,11 +196,11 @@ dotfiles::argparse() {
 		# 	exit 0
 		# 	;;
 		-u | --update)
-			arguments+=("update")
+			#FIXME: add
 			shift
 			;;
 		-n | --dry-run)
-			arguments+=("dry-run")
+			#FIXME: add
 			shift
 			;;
 		# -f | --force)
@@ -278,6 +265,14 @@ dotfiles::main() {
 
 	dotfiles::argparse "$@"
 }
+# TODO: bootstrap # move deps to bootstrap
+# env
+
+# logging
+# windows prompt powershell handoff
+# check_exists
+# main()
+#
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
 ###################
