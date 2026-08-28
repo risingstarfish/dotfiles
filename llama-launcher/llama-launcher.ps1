@@ -109,9 +109,9 @@ if ([string]::IsNullOrWhiteSpace($Mode)) {
     $Mode = if ($Choice -eq "1") { "thinking" } else { "instruct" }
 }
 
+$ChatKwargs = '{"reasoning_effort":"' + $Reasoning + '"}'
 if ($Mode -eq "thinking") {
     Write-Host "Mode: Thinking" -ForegroundColor Yellow
-    $ChatKwargs = '{"reasoning_effort":"' + $Reasoning + '"}'
     $modelArgs = @(
         "--temp", "1.0",
         "--top-p", "0.95",
@@ -119,12 +119,12 @@ if ($Mode -eq "thinking") {
         "--min-p", "0.0",
         "--presence-penalty", "0.0",
         "--repeat-penalty", "1.0",
+        "--reasoning", "on",
         "--chat-template-kwargs", $ChatKwargs
     )
 }
 else {
     Write-Host "Mode: Instruct" -ForegroundColor Yellow
-    $ChatKwargs = '{"enable_thinking":false,"reasoning_effort":"' + $Reasoning + '"}'
     $modelArgs = @(
         "--temp", "0.7",
         "--top-p", "0.80",
@@ -132,6 +132,7 @@ else {
         "--min-p", "0.0",
         "--presence-penalty", "1.5",
         "--repeat-penalty", "1.0",
+        "--reasoning", "off",
         "--chat-template-kwargs", $ChatKwargs
     )
 }
