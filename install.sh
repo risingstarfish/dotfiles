@@ -55,29 +55,26 @@ dotfiles::default_install_dir() {
 
 dotfiles::install_dir() {
 	if [[ -n "${DOTFILES_DIR}" ]]; then
-	printf "%s" "${DOTFILES_DIR}"
+		printf "%s" "${DOTFILES_DIR}"
 	else
-	dotfiles::default_install_dir
-fi
+		dotfiles::default_install_dir
+	fi
 }
 
 dotfiles::install_from_git() {
 	repo_url="https://github.com/${DOTFILES_GITHUB_REPO:-risingstarfish/dotfiles}.git"
 	ref="${DOTFILES_REF:-main}"
+	install_dir="$(dotfiles::install_dir)"
 
+	if [[ -e "${install_dir}" && ! -d "${install_dir}" ]]; then
+		dotfiles::println 'Error: path "%s" is not a directory.' "${install_dir}" >&2
+		exit 1
+	fi
+	if [[ ! -e "${install_dir}" ]]; then
+		dotfiles::println 'Error: path "%s" does not exist.' "${install_dir}" >&2
+		exit 1
+	fi
 
-
-
-
-if [[ -e "${install_dir}" && ! -d "${install_dir}" ]]; then
-    dotfiles::println 'Error: path "%s" is not a directory.' "${install_dir}" >&2
-    exit 1
-elif [[ ! -e "${install_dir}" ]]; then
-    dotfiles::println 'Error: path "%s" does not exist.' "${install_dir}" >&2
-    exit 1
-else # valid
-
-fi
 	dotfiles::println '=> Cloning %s (ref: %s) to %s' "${repo_url}" "${ref}" "${install_dir}"
 	command git clone --depth=1 -b "$ref" "$repo_url" "${install_dir}" || {
 		dotfiles::println 'Error: Clone failed for %s (ref: %s)' "${repo_url}" "${ref}" >&2
@@ -86,9 +83,6 @@ fi
 
 	git -C "${install_dir}" reflog expire --expire=now --all 2>/dev/null || true
 	git -C "${install_dir}" gc --auto --prune=now 2>/dev/null || true
-
-	dotfiles::println "=> Restarting script"
-	# TODO: restart
 }
 
 ############
@@ -187,7 +181,7 @@ OPTIONS:
                            	(env: DOTFILES_LOG_DIR)
 	  --cache-dir <path>    Write cache to file
 	  						(default: ~/.cache/dotfiles)
-      --no-log             	Disable writing to a log file
+      --no-log             	Disable writing to log file
       --version				Display the version and git information of this program
   -h, --help               	Show this help message
 
@@ -279,10 +273,10 @@ dotfiles::main() {
 	# piped to bash
 	if [[ -z "$src_path" ]]; then
 		dotfiles::install_from_git
+		src_path="$(dotfiles::default_install_dir)"
 	fi
 
 	dotfiles::argparse "$@"
-	# TODO: if sudo, install execs/add to path
 }
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
