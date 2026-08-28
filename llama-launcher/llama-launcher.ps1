@@ -1,266 +1,223 @@
 [CmdletBinding()]
 param (
-    [Parameter(Mandatory = $true, Position = 0)]
-    [string]$ModelFilePath,
+    [string]$ModelFilePath = "",
 
-    [string]$llamaBinary = "llama-server",
+    [string]$llamaBinary = "",
 
+    [string]$ChatTemplate = "",
+
+    [ValidateRange(0, 999)]
     [int]$NgL = 999,
+    
+    [ValidateRange(4096, 262144)]
     [int]$CtxSize = 262144,
 
     [ValidateSet("xhigh", "medium", "low")]
-    [string]$Reasoning = "medium"
+    [string]$Reasoning = "medium",
+
+    [ValidateSet("thinking", "instruct")]
+    [string]$Mode = "",
+
+    [string]$HostIP = "0.0.0.0",
+
+    [ValidateRange(1, 65535)]
+    [int]$Port = 9931
 )
-# clamp 
-if ($NgL -lt 0) { $NgL = 0 } elseif ($NgL -gt 999) { $NgL = 999 }
-if ($CtxSize -lt 32768) { $CtxSize = 32768 } elseif ($CtxSize -gt 262144) { $CtxSize = 262144 }
+
+Set-StrictMode -Version Latest
+
+# env check
+$RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
+$MissingEnv = @()
+foreach ($envVar in $RequiredEnvs) {
+    if (-not (Test-Path "env:$envVar")) {
+        $MissingEnv += $envVar
+    }
+}
+if ($MissingEnv) {
+    Write-Host "Error: Missing required environment variables: $($MissingEnv -join ', ')" -ForegroundColor Red
+    exit 1
+}
+
+# defaults from env
+if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
+    $ModelFilePath = Join-Path $env:AI_MODELS "Qwen3.8-27B-UD-Q8_K_XL.gguf"
+}
+if ([string]::IsNullOrWhiteSpace($ChatTemplate)) {
+    $ChatTemplate = Join-Path $env:AI_MODELS "Qwen3.5_chat_template.jinja"
+}
+
+# binary detection
+if ([string]::IsNullOrWhiteSpace($llamaBinary)) {
+    $llamaBinary = (Get-Command "llama-server" -ErrorAction SilentlyContinue)?.Source
+    if (-not $llamaBinary) {
+        $llamaBinary = (Get-Command "ik-llama-server" -ErrorAction SilentlyContinue)?.Source
+    }
+    if (-not $llamaBinary) {
+        Write-Host "Error: Neither 'llama-server' nor 'ik-llama-server' found in PATH." -ForegroundColor Red
+        Write-Host "Specify explicitly:  llama-launcher -llamaBinary <path-to-binary>" -ForegroundColor DarkGray
+        exit 1
+    }
+}
+
+if (-not (Test-Path $llamaBinary)) {
+    Write-Host "Error: Binary not found: $llamaBinary" -ForegroundColor Red
+    exit 1
+}
+
+$binName = [System.IO.Path]::GetFileNameWithoutExtension($llamaBinary)
+$isIkLlama = $binName -eq 'ik-llama-server'
+
+if (-not (Test-Path $ModelFilePath)) {
+    Write-Host "Error: Model file not found: $ModelFilePath" -ForegroundColor Red
+    exit 1
+}
+if (-not (Test-Path $ChatTemplate)) {
+    Write-Host "Error: Chat template not found: $ChatTemplate" -ForegroundColor Red
+    exit 1
+}
+
+# port
+$bindAddr = if ($HostIP -eq "0.0.0.0") {
+    [System.Net.IPAddress]::Any
+} else {
+    [System.Net.IPAddress]::Parse($HostIP)
+}
+try {
+    $listener = [System.Net.Sockets.TcpListener]::new($bindAddr, $Port)
+    $listener.Start()
+    $listener.Stop()
+} catch [System.Net.Sockets.SocketException] {
+    Write-Host "Error: Port $Port is already in use on $HostIP." -ForegroundColor Red
+    exit 1
+}
 
 
 Write-Host "=================================================" -ForegroundColor Cyan
 Write-Host "                 llama-launcher                  " -ForegroundColor Cyan
 Write-Host "=================================================" -ForegroundColor Cyan
-
-
-# --- Binary detection ---
-if ([string]::IsNullOrWhiteSpace($llamaBinary)) {
-    # auto-detect from PATH: prefer ik-llama-server, fall back to llama-server
-    $llamaBinary = (Get-Command "ik-llama-server" -ErrorAction SilentlyContinue)?.Source
-    if (-not $llamaBinary) {
-        $llamaBinary = (Get-Command "llama-server" -ErrorAction SilentlyContinue)?.Source
-    }
-    if (-not $llamaBinary) {
-        Write-Host "`e[1;91m[ ERROR ]`e[0m Neither 'ik-llama-server' nor 'llama-server' found in PATH." -ForegroundColor Red
-        Write-Host "Specify explicitly:  llama-launcher <model.gguf> <path-to-binary>" -ForegroundColor DarkGray
-        exit 1
-    } 
-}
-
-$isIkLlama = $llamaBinary -match '^ik-llama-server$'
-
-
-Write-Host "  Binary : `e[1;36m$llamaBinary`e[0m" -ForegroundColor Cyan
+Write-Host "  Binary : $llamaBinary" -ForegroundColor Cyan
 Write-Host "  Model  : $ModelFilePath" -ForegroundColor Cyan
-Write-Host "`n"
+Write-Host "  Host   : $HostIP : $Port" -ForegroundColor Cyan
+Write-Host ""
 
-# env
-$RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
-function Check-EnvVars {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$EnvNames
-    )
-    
-    $MissingEnv = @()
-    foreach ($envVar in $EnvNames) {
-        if (-not (Test-Path "env:\$envVar")) {
-            $MissingEnv += $envVar
-        }
+if ([string]::IsNullOrWhiteSpace($Mode)) {
+    $Choice = ""
+    while ($Choice -notin @("1", "2")) {
+        $Choice = Read-Host "Select Mode:`n[1] Thinking`n[2] Instruct`nEnter choice (1 or 2)"
     }
-    return $MissingEnv
+    $Mode = if ($Choice -eq "1") { "thinking" } else { "instruct" }
 }
 
-$missing = Check-EnvVars -EnvNames $RequiredEnvs
-if ($missing) {
-    Write-Host "`e[1;91m[ ERROR ]`e[0m Missing required environment variables: `e[33m$($missing -join ', ')`e[0m"
-    exit 1
-}
-
-function Get-LLamaArgs {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [ValidateScript({
-                if (Test-Path $_) { $true } else { throw "Model file not found at: $_" }
-            })]
-        [string]$ModelPath,
-
-        [Parameter(Mandatory = $false)]
-        [ValidateRange(1024, 1048576)]
-        [int]$Context = 131072,
-
-        [Parameter(Mandatory = $false)]
-        [ValidateRange(0, 999)]
-        [int]$NgL = 999,
-        
-        [Parameter(Mandatory = $false)]
-        [ValidateRange(1, 128)]
-        [int]$Parallel = 1,
-        
-        [string]$HostIP = "192.168.0.245",
-        
-        [ValidateRange(1, 65535)]
-        [int]$Port = 8080,
-
-        [string]$Alias = "kvstorm1",
-        [string]$CorsOrigins = "http://localhost,http://192.168.0.245",
-        
-        [switch]$DisableFlashAttn,
-        [switch]$DisableContBatching,
-        [switch]$DisableMetrics,
-        [switch]$DisableCachePrompt,
-        [switch]$DisableJinja,
-
-        [Parameter(Mandatory = $true)]
-        [switch]$isIkLlama
-    )
-
-    $argsList = @(
-        "--model", $ModelPath,
-        "--ctx-size", $Context,
-        "--gpu-layers", $NgL,
-        "--host", $HostIP,
-        "--port", $Port,
-        "--parallel", $Parallel
-    )
-
-    # --- Speculative decoding flags (binary-specific) ---
-    if ($isIkLlama) {
-        # ik-llama-server flags
-        $argsList += "--chat-template-file", "C:\Users\tiger\opt\ai_models\Qwen3.5_chat_template.jinja"
-        $argsList += "--spec-type", "mtp:n_max=3,p_min=0.75"
-    }
-    else {
-        # standard llama-server flags
-        $argsList += "--chat-template-file", "C:\Users\tiger\opt\ai_models\Qwen3.5_chat_template.jinja"
-        $argsList += "--spec-type", "draft-mtp"
-        $argsList += "--spec-draft-n-max", "3"
-        
-        if (-not [string]::IsNullOrWhiteSpace($CorsOrigins)) { 
-            $argsList += "--cors-origins", $CorsOrigins
-            $argsList += "--cors-credentials"
-        }
-        if (-not $DisableCachePrompt) { $argsList += "--cache-prompt" }
-
-    }
-
-    $argsList += "--cache-type-k", "q8_0", "--cache-type-v", "q8_0"
-
-    if (-not [string]::IsNullOrWhiteSpace($Alias)) { 
-        $argsList += "--alias", $Alias 
-    }
-
-    
-    if (-not $DisableFlashAttn) { $argsList += "--flash-attn", "on" }
-    if (-not $DisableContBatching) { $argsList += "--cont-batching" }
-    if (-not $DisableMetrics) { $argsList += "--metrics" }
-    if (-not $DisableJinja) { $argsList += "--jinja" }
-
-    return $argsList
-}
-
-function Get-ModelArgs {
-    [CmdletBinding()]
-    param(
-        [ValidateRange(0.0, 5.0)]
-        [float]$Temperature = 0.7,
-
-        [ValidateRange(0.0, 1.0)]
-        [float]$TopP = 0.8,
-
-        [ValidateRange(0, 100)]
-        [int]$TopK = 20,
-
-        [ValidateRange(0.0, 1.0)]
-        [float]$MinP = 0.0,
-
-        [ValidateRange(0.0, 5.0)]
-        [float]$PresencePenalty = 0.0,
-
-        [ValidateRange(0.0, 5.0)]
-        [float]$RepetitionPenalty = 1.0,
-
-        [string]$ChatKwargs
-    )
-    
-    $argsList = @(
-        "--temp", $Temperature,
-        "--top-p", $TopP,
-        "--top-k", $TopK,
-        "--min-p", $MinP,
-        "--presence-penalty", $PresencePenalty,
-        "--repeat-penalty", $RepetitionPenalty
-    )
-
-    # append chat kwargs if valid string provided
-    if (-not [string]::IsNullOrWhiteSpace($ChatKwargs)) {
-        $argsList += "--chat-template-kwargs", $ChatKwargs
-    }
-
-    return $argsList
-}
-
-# prompt for mode
-$Choice = ""
-while ($Choice -notin @("1", "2")) {
-    $Choice = Read-Host "Select Mode:`n[1] Thinking`n[2] Instruct`nEnter choice (1 or 2)"
-}
-
-if ($Choice -eq "1") {
-    Write-Host "`nMode: Thinking selected." -ForegroundColor Yellow
+if ($Mode -eq "thinking") {
+    Write-Host "Mode: Thinking" -ForegroundColor Yellow
     $ChatKwargs = '{"reasoning_effort":"' + $Reasoning + '"}'
-    $modelArgs = Get-ModelArgs -Temperature 1.0 -TopP 0.95 -TopK 20 -MinP 0.0 -PresencePenalty 0.0 -RepetitionPenalty 1.0 -ChatKwargs $ChatKwargs
+    $modelArgs = @(
+        "--temp", "1.0",
+        "--top-p", "0.95",
+        "--top-k", "20",
+        "--min-p", "0.0",
+        "--presence-penalty", "0.0",
+        "--repeat-penalty", "1.0",
+        "--chat-template-kwargs", $ChatKwargs
+    )
 }
 else {
-    Write-Host "`nMode: Instruct selected." -ForegroundColor Yellow
+    Write-Host "Mode: Instruct" -ForegroundColor Yellow
     $ChatKwargs = '{"enable_thinking":false,"reasoning_effort":"' + $Reasoning + '"}'
-    $modelArgs = Get-ModelArgs -Temperature 0.7 -TopP 0.80 -TopK 20 -MinP 0.0 -PresencePenalty 1.5 -RepetitionPenalty 1.0 -ChatKwargs $ChatKwargs
+    $modelArgs = @(
+        "--temp", "0.7",
+        "--top-p", "0.80",
+        "--top-k", "20",
+        "--min-p", "0.0",
+        "--presence-penalty", "1.5",
+        "--repeat-penalty", "1.0",
+        "--chat-template-kwargs", $ChatKwargs
+    )
 }
 
-# build args
-$serverArgs = Get-LLamaArgs -ModelPath $ModelFilePath -Context $CtxSize -NgL $NgL -isIkLlama:$isIkLlama
+$serverArgs = @(
+    "--model", $ModelFilePath,
+    "--ctx-size", $CtxSize,
+    "--gpu-layers", $NgL,
+    "--host", $HostIP,
+    "--port", $Port,
+    "--parallel", "1",
+    "--chat-template-file", $ChatTemplate,
+    "--cache-type-k", "q8_0",
+    "--cache-type-v", "q8_0",
+    "--alias", "kvstorm1",
+    "--flash-attn", "on",
+    "--cont-batching",
+    "--metrics",
+    "--jinja"
+)
+
+if ($isIkLlama) {
+    $serverArgs += "--spec-type", "mtp:n_max=3,p_min=0.75"
+}
+else {
+    $serverArgs += "--spec-type", "draft-mtp"
+    $serverArgs += "--spec-draft-n-max", "3"
+    $serverArgs += "--cors-origins", "http://localhost"
+    $serverArgs += "--cors-credentials"
+    $serverArgs += "--cache-prompt"
+}
+
 $llamaArgs = $serverArgs + $modelArgs
 
-Write-Host "`n`e[1;32m[ Binary ]`e[0m $llamaBinary" -ForegroundColor Cyan
-Write-Host "`e[1;32m[ Model  ]`e[0m $ModelFilePath" -ForegroundColor Cyan
-Write-Host "`e[1;32m[ Ctx    ]`e[0m $CtxSize" -ForegroundColor Cyan
-Write-Host "`e[1;32m[ GPU-L  ]`e[0m $NgL" -ForegroundColor Cyan
-Write-Host "`e[1;32m[ Mode   ]`e[0m $(if ($Choice -eq '1') { 'Thinking' } else { 'Instruct'})" -ForegroundColor Cyan
-Write-Host "`n"
+Write-Host ""
+Write-Host "  [ Binary ] $llamaBinary" -ForegroundColor Green
+Write-Host "  [ Model  ] $ModelFilePath" -ForegroundColor Green
+Write-Host "  [ Ctx    ] $CtxSize" -ForegroundColor Green
+Write-Host "  [ GPU-L  ] $NgL" -ForegroundColor Green
+Write-Host "  [ Mode   ] $Mode" -ForegroundColor Green
+Write-Host ""
 
-$maxRetries = 5
-$retryCount = 0
-$success = $false
-
-
+# log setup
 $logDir = if ($env:LLAMA_LAUNCHER_LOG_DIR) { $env:LLAMA_LAUNCHER_LOG_DIR } else { "$env:USERPROFILE\.config\llama-launcher" }
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
-$logFile = Join-Path $logDir "($binaryName)_crash_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+$logFile = Join-Path $logDir "${binName}_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 
-
-# launch and restart
+$retryCount = 0
+$success = $false
+$minUptimeSeconds = 5
 $maxRetries = 5
-$displayMax = "5"
+$displayMax = "$maxRetries"
 
 $envRetry = $env:LLAMA_LAUNCHER_MAX_RETRY
 if (-not [string]::IsNullOrWhiteSpace($envRetry)) {
     $envRetry = $envRetry.Trim().ToLower()
-    
+
     if ($envRetry -eq 'max' -or $envRetry -eq 'infinite') {
         $maxRetries = [int]::MaxValue
         $displayMax = "Infinite"
     }
     elseif ($envRetry -match '^\d+$') {
         $maxRetries = [int]$envRetry
-        $displayMax = $maxRetries
+        $displayMax = "$maxRetries"
     }
     elseif ($envRetry -ne 'auto') {
         Write-Host "Warning: Invalid LLAMA_LAUNCHER_MAX_RETRY value '$envRetry'. Defaulting to 5." -ForegroundColor Yellow
     }
 }
 
-$retryCount = 0
-$success = $false
-$minUptimeSeconds = 5 # min seconds it must run to be successful
+trap {
+    Write-Host ""
+    Write-Host "[ llama-launcher ] Interrupted." -ForegroundColor Yellow
+    exit 130
+}
 
 while ($retryCount -lt $maxRetries -and -not $success) {
-    Write-Host "`nStarting $llamaBinary (Attempt $($retryCount + 1) of $displayMax)..." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Starting $llamaBinary (Attempt $($retryCount + 1) of $displayMax)..." -ForegroundColor Green
     Write-Host "Command: $llamaBinary $($llamaArgs -join ' ')" -ForegroundColor White
     Write-Host "==================================================" -ForegroundColor Cyan
 
     $startTime = Get-Date
 
-    # have to extract raw text since 2>&1 in powershell wraps in ErrorRecord object
+    "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] --- Attempt $($retryCount + 1) ---" | Out-File $logFile -Append
+
     & $llamaBinary @llamaArgs 2>&1 | ForEach-Object { $_.ToString() } | Tee-Object -FilePath $logFile -Append
 
     $endTime = Get-Date
@@ -272,26 +229,26 @@ while ($retryCount -lt $maxRetries -and -not $success) {
     }
     else {
         Write-Host "Server crashed with exit code $LASTEXITCODE." -ForegroundColor Red
-        
-        # check if it crashed immediately
+
         if ($runTime.TotalSeconds -lt $minUptimeSeconds) {
-            Write-Host "CRITICAL: Server crashed immediately (ran for less than $minUptimeSeconds seconds)." -ForegroundColor Red
-            Write-Host "This usually indicates invalid arguments, a bad model path, or the port is already in use." -ForegroundColor Red
-            Write-Host "Error details logged to: $logFile" -ForegroundColor DarkGray
-            Write-Host "Aborting restart to prevent infinite loop." -ForegroundColor Red
+            Write-Host "CRITICAL: Server crashed immediately (ran < $minUptimeSeconds s)." -ForegroundColor Red
+            Write-Host "Likely cause: invalid args, bad model path, or port conflict." -ForegroundColor Red
+            Write-Host "Log: $logFile" -ForegroundColor DarkGray
+            Write-Host "Aborting to prevent infinite loop." -ForegroundColor Red
             exit $LASTEXITCODE
         }
 
         $retryCount++
-        Write-Host "Server crashed after running for $([math]::Round($runTime.TotalSeconds)) seconds." -ForegroundColor Yellow
-        Write-Host "Error details logged to: $logFile" -ForegroundColor DarkGray
-        
+        $elapsed = [math]::Round($runTime.TotalSeconds)
+        Write-Host "Server crashed after running for $elapsed s." -ForegroundColor Yellow
+        Write-Host "Log: $logFile" -ForegroundColor DarkGray
+
         if ($retryCount -lt $maxRetries) {
             Write-Host "Restarting in 5 seconds..." -ForegroundColor Yellow
             Start-Sleep -Seconds 5
         }
         else {
-            Write-Host "Maximum retry limit ($maxRetries) reached. Abandoning startup." -ForegroundColor Red
+            Write-Host "Maximum retries ($displayMax) reached. Abandoning." -ForegroundColor Red
             exit $LASTEXITCODE
         }
     }
