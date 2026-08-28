@@ -50,30 +50,51 @@ dotfiles::bash_version_check() {
 
 ###################
 dotfiles::default_install_dir() {
-	printf "%s" "${HOME}"
+	printf "%s" "${HOME}/dotfiles"
 }
 
 dotfiles::install_dir() {
-	if [[ -n "${DOTFILES_DIR}" ]]; then
-		printf "%s" "${DOTFILES_DIR}"
+	if [[ -n "${INSTALL_DIR:-}" ]]; then
+		printf "%s" "${INSTALL_DIR}"
 	else
 		dotfiles::default_install_dir
 	fi
 }
 
 dotfiles::install_from_git() {
-	repo_url="https://github.com/${DOTFILES_GITHUB_REPO:-risingstarfish/dotfiles}.git"
-	ref="${DOTFILES_REF:-main}"
-	install_dir="$(dotfiles::install_dir)"
+	local -r repo_url="https://github.com/risingstarfish/dotfiles.git"
+	local -r ref="${DOTFILES_REF:-main}"
+	local -r install_dir="$(dotfiles::install_dir)"
 
+	# path is not directory
 	if [[ -e "${install_dir}" && ! -d "${install_dir}" ]]; then
 		dotfiles::println 'Error: path "%s" is not a directory.' "${install_dir}" >&2
 		exit 1
 	fi
-	if [[ ! -e "${install_dir}" ]]; then
-		dotfiles::println 'Error: path "%s" does not exist.' "${install_dir}" >&2
+	# already cloned
+	if [[ -d "${install_dir}/.git" ]]; then
+		if [[ -f "${install_dir}/install.sh" ]]; then
+			dotfiles::println '=> Existing clone at %s.' "${install_dir}"
+			exec bash "${install_dir}/install.sh" "$@"
+		else # random repo
+			dotfiles::println 'Error: %s/.git exists but %s does not.' \
+				"${install_dir}" "install.sh" >&2
+			dotfiles::println '  This does not appear to be a dotfiles clone.' >&2
+			dotfiles::println '  Remove it or set INSTALL_DIR to a different path.' >&2
+			exit 1
+		fi
+	fi
+	# non-empty dir and NOT git clone
+	if [[ -d "${install_dir}" && -n "$(ls -A "${install_dir}" 2>/dev/null)" ]]; then
+		dotfiles::println 'Error: %s is not empty and is not a git clone.' "${install_dir}" >&2
+		dotfiles::println '  Move it aside or set INSTALL_DIR to a different path.' >&2
 		exit 1
 	fi
+	# install_dir does not exist
+	mkdir -p "${install_dir}" || {
+		dotfiles::println 'Error: cannot create %s' "${install_dir}" >&2
+		exit 1
+	}
 
 	dotfiles::println '=> Cloning %s (ref: %s) to %s' "${repo_url}" "${ref}" "${install_dir}"
 	command git clone --depth=1 -b "$ref" "$repo_url" "${install_dir}" || {
@@ -81,8 +102,12 @@ dotfiles::install_from_git() {
 		exit 1
 	}
 
-	git -C "${install_dir}" reflog expire --expire=now --all 2>/dev/null || true
-	git -C "${install_dir}" gc --auto --prune=now 2>/dev/null || true
+	command git -C "${install_dir}" reflog expire --expire=now --all 2>/dev/null || true
+	command git -C "${install_dir}" gc --auto --prune=now 2>/dev/null || true
+
+	# restart script with local copy
+	dotfiles::println "=> Restarting script with local copy." # TODO: read -p
+	exec bash "${install_dir}/install.sh" "$@"
 }
 
 ############
@@ -96,7 +121,7 @@ dotfiles::src_path() {
 	fi
 
 	local symlink_dir
-	while [ -L "$source_path" ]; do
+	while [[ -L "$source_path" ]]; do
 		symlink_dir="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
 		source_path="$(readlink "$source_path")"
 
@@ -122,16 +147,16 @@ dotfiles::update() {
 
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/version.sh
 dotfiles::print_version() {
-	dotfiles_clone_branch=$(git rev-parse --show-toplevel)
-	dotfiles_branch=$(git rev-parse --abbrev-ref HEAD)
-	dotfiles_remote=$(git config --get remote.origin.url)
-	dotfiles_version=$(git describe --tags --always)
-	dotfiles_commit_hash=$(git rev-parse HEAD)
-	dotfiles_version_commit_msg=$(git log -1 --pretty=%B)
-	dotfiles_version_last_checked=$(date +%Y-%m-%d\ %H:%M:%S\ %Z)
+	local -r dotfiles_clone_branch=$(command git -C "${SRC_PATH}" rev-parse --show-toplevel)
+	local -r dotfiles_branch=$(command git -C "${SRC_PATH}" rev-parse --abbrev-ref HEAD)
+	local -r dotfiles_remote=$(command git -C "${SRC_PATH}" config --get remote.origin.url)
+	local -r dotfiles_version=$(command git -C "${SRC_PATH}" describe --tags --always)
+	local -r dotfiles_commit_hash=$(command git -C "${SRC_PATH}" rev-parse HEAD)
+	local -r dotfiles_version_commit_msg=$(command git -C "${SRC_PATH}" log -1 --pretty=%B)
+	local -r dotfiles_version_last_checked=$(date +%Y-%m-%d\ %H:%M:%S\ %Z)
 
 	cat <<EOF
-dotfiles ${dotfiles_version} built from branch ${dotfiles_branch} at commit ${dotfiles_commit_hash:0:12} ($dotfiles_version_commit_msg)'
+dotfiles ${dotfiles_version} built from branch ${dotfiles_branch} at commit ${dotfiles_commit_hash:0:12} ($dotfiles_version_commit_msg)
 Date: ${dotfiles_version_last_checked}
 Repository: ${dotfiles_clone_branch}
 Remote: ${dotfiles_remote}
@@ -148,22 +173,19 @@ dotfiles::print_help() {
 	cat <<EOF
 OVERVIEW: Installs and synchronizes dotfiles, shell configuration, TODO: and optional packages.
 
-USAGE: ${program} [options]
+USAGE: $(basename "$0") [options]
 
 OPTIONS:
   -i, --install <module>	TODO: impl
-  -n, --dry-run, 		    Simulate installation without making actual changes
+  -n, --dry-run 		    Simulate installation without making actual changes
   -f, --force              	Overwrite existing dotfiles without prompting
-							(env: DOTFILES_FORCE_OVERWRITE)
+					        (env: DOTFILES_FORCE_OVERWRITE)
+	  --no-restart          Do not automatically restart zsh shell after installation
       --no-backup        	Do not create backups for preexisting files
       --no-confirm       	Do not prompt for confirmation
   -u, --update				Update repository before installing
   							(default: false)
   -s, --status				Compare local configuration with upstream/current
-  -c, --colour <mode>       Set colour mode: auto | truecolor | xterm | ansi |
-  							always | never
-							(default: auto)
-	  						(env: DOTFILES_COLOUR)
   -l, --log-level <level>  	Set verbosity ('debug', 'info', 'success', 'warning', 'error', 'quiet')
                            	(default: 'info')
   -q, --quiet              	Suppress all output except errors (same as --log-level=error)
@@ -201,6 +223,10 @@ dotfiles::argparse() {
 			;;
 		-n | --dry-run)
 			#FIXME: add
+			shift
+			;;
+		--no-restart)
+			NO_RESTART=1
 			shift
 			;;
 		# -f | --force)
@@ -252,34 +278,103 @@ dotfiles::argparse() {
 	done
 }
 
-dotfiles::main() {
-	program="$(basename "$0")"
+dotfiles::print_banner() {
+	cat <<'EOF'
 
+  ____        _    __ _ _           
+ |  _ \  ___ | |_ / _(_) | ___  ___ 
+ | | | |/ _ \| __| |_| | |/ _ \/ __|
+ | |_| | (_) | |_|  _| | |  __/\__ \\
+ |____/ \___/ \__|_| |_|_|\___||___/
+ -----------------------------------
+     Automated Environment Setup      
+ -----------------------------------
+
+EOF
+}
+
+dotfiles::print_start() {
+	cat <<'EOF'
+
+╭───────────────────────────────────────────╮
+│                                           │
+│           STARTING INSTALLATION           │
+│                                           │
+╰───────────────────────────────────────────╯
+
+EOF
+}
+dotfiles::print_end() {
+	if [[ -z "${NO_RESTART:-}" ]]; then
+		cat <<'EOF'
+
+╭───────────────────────────────────────────╮
+│                                           │
+│          INSTALLATION COMPLETE!           │
+│                                           │
+│  Restarting shell…                        │
+╰───────────────────────────────────────────╯
+
+EOF
+	else
+		cat <<'EOF'
+
+╭───────────────────────────────────────────╮
+│                                           │
+│          INSTALLATION COMPLETE!           │
+│                                           │
+│  Run exec zsh to apply your changes.      │
+╰───────────────────────────────────────────╯
+
+EOF
+	fi
+}
+
+dotfiles::unset_all() {
+	unset -f dotfiles::println dotfiles::print_banner dotfiles::print_start dotfiles::print_end \
+		dotfiles::print_help dotfiles::print_status dotfiles::print_version \
+		dotfiles::bash_version_check dotfiles::src_path dotfiles::argparse \
+		dotfiles::install_from_git dotfiles::install_dir dotfiles::default_install_dir
+	#dotfiles::update
+}
+
+main() {
 	dotfiles::bash_version_check
-	src_path="$(dotfiles::src_path)"
+
+	SRC_PATH="$(dotfiles::src_path)"
+	readonly SRC_PATH
 	# piped to bash
-	if [[ -z "$src_path" ]]; then
-		dotfiles::install_from_git
-		src_path="$(dotfiles::default_install_dir)"
+	if [[ -z "$SRC_PATH" ]]; then
+		# noreturn
+		dotfiles::install_from_git "$@"
 	fi
 
 	dotfiles::argparse "$@"
-}
-# TODO: bootstrap # move deps to bootstrap
-# env
+	# TODO: bootstrap # move deps to bootstrap
+	# env
+	# logging
+	# check_exists base bootstrap files
+	dotfiles::print_banner
+	# windows prompt powershell handoff
+	# check_exists
+	dotfiles::print_start
+	# TODO: symlink etc
+	dotfiles::print_end
+	if [[ -z "${NO_RESTART:-}" ]]; then
+		exec zsh
+	fi
 
-# logging
-# windows prompt powershell handoff
-# check_exists
-# main()
+	dotfiles::unset_all
+	exit 0
+}
 #
 # https://github.com/HyDE-Project/HyDE/blob/master/Scripts/install.sh
 # https://github.com/nvm-sh/nvm/blob/master/install.sh
 ###################
 
-dotfiles::main "$@"
-echo "fin"
-exit 0
+main "$@"
+#dotfiles::unset_all
+#exit 0
 
 # colours
 {
@@ -553,22 +648,6 @@ exit 0
 	}
 	set_pwsh_cmd
 	unset -f set_pwsh_cmd
-}
-
-# usage, banners, large text
-print_banner() {
-	cat <<EOF
-
-  ____        _    __ _ _           
- |  _ \  ___ | |_ / _(_) | ___  ___ 
- | | | |/ _ \| __| |_| | |/ _ \/ __|
- | |_| | (_) | |_|  _| | |  __/\__ \
- |____/ \___/ \__|_| |_|_|\___||___/
- -----------------------------------
-     Automated Environment Setup      
- -----------------------------------
-
-EOF
 }
 
 # logging
