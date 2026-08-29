@@ -59,29 +59,34 @@ dotfiles::bash_version_check() {
 	#   $1 (format) : (Optional) The warning message, or a printf-style format string.
 	#   $@ (args)   : (Optional) Arguments to populate the format string.
 	dotfiles::prompt_continue() {
-		local message
+		local msg
 		if [[ $# -gt 1 ]]; then
 			# shellcheck disable=SC2059
-			printf -v message "$@"
+			printf -v msg "$@"
 		else
-			message="$1"
+			msg="${1:-}"
 		fi
 
-		if [[ -n "$message" ]]; then
-			printf "%b\n" "$message" >&2
+		if [[ -n "$msg" ]]; then
+			printf "%b" "$msg" >&2
 		fi
 
-		dotfiles::println "\n=> Do you want to continue anyway? [y/N]: " >&2
+		printf "\n=> Do you want to continue anyway? [y/N]: " >&2
 
 		local choice
 		while true; do
-			read -r choice
+			if ! read -r choice; then
+				dotfiles::println "Error: No input available for prompt." >&2
+				return 1
+			fi
+
 			case "$choice" in
 			[yY])
 				return 0
 				;;
 			[nN])
 				dotfiles::println "Aborting installation!" >&2
+				exit 1
 				;;
 			*)
 				dotfiles::println "Error: Invalid input. Please enter y or n." >&2
@@ -137,13 +142,13 @@ EOF
 
 	# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/version.sh
 	dotfiles::print_version() {
-		local -r dotfiles_clone_branch=$(command git -C "${SRC_PATH}" rev-parse --show-toplevel) || printf "<unknown>"
-		local -r dotfiles_branch=$(command git -C "${SRC_PATH}" rev-parse --abbrev-ref HEAD) || printf "<unknown>"
-		local -r dotfiles_remote=$(command git -C "${SRC_PATH}" config --get remote.origin.url) || printf "<unknown>"
-		local -r dotfiles_version=$(command git -C "${SRC_PATH}" describe --tags --always) || printf "<unknown>"
-		local -r dotfiles_commit_hash=$(command git -C "${SRC_PATH}" rev-parse HEAD) || printf "<unknown>"
-		local -r dotfiles_version_commit_msg=$(command git -C "${SRC_PATH}" log -1 --pretty=%B) || printf "<unknown>"
-		local -r dotfiles_version_last_checked=$(date +%Y-%m-%d\ %H:%M:%S\ %Z) || printf "<unknown>"
+		local -r dotfiles_clone_branch=$(command git -C "${SRC_PATH}" rev-parse --show-toplevel) || dotfiles_clone_branch="<unknown>"
+		local -r dotfiles_branch=$(command git -C "${SRC_PATH}" rev-parse --abbrev-ref HEAD) || dotfiles_branch="<unknown>"
+		local -r dotfiles_remote=$(command git -C "${SRC_PATH}" config --get remote.origin.url) || dotfiles_remote="<unknown>"
+		local -r dotfiles_version=$(command git -C "${SRC_PATH}" describe --tags --always) || dotfiles_version="<unknown>"
+		local -r dotfiles_commit_hash=$(command git -C "${SRC_PATH}" rev-parse HEAD) || dotfiles_commit_hash="<unknown>"
+		local -r dotfiles_version_commit_msg=$(command git -C "${SRC_PATH}" log -1 --pretty=%B) || dotfiles_version_commit_msg="<unknown>"
+		local -r dotfiles_version_last_checked=$(date +%Y-%m-%d\ %H:%M:%S\ %Z) || dotfiles_version_last_checked="<unknown>"
 
 		cat <<EOF
 dotfiles ${dotfiles_version} built from branch ${dotfiles_branch} at commit ${dotfiles_commit_hash:0:12} ($dotfiles_version_commit_msg)
@@ -301,12 +306,17 @@ EOF
 
 	dotfiles::update() {
 		if [[ ! -d "${SRC_PATH}/.git" ]]; then
-			dotfiles::println 'Error: %s is not a git clone. Run install first.\n' "${SRC_PATH}" >&2
+			dotfiles::println 'Error: %s is not a git clone. Run install first.' "${SRC_PATH}" >&2
 			exit 1
 		fi
 
-		# do not update local modifications
+		local has_local_mods=0
 		if ! command git -C "${SRC_PATH}" diff --quiet HEAD 2>/dev/null; then
+			has_local_mods=1
+		fi
+
+		# ── Normal user: block hard ──────────────────────────────────
+		if ((has_local_mods)) && [[ -z "${DOTFILES_ALLOW_LOCAL_MODS:-}" ]]; then
 			cat <<EOF >&2
 
 Error: You have uncommitted changes in ${SRC_PATH}:
@@ -317,30 +327,45 @@ $(command git -C "${SRC_PATH}" diff --stat HEAD 2>/dev/null)
     e.g.  tmux.conf  →  tmux.conf.local
 
   Revert your changes or move them to a .local file, then re-run:
-    bash $(basename $0) --update
+    bash $(basename "$0") --update
+
+  (dev: set DOTFILES_ALLOW_LOCAL_MODS=1 to bypass this check)
 
 EOF
 			exit 1
 		fi
 
-		if command git -C "${SRC_PATH}" diff --cached --quiet 2>/dev/null; then
-			: # nothing staged
-		else
-			dotfiles::println '  (staged changes detected — unstage with: git reset)\n' >&2
-			dotfiles::prompt_continue || exit 1
+		# ── Dev override: rebase instead of force-checkout ──────────
+		if ((has_local_mods)) && [[ -n "${DOTFILES_ALLOW_LOCAL_MODS:-}" ]]; then
+			dotfiles::println '=> Local modifications detected. Rebasing instead of force-checkout.'
+			dotfiles::println '  Your changes will be preserved on top of the latest %s.' "$REF"
+
+			if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "$REF" 2>/dev/null; then
+				dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "$REF" >&2
+				exit 1
+			fi
+			if ! command git -C "${SRC_PATH}" rebase FETCH_HEAD 2>/dev/null; then
+				dotfiles::println 'Error: Rebase failed. Resolve conflicts, then:' >&2
+				dotfiles::println '    git -C "%s" rebase --continue' "${SRC_PATH}" >&2
+				dotfiles::println '  Or abort with:' >&2
+				dotfiles::println '    git -C "%s" rebase --abort' "${SRC_PATH}" >&2
+				exit 1
+			fi
+			return 0
 		fi
 
 		dotfiles::println '=> Updating dotfiles in %s' "${SRC_PATH}"
 
+		local fetch_ok=1
 		if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "$REF" 2>/dev/null; then
 			fetch_ok=0
-			dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.\n' "$REF" >&2
+			dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "$REF" >&2
 			dotfiles::prompt_continue "Your files may be overwritten\n" || exit 1
-			dotfiles::println '  Continuing with current local state.\n'
+			dotfiles::println '  Continuing with current local state.'
 		fi
 		if ((fetch_ok)); then
 			if ! command git -C "${SRC_PATH}" checkout -f FETCH_HEAD 2>/dev/null; then
-				dotfiles::println 'Error: Checkout of %s failed in %s\n' "$REF" "${SRC_PATH}" >&2
+				dotfiles::println 'Error: Checkout of %s failed in %s' "$REF" "${SRC_PATH}" >&2
 				exit 1
 			fi
 		fi
@@ -352,7 +377,7 @@ EOF
 # $2 = value to assign to MODE
 dotfiles::check_and_set_mode() {
 	if [[ -n "$MODE" ]]; then
-		dotfiles::println "Error: Cannot specify multiple actions. %s conflicts with '%s'\n" "$1" "$MODE" >&2
+		dotfiles::println "Error: Cannot specify multiple actions. %s conflicts with '%s'" "$1" "$MODE" >&2
 		exit 1
 	fi
 	MODE="$2"
@@ -366,9 +391,10 @@ dotfiles::parse_module_list() {
 	local top
 	local sub
 	local valid
+	local -a mods
 
-	IFS=';' read -ra _mods <<<"$1"
-	for m in "${_mods[@]}"; do
+	IFS=';' read -ra mods <<<"$1"
+	for m in "${mods[@]}"; do
 		[[ -z "$m" ]] && continue
 		valid=0
 
@@ -404,7 +430,7 @@ dotfiles::parse_module_list() {
 		fi
 
 		if [[ $valid -eq 0 ]]; then
-			dotfiles::println "Error: Unknown module '%s'\n" "$m" >&2
+			dotfiles::println "Error: Unknown module '%s'" "$m" >&2
 			exit 1
 		fi
 		arr+=("$m")
@@ -584,22 +610,53 @@ dotfiles::argparse() {
 	fi
 
 	if [[ "$MODE" != "install" && ${#INSTALL_MODULES[@]} -gt 0 ]]; then
-		dotfiles::println "Error: --install is not valid with --%s\n" "$MODE" >&2
+		dotfiles::println "Error: --install is not valid with --%s" "$MODE" >&2
 		exit 1
 	fi
 	if [[ "$MODE" != "install" && ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
-		dotfiles::println "Error: --exclude is not valid with --%s\n" "$MODE" >&2
+		dotfiles::println "Error: --exclude is not valid with --%s" "$MODE" >&2
 		exit 1
 	fi
 	if [[ ${#INSTALL_MODULES[@]} -gt 0 && ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
-		dotfiles::println "Error: --install and --exclude are mutually exclusive\n" >&2
+		dotfiles::println "Error: --install and --exclude are mutually exclusive" >&2
 		exit 1
 	fi
 	# TODO: process args
 }
 
+dotfiles::do_mode() {
+	case "$MODE" in
+	install)
+		# TODO: implement
+		# TODO: symlink, env, logging, check_exists, windows pwsh handoff
+		;;
+	clean)
+		# TODO: remove orphaned symlinks, then install/relink
+		;;
+	reset)
+		# TODO: remove all symlinks managed by this tool
+		;;
+	list)
+		# TODO: list all available modules
+		# TODO: also list available upstream
+		;;
+	diff)
+		# TODO: show diff between current files and incoming dotfiles
+		;;
+	status)
+		dotfiles::print_status
+		;;
+	*)
+		dotfiles::println "Error: Unknown mode '%s'" "$MODE" >&2
+		exit 1
+		;;
+	esac
+}
+
 main() {
 	dotfiles::bash_version_check
+
+	readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
 
 	SRC_PATH="$(dotfiles::src_path)"
 	readonly SRC_PATH
@@ -609,7 +666,6 @@ main() {
 		dotfiles::install_from_git "$@"
 	fi
 
-	readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
 	REF="$(command git -C "${SRC_PATH}" config --local dotfiles.ref 2>/dev/null)"
 	readonly REF="${REF:-main}"
 
@@ -628,6 +684,8 @@ main() {
 	# check_exists
 	dotfiles::print_start
 	# TODO: symlink etc
+	dotfiles::do_mode
+
 	dotfiles::print_end
 	if [[ -z "${NO_RESTART:-}" ]]; then
 		exec zsh
