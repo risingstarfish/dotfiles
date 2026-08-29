@@ -1,1 +1,26 @@
 vscode
+
+  ____        _    __ _ _
+ |  _ \  ___ | |_ / _(_) | ___  ___
+ | | | |/ _ \| __| |_| | |/ _ \/ __|
+ | |_| | (_) | |_|  _| | |  __/\__ \
+ |____/ \___/ \__|_| |_|_|\___||___/
+ -----------------------------------
+     Automated Environment Setup
+ -----------------------------------
+
+[ INFO ]    Pulling latest changes…
+[ OK ]      Repository up to date (a3f7c2e)
+[ INFO ]    Validating required files…
+[ OK ]      32/32 files present.
+[ INFO ]    Linking configuration files…
+[ WARNING ] Overwriting ~/.ssh/config (was a regular file). Backup saved.
+[ OK ]      30 linked, 2 skipped (no change).
+[ INFO ]    Setting up local templates…
+[ OK ]      ~/.zshrc.local, ~/.gitconfig.local installed.
+
+  ╭───────────────────────────────────────────╮
+  │                                           │
+  │          INSTALLATION COMPLETE!           │
+  │  Run exec zsh to apply your changes.      │
+  ╰───────────────────────────────────────────╯
