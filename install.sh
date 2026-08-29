@@ -491,8 +491,12 @@ EOF
 			dotfiles::println '  Continuing with current local state.'
 		fi
 		if ((fetch_ok)); then
-			if ! command git -C "${SRC_PATH}" checkout -f FETCH_HEAD 2>/dev/null; then
+			if ! command git -C "${SRC_PATH}" checkout "$REF" 2>/dev/null; then
 				dotfiles::println 'Error: Checkout of %s failed in %s' "$REF" "${SRC_PATH}" >&2
+				exit 1
+			fi
+			if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2>/dev/null; then
+				dotfiles::println 'Error: Reset to %s failed in %s' "$REF" "${SRC_PATH}" >&2
 				exit 1
 			fi
 		fi
