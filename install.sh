@@ -89,8 +89,8 @@ dotfiles::bash_version_check() {
 }
 
 # Detect if script was run as sudo or root.
-# Usage: set_admin
-dotfiles::set_admin() {
+# Usage: detect_admin
+dotfiles::detect_admin() {
 	if [[ "$EUID" -eq 0 || -n "${SUDO_USER:-}" ]]; then
 		readonly IS_ELEVATED=true
 	elif [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]] && net session >/dev/null 2>&1; then
@@ -594,16 +594,16 @@ dotfiles::parse_module_list() {
 				curl | fastfetch | git | iterm2 | oh-my-posh | shellcheck | ssh | tmux | wget) valid=1 ;;
 				esac
 				;;
-			os)
-				case "$sub" in
-				archlinux | debian | mac | windows) valid=1 ;;
-				esac
-				;;
-			runtime)
-				case "$sub" in
-				gitbash | msys | native | wsl) valid=1 ;;
-				esac
-				;;
+			# os)
+			# 	case "$sub" in
+			# 	archlinux | debian | mac | windows) valid=1 ;;
+			# 	esac
+			# 	;;
+			# runtime)
+			# 	case "$sub" in
+			# 	gitbash | msys | native | wsl) valid=1 ;;
+			# 	esac
+			# 	;;
 			shells)
 				case "$sub" in
 				bash | pwsh | zsh) valid=1 ;;
@@ -612,7 +612,7 @@ dotfiles::parse_module_list() {
 			esac
 		else
 			case "$m" in
-			apps | configs | docs | lib | llama-launcher | os | runtime | setup | shells) valid=1 ;;
+			apps | os | runtime | shells) valid=1 ;;
 			esac
 		fi
 
@@ -823,10 +823,10 @@ dotfiles::do_mode() {
 		;;
 	esac
 }
-
+################
 main() {
 	dotfiles::bash_version_check
-	dotfiles::set_admin
+	dotfiles::detect_admin
 
 	SRC_PATH="$(dotfiles::src_path)"
 	readonly SRC_PATH
@@ -850,7 +850,7 @@ main() {
 		dotfiles::prompt_continue "Some modules may be skipped"
 	}
 
-	dotfiles::set_pwsh_cmd
+	dotfiles::set_pwsh_cmd # TODO: move to windows
 	# logging
 	# check_exists base bootstrap files
 
@@ -870,8 +870,8 @@ main() {
 
 	exit 0
 }
-####################
 main "$@" || exit 1
+####################
 
 # logging
 {
