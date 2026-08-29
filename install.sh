@@ -8,6 +8,46 @@ if [[ -n "${__INSTALL_SH_INCLUDED__:-}" ]]; then
 fi
 readonly __INSTALL_SH_INCLUDED__=1
 #######
+IS_ELEVATED=false
+SRC_PATH=""
+
+readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
+REF=""
+# env
+readonly OS_ARCHLINUX="archlinux"
+readonly OS_DEBIAN="debian"
+readonly OS_MAC="mac"
+readonly OS_WINDOWS="windows"
+readonly OS_UNKNOWN="unknown"
+
+readonly RUNTIME_NATIVE="native"
+readonly RUNTIME_WSL="wsl"
+readonly RUNTIME_MSYS="msys"
+readonly RUNTIME_GITBASH="gitbash"
+readonly RUNTIME_UNKNOWN="unknown"
+
+TARGET_OS="${OS_UNKNOWN}"
+TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
+# argparse
+NO_RESTART=0
+DRY_RUN=0
+FORCE=0
+UPDATE=0
+INTERACTIVE=0
+NO_BACKUP=0
+NO_DEPS=0
+NO_HOOKS=0
+NO_LOG=0
+VERBOSE=0
+QUIET=0
+MODE=""
+LOG_LEVEL="info"
+INSTALL_MODULES=()
+EXCLUDE_MODULES=()
+# windows TODO: possible add any1 with pwsh
+PWSH_CMD=""
+
+#######
 dotfiles::println() {
 	if [[ $# -gt 1 ]]; then
 		# format
@@ -48,6 +88,93 @@ dotfiles::bash_version_check() {
 	fi
 }
 
+# Detect if script was run as sudo or root.
+# Usage: set_admin
+dotfiles::set_admin() {
+	if [[ "$EUID" -eq 0 || -n "${SUDO_USER:-}" ]]; then
+		readonly IS_ELEVATED=true
+	elif [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]] && net session >/dev/null 2>&1; then
+		# net session fails with exit code 5 if not admin
+		readonly IS_ELEVATED=true
+	else
+		readonly IS_ELEVATED=false
+	fi
+}
+
+# Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
+# against OS_UNKNOWN and RUNTIME_UNKNOWN
+# Usage: set_env
+#
+# Returns:
+#   0 if TARGET_OS and TARGET_RUNTIME are set
+#   1 if TARGET_OS and TARGET_RUNTIME remain 'unknown'
+dotfiles::set_env() {
+	local kernel_name
+	kernel_name="$(uname -s 2>/dev/null || echo "unknown")"
+
+	case "${kernel_name}" in
+	Linux*)
+		# wsl vs native
+		if uname -r | grep -qi "microsoft"; then
+			readonly TARGET_RUNTIME="${RUNTIME_WSL}"
+		else
+			readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
+		fi
+
+		# distro
+		if [[ -f "/etc/os-release" ]]; then
+			if grep -qiE '^ID=.*cachyos' /etc/os-release; then
+				readonly TARGET_OS="${OS_CACHYOS:-cachyos}"
+			elif grep -qiE '^ID(_LIKE)?=.*arch' /etc/os-release || [[ -f "/etc/arch-release" ]]; then
+				readonly TARGET_OS="${OS_ARCHLINUX}"
+			elif grep -qiE '^ID(_LIKE)?=.*debian' /etc/os-release || [[ -f "/etc/debian_version" ]]; then
+				readonly TARGET_OS="${OS_DEBIAN}"
+			else
+				readonly TARGET_OS="${OS_UNKNOWN}"
+			fi
+		else
+			readonly TARGET_OS="${OS_UNKNOWN}"
+		fi
+		;;
+
+	Darwin*)
+		readonly TARGET_OS="${OS_MAC}"
+		readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
+		;;
+
+	CYGWIN* | MSYS*)
+		readonly TARGET_OS="${OS_WINDOWS}"
+		readonly TARGET_RUNTIME="${RUNTIME_MSYS}"
+		;;
+
+	MINGW*)
+		readonly TARGET_OS="${OS_WINDOWS}"
+		# Git Bash and standard MSYS2 MinGW output "MINGW*"
+		# Git Bash explicitly places git-bash.exe at the root and sets $EXEPATH
+		if [[ -f "/git-bash.exe" || -n "${EXEPATH:-}" ]]; then
+			readonly TARGET_RUNTIME="${RUNTIME_GITBASH}"
+		else
+			readonly TARGET_RUNTIME="${RUNTIME_MSYS}"
+		fi
+		;;
+
+	*)
+		# Unknown
+		if [[ "${OS:-}" == "Windows_NT" ]]; then
+			readonly TARGET_OS="${OS_WINDOWS}"
+			readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}" # redundant
+		else
+			readonly TARGET_OS
+			readonly TARGET_RUNTIME
+
+			return 1
+		fi
+		;;
+	esac
+
+	return 0
+}
+
 ###################
 # util
 {
@@ -68,7 +195,7 @@ dotfiles::bash_version_check() {
 		fi
 
 		if [[ -n "$msg" ]]; then
-			printf "%b" "$msg" >&2
+			printf "%s\n" "$msg" >&2
 		fi
 
 		printf "\n=> Do you want to continue anyway? [y/N]: " >&2
@@ -373,9 +500,66 @@ EOF
 	}
 }
 
+# Determine which PowerShell binary to use and set PWSH_CMD to it
+dotfiles::set_pwsh_cmd() {
+	if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
+		if PWSH_CMD=$(command -v pwsh.exe 2>/dev/null); then
+			readonly PWSH_CMD
+		elif PWSH_CMD=$(command -v powershell.exe 2>/dev/null); then
+			readonly PWSH_CMD
+		else
+			readonly PWSH_CMD
+		fi
+	else # linux
+		if PWSH_CMD=$(command -v pwsh 2>/dev/null); then
+			readonly PWSH_CMD
+		else
+			readonly PWSH_CMD
+		fi
+	fi
+}
+
+# Check if provided paths exist.
+# If any paths are missing, outputs a summary at the end.
+# Usage: check_exists <path> [path...]
+#
+# Arguments:
+#   $@ (args) : Paths to verify.
+#
+# Returns:
+#   0 if all paths exist
+#   1 if any paths do not exist
+dotfiles::check_exists() {
+	local -r -a paths=("$@")
+	local -a missing_paths=()
+	local -r prefix="${SRC_PATH}/"
+
+	for path in "${paths[@]}"; do
+		if [[ ! -e "$path" ]]; then
+			missing_paths+=("${path#"$prefix"}")
+		fi
+	done
+
+	if [[ ${#missing_paths[@]} -gt 0 ]]; then
+		local msg="Missing ${#missing_paths[@]} path(s):"
+		for missing in "${missing_paths[@]}"; do
+			# '[ DEV_ERROR ]  ' 15 chars
+			#       vvv indent 2 		 15 chars vvv
+			printf -v msg "%s\n✗ %s" "${msg}" "${missing}"
+		done
+
+		#log::dev_fatal "%s" "${msg}"
+		exit 1
+	fi
+
+	return 0
+}
+
+#######################################
+
 # $1 = flag name for the error message
 # $2 = value to assign to MODE
-dotfiles::check_and_set_mode() {
+dotfiles::set_mode() {
 	if [[ -n "$MODE" ]]; then
 		dotfiles::println "Error: Cannot specify multiple actions. %s conflicts with '%s'" "$1" "$MODE" >&2
 		exit 1
@@ -438,22 +622,6 @@ dotfiles::parse_module_list() {
 }
 
 dotfiles::argparse() {
-	NO_RESTART=0
-	DRY_RUN=0
-	FORCE=0
-	UPDATE=0
-	INTERACTIVE=0
-	NO_BACKUP=0
-	NO_DEPS=0
-	NO_HOOKS=0
-	NO_LOG=0
-	VERBOSE=0
-	QUIET=0
-	MODE=""
-	LOG_LEVEL="info"
-	INSTALL_MODULES=()
-	EXCLUDE_MODULES=()
-
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		-h | --help)
@@ -474,19 +642,19 @@ dotfiles::argparse() {
 			shift
 			;;
 		-c | --clean)
-			dotfiles::check_and_set_mode "--clean" "clean"
+			dotfiles::set_mode "--clean" "clean"
 			shift
 			;;
 		--reset)
-			dotfiles::check_and_set_mode "--reset" "reset"
+			dotfiles::set_mode "--reset" "reset"
 			shift
 			;;
 		-l | --list)
-			dotfiles::check_and_set_mode "--list" "list"
+			dotfiles::set_mode "--list" "list"
 			shift
 			;;
 		-d | --diff)
-			dotfiles::check_and_set_mode "--diff" "diff"
+			dotfiles::set_mode "--diff" "diff"
 			shift
 			;;
 		-i | --install)
@@ -655,31 +823,37 @@ dotfiles::do_mode() {
 
 main() {
 	dotfiles::bash_version_check
-
-	readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
+	dotfiles::set_admin
 
 	SRC_PATH="$(dotfiles::src_path)"
 	readonly SRC_PATH
 	# piped to bash
 	if [[ -z "$SRC_PATH" ]]; then
-		# noreturn
-		dotfiles::install_from_git "$@"
+		dotfiles::install_from_git "$@" # noreturn
 	fi
 
 	REF="$(command git -C "${SRC_PATH}" config --local dotfiles.ref 2>/dev/null)"
 	readonly REF="${REF:-main}"
 
+	# TODO: bootstrap # move deps to bootstrap # check_exists
+	# lib_files=
+	# check_exists
 	dotfiles::argparse "$@"
+
+	dotfiles::print_banner
+
+	dotfiles::set_env || {
+		dotfiles::println "Warning: unable to determine \$TARGET_OS or \$TARGET_RUNTIME"
+		dotfiles::prompt_continue "Some modules may be skipped"
+	}
+
+	dotfiles::set_pwsh_cmd
+	# logging
+	# check_exists base bootstrap files
 
 	if [[ "${UPDATE}" -eq 1 ]]; then
 		dotfiles::update
 	fi
-
-	# TODO: bootstrap # move deps to bootstrap
-	# env
-	# logging
-	# check_exists base bootstrap files
-	dotfiles::print_banner
 	# windows prompt powershell handoff
 	# check_exists
 	dotfiles::print_start
@@ -695,280 +869,6 @@ main() {
 }
 ####################
 main "$@" || exit 1
-
-# colours
-{
-	declare -A COLOUR
-
-	#
-	# Detect the maximum supported colour depth of the *environment*.
-	# This does NOT check whether a specific stream is a TTY — that's
-	# done at emit time (see log::detail::emit). This function answers:
-	# "what is the terminal *capable* of?"
-	#
-	# Returns via stdout: "none", "16", "256", or "truecolor"
-	detect_colour_support() {
-		if [[ -n "${NO_COLOR:-}" ]] || [[ "${TERM:-}" == "dumb" ]]; then
-			printf "none"
-			return 0
-		fi
-
-		if [[ "${COLORTERM:-}" == "truecolor" || "${COLORTERM:-}" == "24bit" ]]; then
-			printf "truecolor"
-			return 0
-		fi
-
-		# query terminal database
-		if command -v tput &>/dev/null; then
-			local tput_colors
-			# suppress errors in case tput fails (e.g., missing terminfo)
-			tput_colors=$(tput colors 2>/dev/null || echo 0)
-
-			if ((tput_colors >= 256)); then
-				printf "256"
-				return 0
-			elif ((tput_colors >= 8)); then
-				printf "16"
-				return 0
-			fi
-		fi
-
-		if [[ "${TERM:-}" == *"-256color"* || "${TERM:-}" == *"xterm-256"* ]]; then
-			printf "256"
-			return 0
-		fi
-		# fallback
-		printf "16"
-	}
-	COLOUR_DEPTH="$(detect_colour_support)"
-	unset -f detect_colour_support
-	readonly COLOUR_DEPTH
-
-	case "${COLOUR_DEPTH}" in
-	"none")
-		COLOUR["RESET"]=$''
-		COLOUR["BLACK"]=$''
-		COLOUR["GREY"]=$''
-		COLOUR["RED"]=$''
-		COLOUR["GREEN"]=$''
-		COLOUR["YELLOW"]=$''
-		COLOUR["BLUE"]=$''
-		COLOUR["MAGENTA"]=$''
-		COLOUR["CYAN"]=$''
-		COLOUR["WHITE"]=$''
-
-		COLOUR["BOLD_BLACK"]=$''
-		COLOUR["BOLD_GREY"]=$''
-		COLOUR["BOLD_RED"]=$''
-		COLOUR["BOLD_GREEN"]=$''
-		COLOUR["BOLD_YELLOW"]=$''
-		COLOUR["BOLD_BLUE"]=$''
-		COLOUR["BOLD_MAGENTA"]=$''
-		COLOUR["BOLD_CYAN"]=$''
-		COLOUR["BOLD_WHITE"]=$''
-		;;
-	"16")
-		COLOUR["RESET"]=$'\e[0m'
-		COLOUR["BLACK"]=$'\e[30m'
-		COLOUR["GREY"]=$'\e[90m'
-		COLOUR["RED"]=$'\e[91m'
-		COLOUR["GREEN"]=$'\e[92m'
-		COLOUR["YELLOW"]=$'\e[93m'
-		COLOUR["BLUE"]=$'\e[94m'
-		COLOUR["MAGENTA"]=$'\e[95m'
-		COLOUR["CYAN"]=$'\e[96m'
-		COLOUR["WHITE"]=$'\e[97m'
-
-		COLOUR["BOLD_BLACK"]=$'\e[1;30m'
-		COLOUR["BOLD_GREY"]=$'\e[1;90m'
-		COLOUR["BOLD_RED"]=$'\e[1;91m'
-		COLOUR["BOLD_GREEN"]=$'\e[1;92m'
-		COLOUR["BOLD_YELLOW"]=$'\e[1;93m'
-		COLOUR["BOLD_BLUE"]=$'\e[1;94m'
-		COLOUR["BOLD_MAGENTA"]=$'\e[1;95m'
-		COLOUR["BOLD_CYAN"]=$'\e[1;96m'
-		COLOUR["BOLD_WHITE"]=$'\e[1;97m'
-		;;
-	"256")
-		COLOUR["RESET"]=$'\e[0m'
-		COLOUR["BLACK"]=$'\e[38;5;0m'
-		COLOUR["GREY"]=$'\e[38;5;8m'
-		COLOUR["RED"]=$'\e[38;5;9m'
-		COLOUR["GREEN"]=$'\e[38;5;10m'
-		COLOUR["YELLOW"]=$'\e[38;5;11m'
-		COLOUR["BLUE"]=$'\e[38;5;12m'
-		COLOUR["MAGENTA"]=$'\e[38;5;13m'
-		COLOUR["CYAN"]=$'\e[38;5;14m'
-		COLOUR["WHITE"]=$'\e[38;5;15m'
-
-		COLOUR["BOLD_BLACK"]=$'\e[1;38;5;0m'
-		COLOUR["BOLD_GREY"]=$'\e[1;38;5;8m'
-		COLOUR["BOLD_RED"]=$'\e[1;38;5;9m'
-		COLOUR["BOLD_GREEN"]=$'\e[1;38;5;10m'
-		COLOUR["BOLD_YELLOW"]=$'\e[1;38;5;11m'
-		COLOUR["BOLD_BLUE"]=$'\e[1;38;5;12m'
-		COLOUR["BOLD_MAGENTA"]=$'\e[1;38;5;13m'
-		COLOUR["BOLD_CYAN"]=$'\e[1;38;5;14m'
-		COLOUR["BOLD_WHITE"]=$'\e[1;38;5;15m'
-		;;
-	"truecolor")
-		COLOUR["RESET"]=$'\e[0m'
-		COLOUR["BLACK"]=$'\e[38;2;0;0;0m'
-		COLOUR["GREY"]=$'\e[38;2;128;128;128m'
-		COLOUR["RED"]=$'\e[38;2;255;0;0m'
-		COLOUR["GREEN"]=$'\e[38;2;0;255;0m'
-		COLOUR["YELLOW"]=$'\e[38;2;255;255;0m'
-		COLOUR["BLUE"]=$'\e[38;2;0;0;255m'
-		COLOUR["MAGENTA"]=$'\e[38;2;255;0;255m'
-		COLOUR["CYAN"]=$'\e[38;2;0;255;255m'
-		COLOUR["WHITE"]=$'\e[38;2;255;255;255m'
-
-		COLOUR["BOLD_BLACK"]=$'\e[1;38;2;0;0;0m'
-		COLOUR["BOLD_GREY"]=$'\e[1;38;2;128;128;128m'
-		COLOUR["BOLD_RED"]=$'\e[1;38;2;255;0;0m'
-		COLOUR["BOLD_GREEN"]=$'\e[1;38;2;0;255;0m'
-		COLOUR["BOLD_YELLOW"]=$'\e[1;38;2;255;255;0m'
-		COLOUR["BOLD_BLUE"]=$'\e[1;38;2;0;0;255m'
-		COLOUR["BOLD_MAGENTA"]=$'\e[1;38;2;255;0;255m'
-		COLOUR["BOLD_CYAN"]=$'\e[1;38;2;0;255;255m'
-		COLOUR["BOLD_WHITE"]=$'\e[1;38;2;255;255;255m'
-		;;
-	esac
-
-	readonly -A COLOUR
-}
-
-# OS and Runtime
-{
-	readonly OS_ARCHLINUX="archlinux"
-	readonly OS_DEBIAN="debian"
-	readonly OS_MAC="mac"
-	readonly OS_WINDOWS="windows"
-	readonly OS_UNKNOWN="unknown"
-
-	readonly RUNTIME_NATIVE="native"
-	readonly RUNTIME_WSL="wsl"
-	readonly RUNTIME_MSYS="msys"
-	readonly RUNTIME_GITBASH="gitbash"
-	readonly RUNTIME_UNKNOWN="unknown"
-
-	TARGET_OS="${OS_UNKNOWN}"
-	TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
-	IS_ELEVATED=0
-	PWSH_CMD="" # only used if TARGET_OS == OS_WINDOWS
-
-	# Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
-	# against OS_UNKNOWN and RUNTIME_UNKNOWN
-	# Usage: set_env
-	#
-	# Returns:
-	#   0 if TARGET_OS and TARGET_RUNTIME are set
-	#   1 if TARGET_OS and TARGET_RUNTIME remain 'unknown'
-	set_env() {
-		local kernel_name
-		kernel_name="$(uname -s 2>/dev/null || echo "unknown")"
-
-		case "${kernel_name}" in
-		Linux*)
-			# wsl vs native
-			if uname -r | grep -qi "microsoft"; then
-				readonly TARGET_RUNTIME="${RUNTIME_WSL}"
-			else
-				readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
-			fi
-
-			# archlinux vs debian
-			if [[ -f "/etc/arch-release" ]]; then
-				readonly TARGET_OS="${OS_ARCHLINUX}"
-			elif [[ -f "/etc/debian_version" ]]; then
-				readonly TARGET_OS="${OS_DEBIAN}"
-			elif [[ -f "/etc/os-release" ]]; then
-				if grep -qiE '^ID(_LIKE)?=.*debian' /etc/os-release; then
-					readonly TARGET_OS="${OS_DEBIAN}"
-				elif grep -qiE '^ID(_LIKE)?=.*arch' /etc/os-release; then
-					readonly TARGET_OS="${OS_ARCHLINUX}"
-				fi
-			fi
-			;;
-
-		Darwin*)
-			readonly TARGET_OS="${OS_MAC}"
-			readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
-			;;
-
-		CYGWIN* | MSYS*)
-			readonly TARGET_OS="${OS_WINDOWS}"
-			readonly TARGET_RUNTIME="${RUNTIME_MSYS}"
-			;;
-
-		MINGW*)
-			readonly TARGET_OS="${OS_WINDOWS}"
-			# Git Bash and standard MSYS2 MinGW output "MINGW*"
-			# Git Bash explicitly places git-bash.exe at the root and sets $EXEPATH
-			if [[ -f "/git-bash.exe" || -n "${EXEPATH:-}" ]]; then
-				readonly TARGET_RUNTIME="${RUNTIME_GITBASH}"
-			else
-				readonly TARGET_RUNTIME="${RUNTIME_MSYS}"
-			fi
-			;;
-
-		*)
-			# Unknown
-			if [[ "$OS" == "Windows_NT" ]]; then
-				readonly TARGET_OS="${OS_WINDOWS}"
-				readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}" # redundant
-			else
-				readonly TARGET_OS
-				readonly TARGET_RUNTIME
-
-				return 1
-			fi
-			;;
-		esac
-
-		return 0
-	}
-	set_env || {
-		printf "[ FATAL ] Unable to detect TARGET_OS and TARGET_RUNTIME." >&2
-	}
-	unset -f set_env
-
-	# Detect if script was run as sudo or root.
-	# Usage: check_admin
-	check_admin() {
-		if [[ "$EUID" -eq 0 || -n "${SUDO_USER:-}" ]]; then
-			readonly IS_ELEVATED=1
-		elif [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]] && net session >/dev/null 2>&1; then
-			# net session fails with exit code 5 (Access Denied) if not admin
-			readonly IS_ELEVATED=1
-		else
-			readonly IS_ELEVATED
-		fi
-	}
-	check_admin
-	unset -f check_admin
-
-	# Determine which PowerShell binary to use and set PWSH_CMD to it
-	set_pwsh_cmd() {
-		if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
-			if PWSH_CMD=$(command -v pwsh.exe 2>/dev/null); then
-				readonly PWSH_CMD
-			elif PWSH_CMD=$(command -v powershell.exe 2>/dev/null); then
-				readonly PWSH_CMD
-			else
-				readonly PWSH_CMD
-			fi
-		else # linux
-			if PWSH_CMD=$(command -v pwsh 2>/dev/null); then
-				readonly PWSH_CMD
-			else
-				readonly PWSH_CMD
-			fi
-		fi
-	}
-	set_pwsh_cmd
-	unset -f set_pwsh_cmd
-}
 
 # logging
 {
@@ -1382,44 +1282,6 @@ main "$@" || exit 1
 		declare -r files_to_check
 	}
 
-	# Check if provided paths exist.
-	# If any paths are missing, outputs a summary at the end.
-	# Usage: check_exists <path> [path...]
-	#
-	# Arguments:
-	#   $@ (args) : Paths to verify.
-	#
-	# Returns:
-	#   0 if all paths exist
-	#   1 if any paths do not exist
-	check_exists() {
-		local -r -a paths=("$@")
-		local -a missing_paths=()
-
-		local prefix=""
-		if [[ -n "${SRC_DIR:-}" ]]; then
-			prefix="${SRC_DIR}/"
-		fi
-
-		for path in "${paths[@]}"; do
-			if [[ ! -e "$path" ]]; then
-				missing_paths+=("${path#"$prefix"}")
-			fi
-		done
-
-		if [[ ${#missing_paths[@]} -gt 0 ]]; then
-			local msg="Missing ${#missing_paths[@]} path(s):"
-			for missing in "${missing_paths[@]}"; do
-				# '[ DEV_ERROR ]  ' 15 chars
-				#       vvv indent 2 		 15 chars vvv
-				printf -v msg "%s\n✗ %s" "${msg}" "${missing}"
-			done
-
-			log::dev_fatal "%s" "${msg}"
-		fi
-
-		return 0
-	}
 	check_exists "${files_to_check[@]}"
 	unset -f check_exists
 }
