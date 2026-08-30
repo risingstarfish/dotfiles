@@ -30,6 +30,7 @@ TARGET_OS="${OS_UNKNOWN}"
 TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
 # argparse
 NO_RESTART=0
+
 DRY_RUN=0
 FORCE=0
 UPDATE=0
@@ -83,7 +84,7 @@ dotfiles::bash_version_check() {
   Then restart your terminal and run this script again using the new bash.'
 		fi
 
-		dotfiles::println "${msg}" >&2
+		p "${msg}" >&2
 		exit 1
 	fi
 }
@@ -198,7 +199,7 @@ dotfiles::set_env() {
 			printf "%s\n" "$msg" >&2
 		fi
 
-		printf "\n=> Do you want to continue anyway? [y/N]: " >&2
+		printf "\nDo you want to continue anyway? [y/N]: " >&2
 
 		local choice
 		while true; do
@@ -212,7 +213,7 @@ dotfiles::set_env() {
 				return 0
 				;;
 			[nN])
-				dotfiles::println "Aborting installation!" >&2
+				dotfiles::println "pAborting installation!" >&2
 				exit 1
 				;;
 			*)
@@ -548,10 +549,10 @@ dotfiles::check_exists() {
 		for missing in "${missing_paths[@]}"; do
 			# '[ DEV_ERROR ]  ' 15 chars
 			#       vvv indent 2 		 15 chars vvv
-			printf -v msg "%s\n✗ %s" "${msg}" "${missing}"
+			printf -v msg "%s\n✗ %s" "${msg}" "${missing}" >&2
 		done
 
-		#log::dev_fatal "%s" "${msg}"
+		printf "%s\n" "${msg}" >&2
 		exit 1
 	fi
 
@@ -846,8 +847,8 @@ main() {
 	dotfiles::print_banner
 
 	dotfiles::set_env || {
-		dotfiles::println "Warning: unable to determine \$TARGET_OS or \$TARGET_RUNTIME"
 		dotfiles::prompt_continue "Some modules may be skipped"
+		dotfiles::println "Warning: unable to determine \$TARGET_OS or \$TARGET_RUNTIME"
 	}
 
 	dotfiles::set_pwsh_cmd # TODO: move to windows
