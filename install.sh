@@ -37,7 +37,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 	readonly RUNTIME_GITBASH="gitbash"
 	readonly RUNTIME_UNKNOWN="unknown"
 
-	readonly WINDOWS_SUDO_REG_LOC="HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Sudo"
+	readonly WINDOWS_SUDO_REG_LOC='HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Sudo'
 }
 ####################
 # util
@@ -698,18 +698,20 @@ dotfiles::check_exists() {
 # windows
 {
 	# detect if windows user has sudo enabled
-	dotfiles::detect_windows_sudo() {
+	dotfiles::set_has_windows_sudo() {
+		[[ -n "${HAS_WINDOWS_SUDO:-}" ]] && return 0
+
 		command -v sudo >/dev/null 2>&1 || return 1
 		command -v reg.exe >/dev/null 2>&1 || return 1 # NOTE: redundant?
 
 		local sudo_reg
-		sudo_reg=$(reg.exe query "${WINDOWS_SUDO_REG_LOC}" /v Enabled 2>/dev/null)
+		sudo_reg=$(MSYS_NO_PATHCONV=1 reg.exe query "${WINDOWS_SUDO_REG_LOC}" /v Enabled 2>/dev/null)
 		# output of 0x1, 0x2, or 0x3 means enabled
 		if [[ "${sudo_reg}" =~ 0x[1-3] ]]; then
-			return 0
+			readonly HAS_WINDOWS_SUDO=0
+		else
+			readonly HAS_WINDOWS_SUDO=1
 		fi
-
-		return 1
 	}
 
 	# Determine which PowerShell binary to use and set PWSH_CMD to it
@@ -751,9 +753,19 @@ dotfiles::check_exists() {
 		#	ps_args+=("-IsElevated")
 		#fi
 
+		local pwsh_name="${PWSH_CMD##*/}"
+		pwsh_name="${pwsh_name%.exe}"
+
 		echo
-		dotfiles::println '=> Handing off execution to "%s"...' "${PWSH_CMD}"
-		exec "${PWSH_CMD}" "${ps_args[@]}"
+		dotfiles::println '=> Handing off execution to %s...' "${pwsh_name}"
+		echo
+
+		# adding exec makes it auto close
+		"${PWSH_CMD}" "${ps_args[@]}"
+
+		echo
+		read -n 1 -s -r -p "Press any key to exit..."
+		exit 0
 	}
 
 	# Checks if running on Windows (Git Bash or Unknown) and prompts user to switch to PowerShell.
@@ -777,8 +789,8 @@ dotfiles::check_exists() {
 			dotfiles::println 'Bash scripts may fail to configure native Windows settings properly.' >&2
 		fi
 
-		dotfiles::println 'Certain functionality may be missing or altered (e.g. instead of symlinking, it copies).' >&2
-		if dotfiles::detect_windows_sudo; then
+		dotfiles::println 'Certain functionality may be missing or altered (e.g. instead of symlinking, files get copied).' >&2
+		if dotfiles::is_true "${HAS_WINDOWS_SUDO}"; then
 			dotfiles::println '   Tip: Re-run this script using `sudo` to enable native symlinks.' >&2
 		else
 			dotfiles::println '   Tip: Enable Windows Developer Mode or Windows Sudo to allow native symlinks.' >&2
@@ -819,7 +831,7 @@ dotfiles::check_exists() {
 ####################
 # $1 = flag name for the error message
 # $2 = value to assign to MODE
-dotfiles::set_mode() {
+dotfiles::assign_mode() {
 	if [[ -n "$MODE" ]]; then
 		dotfiles::println 'Error: Cannot specify multiple actions. "%s" conflicts with "%s".' "$1" "$MODE" >&2
 		exit 1
@@ -904,11 +916,11 @@ dotfiles::argparse() {
 			exit 0
 			;;
 		-c | --clean)
-			dotfiles::set_mode "--clean" "clean"
+			dotfiles::assign_mode "--clean" "clean"
 			shift
 			;;
 		--reset)
-			dotfiles::set_mode "--reset" "reset"
+			dotfiles::assign_mode "--reset" "reset"
 			shift
 			;;
 		-l | --list)
@@ -916,7 +928,7 @@ dotfiles::argparse() {
 			exit 0
 			;;
 		-d | --diff)
-			dotfiles::set_mode "--diff" "diff"
+			dotfiles::assign_mode "--diff" "diff"
 			shift
 			;;
 		-i | --install)
@@ -1087,7 +1099,7 @@ dotfiles::is_module_enabled() {
 }
 
 dotfiles::set_files_to_check() {
-	[[ -n "${SHELL_DIR:-}" || -n "${APP_DIR}" ]] && return 0
+	[[ -n "${SHELL_DIR:-}" || -n "${APP_DIR:-}" ]] && return 0
 
 	# base directory constants
 	readonly SHELL_DIR="${SRC_PATH}/shells"
@@ -1206,6 +1218,9 @@ main() {
 		dotfiles::println 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.'
 		dotfiles::prompt_continue "Some functionality may be limited."
 	}
+	if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
+		dotfiles::set_has_windows_sudo
+	fi
 	dotfiles::set_admin             # IS_ADMIN
 	dotfiles::set_available_modules # ALL_MODULES
 
@@ -1237,7 +1252,7 @@ main() {
 		case "${TARGET_RUNTIME}" in
 		"${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
 			if dotfiles::prompt_windows_handoff; then
-				dotfiles::windows_handoff # noreturn
+				dotfiles::windows_handoff
 			fi
 			;;
 		*) ;;
