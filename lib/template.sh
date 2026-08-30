@@ -1,16 +1,12 @@
 #!/usr/bin/env bash
+# template.sh
+
+set -euo pipefail
 
 if [[ -n "${__TEMPLATE_SH_INCLUDED__:-}" ]]; then
 	return 0
 fi
 readonly __TEMPLATE_SH_INCLUDED__=1
-
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap.sh" || {
-	printf "\n\e[31m[ERROR]\e[0m Failed to source bootstrap.sh. Exiting...\n" >&2
-	exit 1
-}
-
-source_deps "common.sh" "log.sh" "filesystem.sh" || exit 1
 
 {
 	# Validates that a file does not contain a specific unresolved token.

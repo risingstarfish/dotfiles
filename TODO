@@ -24,3 +24,7 @@ vscode
   │          INSTALLATION COMPLETE!           │
   │  Run exec zsh to apply your changes.      │
   ╰───────────────────────────────────────────╯
+
+/////////////
+dotfiles::println with \n
+Error without >&2

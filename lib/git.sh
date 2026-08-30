@@ -1,16 +1,13 @@
 #!/usr/bin/env bash
+# git.sh
+
+set -euo pipefail
 
 if [[ -n "${__GIT_SH_INCLUDED__:-}" ]]; then
 	return 0
 fi
 readonly __GIT_SH_INCLUDED__=1
 
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap.sh" || {
-	printf "\n\e[31m[ERROR]\e[0m Failed to source bootstrap.sh. Exiting...\n" >&2
-	exit 1
-}
-
-source_deps "common.sh" "log.sh" || exit 1
 
 {
 	# Determines the correct git credential helper for the current OS.
@@ -24,8 +21,6 @@ source_deps "common.sh" "log.sh" || exit 1
 	#   1 on failure (unknown OS, unable to determine helper).
 	#   2 on argument count mismatch.
 	git::get_credential_helper() {
-		common::assert_args "git::get_credential_helper" $# 0 || return $?
-
 		if [[ "$OS" == "Windows_NT" ]]; then
 			printf "git-credential-manager.exe\n"
 			return 0
