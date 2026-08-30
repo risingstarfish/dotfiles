@@ -213,7 +213,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 }
 ####################
 dotfiles::bash_version_check() {
-	if [ -z "${BASH_VERSION:-}" ] || [ -n "${ZSH_VERSION:-}" ]; then
+	if [[ -z "${BASH_VERSION:-}" || -n "${ZSH_VERSION:-}" ]]; then
 		dotfiles::println 'Error: the install instructions explicitly say to use the install script with bash; please follow them.' >&2
 		return 1
 	fi
@@ -1087,6 +1087,8 @@ dotfiles::is_module_enabled() {
 }
 
 dotfiles::set_files_to_check() {
+	[[ -n "${SHELL_DIR:-}" || -n "${APP_DIR}" ]] && return 0
+
 	# base directory constants
 	readonly SHELL_DIR="${SRC_PATH}/shells"
 	readonly APP_DIR="${SRC_PATH}/apps"
@@ -1152,6 +1154,8 @@ dotfiles::set_files_to_check() {
 }
 
 dotfiles::set_log() {
+	[[ -n "${DOTFILES_LOG:-}" ]] && return 0
+
 	if dotfiles::is_true "${NO_LOG}"; then
 		readonly DOTFILES_LOG=0
 	else
@@ -1241,17 +1245,17 @@ main() {
 	fi
 
 	# figure out what files are needed based on args
+	dotfiles::println '=> Verifying files...'
 	dotfiles::set_files_to_check # FILES_TO_CHECK
-	# println info verifying files
 	dotfiles::check_exists "${FILES_TO_CHECK[@]}" || {
 		exit 1
 	}
 	dotfiles::println 'File(s) queued for install: %d' "${#FILES_TO_CHECK[@]}"
 
-	# logging
+	# TODO: logging
 
 	# dotfiles::print_start
-	# TODO: symlink etc
+	# TODO: lib filesystem template git
 	dotfiles::do_mode
 
 	dotfiles::print_end
