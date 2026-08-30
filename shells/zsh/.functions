@@ -39,6 +39,25 @@ function mkcd() {
 	fi
 }
 
+
+# https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/cp
+# cp function that uses rsync
+# The enabled options for rsync are:
+#     -p: preserves permissions.
+#     -o: preserves owner.
+#     -g: preserves group.
+#     -b: make a backup of the original file instead of overwriting it, if it exists.
+#     -r: recurse directories.
+#     -hhh: outputs numbers in human-readable format, in units of 1024 (K, M, G, T).
+#     --backup-dir="/tmp/rsync-$USERNAME": move backup copies to "/tmp/rsync-$USERNAME".
+#     -e /dev/null: only work on local files (disable remote shells).
+#     --progress: display progress.
+cpv() {
+    rsync -pogbr -hhh --backup-dir="/tmp/rsync-${USERNAME}" -e /dev/null --progress "$@"
+}
+compdef _files cpv
+
+
 # Determine size of a file or total size of a directory
 function fs() {
 	if du -b /dev/null >/dev/null 2>&1; then
