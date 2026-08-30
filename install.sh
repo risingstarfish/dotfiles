@@ -10,6 +10,19 @@ readonly __INSTALL_SH_INCLUDED__=1
 ####################
 # constants
 {
+	if [[ -z "${HOME:-}" || ! -d "$HOME" ]]; then
+		printf 'Error: unable to resolve $HOME'
+		exit 1
+	fi
+	#  user global env
+	readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-${HOME}/.config/dotfiles/logs}" # post
+	readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-${HOME}/.cache/dotfiles}"   # post
+	# readonly DOTFILES_LOG="${DOTFILES_LOG:-1}" # cli modified --no-log
+	# pre script env. do not get modified by cli
+	readonly DOTFILES_INSTALL_DIR="${DOTFILES_INSTALL_DIR:-${HOME}/dotfiles}" # setup
+	readonly DOTFILES_INSTALL_REF="${DOTFILES_INSTALL_REF:-main}"             # setup
+	readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"                  # post
+
 	readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
 	# env
 	readonly OS_ARCHLINUX="archlinux"
@@ -23,6 +36,8 @@ readonly __INSTALL_SH_INCLUDED__=1
 	readonly RUNTIME_MSYS="msys"
 	readonly RUNTIME_GITBASH="gitbash"
 	readonly RUNTIME_UNKNOWN="unknown"
+
+	readonly WINDOWS_SUDO_REG_LOC="HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Sudo"
 }
 ####################
 # util
@@ -35,6 +50,13 @@ readonly __INSTALL_SH_INCLUDED__=1
 			# single string
 			command printf '%s\n' "${1:-}"
 		fi
+	}
+
+	dotfiles::is_true() {
+		case "${1,,}" in
+		1 | true) return 0 ;;
+		*) return 1 ;;
+		esac
 	}
 }
 ####################
@@ -311,24 +333,25 @@ ACTIONS
       --reset               Remove all symlinks managed by this tool
 
 MODULES
-  -i, --install <module>    Run only for the specified modules, semicolon-separated
-  -x, --exclude <module>    Run for all modules EXCEPT those specified, semicolon-separated
-  -l, --list                List all available modules
+  -i, --install <module>    Install ONLY the specified modules, semicolon-separated
+  -x, --exclude <module>    Install all modules EXCEPT those specified, semicolon-separated
+  -l, --list                Display all available modules, status, and information
 
 SAFETY
   -n, --dry-run             Print planned actions without modifying the disk
-  -I, --interactive         Prompt for confirmation before every overwrite
-  -f, --force               Overwrite existing files/links without prompting
-      --no-backup           Delete existing conflicting files instead of backing up
+  -I, --interactive         Prompt for confirmation before every action/modification
+      --noconfirm           Do not prompt for any confirmation
+  -f, --force               Overwrite existing files/links
+      --no-backup           Delete existing conflicting files instead of backing up	
 
 LOGGING
   -v, --verbose             Print detailed step-by-step instructions
   -q, --quiet               Suppress all standard output except errors
       --log-level <level>   Set log verbosity | debug, info, warn, or error (default: info)
-      --no-log              Disable writing to the log file (env: DOTFILES_DISABLE_LOG)
+      --no-log              Disable writing to the log file
 
 PACKAGES & HOOKS
-      --no-deps         Skip dotfiles dependency installation
+      --no-deps             Skip dotfiles dependency installation
       --no-hooks            Skip pre/post installation scripts
 
 INFORMATION
@@ -337,51 +360,18 @@ INFORMATION
       --version             Show the version and git information of this program
   -h, --help                Show this help message
 
-Environment Variables:
-  DOTFILES_LOG_DIR          Path to store log files (default: ~/.config/dotfiles/logs)
-  DOTFILES_CACHE_DIR        Path to store temporary cache (default: ~/.cache/dotfiles)
+ENVIRONMENT VARIABLES
+  Global (Always Active):
+    DOTFILES_LOG_DIR        Path to store log files (default: ~/.config/dotfiles/logs)
+    DOTFILES_CACHE_DIR      Path to store temporary cache (default: ~/.cache/dotfiles)
+    DOTFILES_LOG            Set to 0 or false to disable log file writing (default: 1)
+    DOTFILES_LOCAL_MODS     Set to 1 or true to stash uncommitted local changes (default: 0)
 
-AVAILABLE MODULES
+  Setup Only:
+    DOTFILES_INSTALL_DIR    Target directory for installation (default: ~/dotfiles)
+    DOTFILES_INSTALL_REF    Specific git branch, tag, or commit to install (default: main)
+
 EOF
-		# 14 wide
-		local current_category=""
-		local count=0
-		local row_str="    "
-
-		for entry in "${ALL_MODULES[@]}"; do
-			local category="${entry%%/*}"
-			local module="${entry##*/}"
-
-			# print new category header
-			if [[ "$category" != "$current_category" ]]; then
-				if [[ "$count" -gt 0 ]]; then
-					echo "${row_str% | }" # strip trailing " | "
-					echo ""
-				fi
-
-				echo "  $category"
-				current_category="$category"
-				count=0
-				row_str="    "
-			fi
-
-			local formatted_module
-			printf -v formatted_module "%-14s" "$module"
-			row_str+="${formatted_module}| "
-			((count++))
-
-			if [[ $count -eq 5 ]]; then
-				echo "${row_str% | }"
-				count=0
-				row_str="    "
-			fi
-		done
-
-		if [[ "$count" -gt 0 ]]; then
-			echo "${row_str% | }"
-		fi
-
-		echo ""
 	}
 
 	# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/version.sh
@@ -407,6 +397,78 @@ EOF
 		dotfiles::println 'TODO: implement.'
 	}
 
+	dotfiles::print_modules() {
+		dotfiles::set_available_modules
+
+		dotfiles::println
+		dotfiles::println 'AVAILABLE MODULES'
+		dotfiles::println
+
+		all_symlinks=$(find "$HOME" -maxdepth 3 -type l -exec ls -ld {} + 2>/dev/null || true)
+		local all_symlinks
+		local current_category=""
+
+		for item in "${ALL_MODULES[@]}"; do
+			local category="${item%%/*}" # everything before the first '/'
+			local module="${item##*/}"   # everything after the last '/'
+
+			# header if it changed
+			if [[ "$category" != "$current_category" ]]; then
+				[[ -n "$current_category" ]] && dotfiles::println
+				dotfiles::println "$category"
+				current_category="$category"
+			fi
+
+			local desc=""
+			case "$module" in
+			zsh) desc="Z shell configuration and plugins" ;;
+			bash) desc="Bare bash profile" ;;
+			git) desc="Global gitconfig and commit templates" ;;
+			ssh) desc="SSH key generation and config setup" ;;
+			curl) desc="Command line tool for transferring data" ;;
+			shellcheck) desc="Shell script analysis tool" ;;
+			wget) desc="Network utility to retrieve files" ;;
+			iterm2) desc="macOS terminal emulator configuration" ;;
+			*) desc="Configuration for $module" ;;
+			esac
+
+			local status='?'
+			if [[ -n "$all_symlinks" ]]; then
+				local mod_dir="${SRC_PATH}/${item}"
+
+				if [[ -d "$mod_dir" ]]; then
+					local total_files=0
+					local linked_files=0
+
+					while IFS= read -r src_file; do
+						[[ -z "$src_file" ]] && continue
+						((total_files++))
+
+						if echo "$all_symlinks" | grep -F -q "$src_file"; then
+							((linked_files++))
+						fi
+					done < <(find "$mod_dir" -maxdepth 1 -type f 2>/dev/null || true)
+
+					if [[ $total_files -gt 0 ]]; then
+						if [[ $linked_files -eq $total_files ]]; then
+							status="✓" # all files symlinked
+						elif [[ $linked_files -gt 0 ]]; then
+							status="~" # some files symlinked, some missing
+						fi
+					else
+						# fallback for modules with no files
+						if echo "$all_symlinks" | grep -F -q "${item}/"; then
+							status="✓"
+						fi
+					fi
+				fi
+			fi
+
+			printf "  (%s) %-15s %s\n" "$status" "$module" "$desc"
+		done
+		dotfiles::println
+	}
+
 	# pictures
 	{
 		dotfiles::print_banner() {
@@ -415,7 +477,7 @@ EOF
   ____        _    __ _ _           
  |  _ \  ___ | |_ / _(_) | ___  ___ 
  | | | |/ _ \| __| |_| | |/ _ \/ __|
- | |_| | (_) | |_|  _| | |  __/\__ \\
+ | |_| | (_) | |_|  _| | |  __/\__ \
  |____/ \___/ \__|_| |_|_|\___||___/
  -----------------------------------
      Automated Environment Setup      
@@ -436,7 +498,7 @@ EOF
 EOF
 		}
 		dotfiles::print_end() {
-			if [[ -z "${NO_RESTART:-}" ]]; then
+			if [[ -z "${NO_RESTART}" ]]; then
 				cat <<'EOF'
 
 ╭───────────────────────────────────────────╮
@@ -470,8 +532,8 @@ EOF
 	}
 
 	dotfiles::install_dir() {
-		if [[ -n "${INSTALL_DIR:-}" ]]; then
-			printf "%s" "${INSTALL_DIR}"
+		if [[ -n "${DOTFILES_INSTALL_DIR:-}" ]]; then
+			printf "%s" "${DOTFILES_INSTALL_DIR}"
 		else
 			dotfiles::default_install_dir
 		fi
@@ -479,7 +541,7 @@ EOF
 
 	dotfiles::install_from_git() {
 		local -r install_dir="$(dotfiles::install_dir)"
-		local -r ref="${DOTFILES_REF:-main}"
+		local -r ref="${DOTFILES_INSTALL_REF:-main}"
 
 		# path is not directory
 		if [[ -e "${install_dir}" && ! -d "${install_dir}" ]]; then
@@ -494,14 +556,14 @@ EOF
 			else # random repo
 				dotfiles::println 'Error: %s/.git exists but %s does not.' "${install_dir}" "install.sh" >&2
 				dotfiles::println '  This does not appear to be a dotfiles clone.' >&2
-				dotfiles::println '  Remove it or set INSTALL_DIR to a different path.' >&2
+				dotfiles::println '  Remove it or set DOTFILES_INSTALL_DIR to a different path.' >&2
 				return 1
 			fi
 		fi
 		# non-empty dir and NOT git clone
 		if [[ -d "${install_dir}" && -n "$(ls -A "${install_dir}" 2>/dev/null)" ]]; then
 			dotfiles::println 'Error: %s is not empty and is not a git clone.' "${install_dir}" >&2
-			dotfiles::println '  Move it aside or set INSTALL_DIR to a different path.' >&2
+			dotfiles::println '  Move it aside or set DOTFILES_INSTALL_DIR to a different path.' >&2
 			return 1
 		fi
 		# install_dir does not exist
@@ -538,7 +600,7 @@ EOF
 		fi
 
 		# ── Normal user: block hard ──────────────────────────────────
-		if ((has_local_mods)) && [[ -z "${DOTFILES_ALLOW_LOCAL_MODS:-}" ]]; then
+		if ((has_local_mods)) && ! dotfiles::is_true "${DOTFILES_LOCAL_MODS}"; then
 			cat <<EOF >&2
 
 Error: You have uncommitted changes in ${SRC_PATH}:
@@ -551,14 +613,14 @@ $(command git -C "${SRC_PATH}" diff --stat HEAD 2>/dev/null)
   Revert your changes or move them to a .local file, then re-run:
     bash $(basename "$0") --update
 
-  (dev: set DOTFILES_ALLOW_LOCAL_MODS=1 to bypass this check)
+  (dev: set DOTFILES_LOCAL_MODS=1 to bypass this check)
 
 EOF
 			return 1
 		fi
 
 		# ── Dev override: rebase instead of force-checkout ──────────
-		if ((has_local_mods)) && [[ -n "${DOTFILES_ALLOW_LOCAL_MODS:-}" ]]; then
+		if ((has_local_mods)) && dotfiles::is_true "${DOTFILES_LOCAL_MODS}"; then
 			dotfiles::println '=> Local modifications detected. Rebasing instead of force-checkout.'
 			dotfiles::println '  Your changes will be preserved on top of the latest %s.' "$GITHUB_REF"
 
@@ -635,6 +697,21 @@ dotfiles::check_exists() {
 #######################################
 # windows
 {
+	# detect if windows user has sudo enabled
+	dotfiles::detect_windows_sudo() {
+		command -v sudo >/dev/null 2>&1 || return 1
+		command -v reg.exe >/dev/null 2>&1 || return 1 # NOTE: redundant?
+
+		local sudo_reg
+		sudo_reg=$(reg.exe query "${WINDOWS_SUDO_REG_LOC}" /v Enabled 2>/dev/null)
+		# output of 0x1, 0x2, or 0x3 means enabled
+		if [[ "${sudo_reg}" =~ 0x[1-3] ]]; then
+			return 0
+		fi
+
+		return 1
+	}
+
 	# Determine which PowerShell binary to use and set PWSH_CMD to it
 	dotfiles::set_pwsh_cmd() {
 		[[ -n "${PWSH_CMD:-}" ]] && return 0
@@ -670,9 +747,9 @@ dotfiles::check_exists() {
 
 		local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script")
 
-		if [[ ${IS_ADMIN} -eq 1 ]]; then
-			ps_args+=("-IsElevated")
-		fi
+		#if [[ ${IS_ADMIN} -eq 1 ]]; then
+		#	ps_args+=("-IsElevated")
+		#fi
 
 		echo
 		dotfiles::println '=> Handing off execution to "%s"...' "${PWSH_CMD}"
@@ -693,19 +770,22 @@ dotfiles::check_exists() {
 		echo >&2
 
 		if [[ "${TARGET_RUNTIME}" == "${RUNTIME_GITBASH}" ]]; then
-			dotfiles::println '=> Windows Git Bash runtime detected.' >&2
-			dotfiles::println '    (Note: If you are not actually running Git Bash, something went wrong)' >&2
+			dotfiles::println '=> Windows Git Bash runtime detected' >&2
+			dotfiles::println 'If you are not actually running Git Bash, something went wrong.' >&2
 		else # unknown
 			dotfiles::println '=> Unknown Windows Bash runtime detected.' >&2
-			dotfiles::println '    Bash scripts may fail to configure native Windows settings properly.' >&2
+			dotfiles::println 'Bash scripts may fail to configure native Windows settings properly.' >&2
 		fi
 
-		dotfiles::println '=> Certain functionality may be missing or altered (e.g. instead of symlinking, it copies).' >&2
-		dotfiles::println '   If you have developer-mode/sudo available, re-run this script with it and the script should function normally.' >&2
+		dotfiles::println 'Certain functionality may be missing or altered (e.g. instead of symlinking, it copies).' >&2
+		if dotfiles::detect_windows_sudo; then
+			dotfiles::println '   Tip: Re-run this script using `sudo` to enable native symlinks.' >&2
+		else
+			dotfiles::println '   Tip: Enable Windows Developer Mode or Windows Sudo to allow native symlinks.' >&2
+		fi
 
 		local choice
 		while true; do
-
 			if ! read -r -p $'\nSwitch to the native PowerShell installer (install.ps1)? [Y/n/(q)uit]: ' choice; then
 				dotfiles::println 'Error: No input available for prompt.' >&2
 				exit 1
@@ -791,6 +871,7 @@ dotfiles::argparse() {
 	NO_DEPS=0
 	NO_HOOKS=0
 	NO_LOG=0
+	NO_CONFIRM=0
 	VERBOSE=0
 	QUIET=0
 	MODE=""
@@ -831,8 +912,8 @@ dotfiles::argparse() {
 			shift
 			;;
 		-l | --list)
-			dotfiles::set_mode "--list" "list"
-			shift
+			dotfiles::print_modules
+			exit 0
 			;;
 		-d | --diff)
 			dotfiles::set_mode "--diff" "diff"
@@ -868,18 +949,22 @@ dotfiles::argparse() {
 			shift
 			;;
 		-I | --interactive)
-			if [[ "${FORCE}" -eq 1 ]]; then
-				dotfiles::println 'Error: --interactive conflicts with --force.' >&2
+			if [[ "${NO_CONFIRM}" -eq 1 ]]; then
+				dotfiles::println 'Error: --interactive conflicts with --noconfirm.' >&2
 				exit 1
 			fi
 			INTERACTIVE=1
 			shift
 			;;
-		-f | --force)
+		--noconfirm)
 			if [[ "${INTERACTIVE}" -eq 1 ]]; then
-				dotfiles::println 'Error: --force conflicts with --interactive.' >&2
+				dotfiles::println 'Error: --noconfirm conflicts with --interactive.' >&2
 				exit 1
 			fi
+			NO_CONFIRM=1
+			shift
+			;;
+		-f | --force)
 			FORCE=1
 			shift
 			;;
@@ -970,7 +1055,6 @@ dotfiles::argparse() {
 		dotfiles::println 'Error: --install and --exclude are mutually exclusive.' >&2
 		exit 1
 	fi
-	# TODO: process args
 }
 
 # Checks if a module should be installed based on INSTALL_MODULES and EXCLUDE_MODULES.
@@ -1067,6 +1151,14 @@ dotfiles::set_files_to_check() {
 	dotfiles::is_module_enabled "apps/iterm2" && FILES_TO_CHECK+=("${app_iterm2_files[@]}")
 }
 
+dotfiles::set_log() {
+	if dotfiles::is_true "${NO_LOG}"; then
+		readonly DOTFILES_LOG=0
+	else
+		readonly DOTFILES_LOG="${DOTFILES_LOG:-1}"
+	fi
+}
+
 dotfiles::do_mode() {
 	case "$MODE" in
 	install)
@@ -1078,10 +1170,6 @@ dotfiles::do_mode() {
 		;;
 	reset)
 		# TODO: remove all symlinks managed by this tool
-		;;
-	list)
-		# TODO: list all available modules
-		# TODO: also list available upstream
 		;;
 	diff)
 		# TODO: show diff between current files and incoming dotfiles
@@ -1118,6 +1206,7 @@ main() {
 	dotfiles::set_available_modules # ALL_MODULES
 
 	dotfiles::argparse "$@"
+	dotfiles::set_log # DOTFILES_LOG
 
 	lib_dir="${SRC_PATH}/lib"
 	local -r -a lib_files=("${lib_dir}/filesystem.sh" "${lib_dir}/git.sh" "${lib_dir}/template.sh")
@@ -1153,16 +1242,14 @@ main() {
 
 	# figure out what files are needed based on args
 	dotfiles::set_files_to_check # FILES_TO_CHECK
-
-	dotfiles::println 'File(s) queued for install: %d' "${#FILES_TO_CHECK[@]}"
+	# println info verifying files
 	dotfiles::check_exists "${FILES_TO_CHECK[@]}" || {
 		exit 1
 	}
+	dotfiles::println 'File(s) queued for install: %d' "${#FILES_TO_CHECK[@]}"
 
-	# dotfiles::set_pwsh_cmd # TODO: move to windows
 	# logging
 
-	# windows prompt powershell handoff
 	# dotfiles::print_start
 	# TODO: symlink etc
 	dotfiles::do_mode
