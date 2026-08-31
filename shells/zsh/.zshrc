@@ -134,6 +134,48 @@ else
 	log_message ERROR "Unable to find $HOME/.exports.\nSome functionality may not work properly."
 fi
 
+# Zim configuration
+print_header "Zim Configuration"
+if [[ ! -d "$HOME/.zim" ]]; then
+	log_message WARNING "Zim directory not found: $HOME/.zim"
+	log_message WARNING "Attempting to create..."
+	mkdir "$HOME/.zim"
+fi
+
+# Check if Zim is installed at usual location
+if [[ -d "$HOME/.zim" ]]; then
+	ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
+	log_message SUCCESS "Zim directory found: $HOME/.zim"
+
+	# Download zimfw plugin manager if missing.
+	if [[ ! -e ${ZIM_HOME}/zimfw.zsh ]]; then
+		curl -fsSL --create-dirs -o ${ZIM_HOME}/zimfw.zsh \
+			https://github.com/zimfw/zimfw/releases/latest/download/zimfw.zsh
+		log_message SUCCESS "Zimfw plugin manager downloaded to ${ZIM_HOME}/zimfw.zsh"
+	else
+		log_message INFO "Zimfw plugin manager already exists at ${ZIM_HOME}/zimfw.zsh"
+	fi
+
+	# Install missing modules, and update ${ZIM_HOME}/init.zsh if missing or outdated.
+	if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}}/.zimrc ]]; then
+		source ${ZIM_HOME}/zimfw.zsh init -q
+		log_message SUCCESS "Zim modules initialized and ${ZIM_HOME}/init.zsh updated."
+	else
+		log_message INFO "Zim modules already initialized and ${ZIM_HOME}/init.zsh is up to date."
+	fi
+
+	# Initialize modules
+	if [[ -f ${ZIM_HOME}/init.zsh ]]; then
+		log_message SUCCESS "Sourcing Zim initialization file: ${ZIM_HOME}/init.zsh"
+		source ${ZIM_HOME}/init.zsh
+	else
+		log_message WARNING "Zim initialization file not found: ${ZIM_HOME}/init.zsh"
+	fi
+else
+	log_message ERROR "Failed to create directory: $HOME/.zim"
+	log_message ERROR "Manually create it then rerun this script."
+fi
+
 print_header "Default paths"
 if [[ -f "$HOME/.paths" ]]; then
 	source "$HOME/.paths"
@@ -265,48 +307,6 @@ else
 	PROMPT="%{%F{green}%}%n@%{%F{blue}%}%m %{%F{yellow}%}%~%{%F{white}%} %# %{%F{reset}%}"
 	RPROMPT=""
 	log_message WARNING "Powerlevel10k not loaded, using a basic prompt."
-fi
-
-# Zim configuration
-print_header "Zim Configuration"
-if [[ ! -d "$HOME/.zim" ]]; then
-	log_message WARNING "Zim directory not found: $HOME/.zim"
-	log_message WARNING "Attempting to create..."
-	mkdir "$HOME/.zim"
-fi
-
-# Check if Zim is installed at usual location
-if [[ -d "$HOME/.zim" ]]; then
-	ZIM_HOME=${ZDOTDIR:-${HOME}}/.zim
-	log_message SUCCESS "Zim directory found: $HOME/.zim"
-
-	# Download zimfw plugin manager if missing.
-	if [[ ! -e ${ZIM_HOME}/zimfw.zsh ]]; then
-		curl -fsSL --create-dirs -o ${ZIM_HOME}/zimfw.zsh \
-			https://github.com/zimfw/zimfw/releases/latest/download/zimfw.zsh
-		log_message SUCCESS "Zimfw plugin manager downloaded to ${ZIM_HOME}/zimfw.zsh"
-	else
-		log_message INFO "Zimfw plugin manager already exists at ${ZIM_HOME}/zimfw.zsh"
-	fi
-
-	# Install missing modules, and update ${ZIM_HOME}/init.zsh if missing or outdated.
-	if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE:-${ZDOTDIR:-${HOME}}}/.zimrc ]]; then
-		source ${ZIM_HOME}/zimfw.zsh init -q
-		log_message SUCCESS "Zim modules initialized and ${ZIM_HOME}/init.zsh updated."
-	else
-		log_message INFO "Zim modules already initialized and ${ZIM_HOME}/init.zsh is up to date."
-	fi
-
-	# Initialize modules
-	if [[ -f ${ZIM_HOME}/init.zsh ]]; then
-		log_message SUCCESS "Sourcing Zim initialization file: ${ZIM_HOME}/init.zsh"
-		source ${ZIM_HOME}/init.zsh
-	else
-		log_message WARNING "Zim initialization file not found: ${ZIM_HOME}/init.zsh"
-	fi
-else
-	log_message ERROR "Failed to create directory: $HOME/.zim"
-	log_message ERROR "Manually create it then rerun this script."
 fi
 
 # ruby
