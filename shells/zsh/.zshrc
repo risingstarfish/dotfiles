@@ -196,14 +196,6 @@ else
 	log_message WARNING "Functions file not found: $HOME/.functions"
 fi
 
-print_header "Git Functions"
-if [[ -f "$HOME/.git_functions" ]]; then
-	log_message SUCCESS "Sourcing git functions file: $HOME/.git_functions"
-	source "$HOME/.git_functions"
-else
-	log_message WARNING "Functions file not found: $HOME/.git_functions"
-fi
-
 # Zsh options
 print_header "Zsh Options"
 if [[ -f "$HOME/.zsh_options" ]]; then
