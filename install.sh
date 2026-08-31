@@ -2030,7 +2030,9 @@ main() {
 	dotfiles::set_available_modules # AVAILABLE_MODULES
 
 	lib_dir="${SRC_PATH}/lib"
-	local -r -a lib_files=("${lib_dir}/filesystem.sh" "${lib_dir}/git.sh" "${lib_dir}/template.sh")
+	local -r -a lib_files=(
+		"${lib_dir}/filesystem.sh"
+	)
 	dotfiles::check_exists "${lib_files[@]}" || exit 1
 
 	dotfiles::source_file "${lib_dir}/filesystem.sh" || {
