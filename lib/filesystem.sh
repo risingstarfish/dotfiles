@@ -34,73 +34,167 @@ dotfiles::file_perm() {
 
 # symlink
 {
-	# Resolve the backup directory for this run.
-	# Creates the full path: $DOTFILES_CACHE_DIR/backups/YYYY-MM-DD/HH-MM-SS/
+	# Ensure a single backup run directory exists for this script invocation.
+	# Computes the timestamp once; all subsequent calls reuse it.
 	#
-	# Usage: backup_dir
-	# Output: prints the absolute path to the current run's backup directory.
+	# Usage: ensure_backup_run
 	# Returns: 0 on success, 1 if directory cannot be created.
-	dotfiles::backup_dir() {
-		local -r day="$(date '+%Y-%m-%d')"
-		local -r time="$(date '+%H-%M-%S')"
-		local -r dir="${DOTFILES_CACHE_DIR}/backups/${day}/${time}"
-
-		if ((DRY_RUN)); then
-			printf '%s' "${dir}"
+	dotfiles::ensure_backup_run() {
+		if [[ -n "${BACKUP_RUN_DIR:-}" ]]; then
 			return 0
 		fi
 
-		mkdir -p "${dir}" || {
-			dotfiles::println 'Error: cannot create backup directory: %s' "${dir}" >&2
-			return 1
-		}
+		local day time
+		day="$(date '+%Y-%m-%d')"
+		time="$(date '+%H-%M-%S')"
 
-		printf '%s' "${dir}"
+		BACKUP_RUN_DIR="${DOTFILES_CACHE_DIR}/backups/${day}/${time}"
+
+		if ((DRY_RUN)); then
+			return 0
+		fi
+
+		if ! mkdir -p "${BACKUP_RUN_DIR}"; then
+			dotfiles::println 'Error: cannot create backup directory: %s' "${BACKUP_RUN_DIR}" >&2
+			return 1
+		fi
+
+		return 0
 	}
 
-	# Move an existing file into the current run's backup directory.
-	# The file keeps its basename; the run directory provides uniqueness.
+	# MOVE an existing file into the current run's backup directory.
+	# The source file is removed from its original location.
+	# Used automatically when a symlink conflicts with an existing user file.
 	#
 	# Usage: backup_file <path>
-	#
-	# Arguments:
-	#   $1 (path) : Absolute path to the existing file to back up.
-	#
-	# Returns:
-	#   0 on success (including DRY_RUN and "file does not exist")
-	#   1 on error
+	# Returns: 0 on success (including DRY_RUN and "file does not exist"), 1 on error
 	dotfiles::backup_file() {
-		local -r src="$1"
+		local -r src="${1:-}"
 
 		if [[ -z "${src}" ]]; then
 			dotfiles::println 'Error: backup_file requires a path argument.' >&2
 			return 1
 		fi
 
-		# nothing to back up
 		if [[ ! -f "${src}" ]]; then
 			return 0
 		fi
 
-		local backup_dir
-		if ! backup_dir="$(dotfiles::backup_dir)"; then
-			return 1
-		fi
+		dotfiles::ensure_backup_run || return 1
 
 		local -r base="${src##*/}"
-		local -r dest="${backup_dir}/${base}.bak"
+		local -r dest="${BACKUP_RUN_DIR}/${base}.bak"
 
 		if ((DRY_RUN)); then
 			dotfiles::println '  [backup] %s -> %s' "${src}" "${dest}"
 			return 0
 		fi
 
-		mv "${src}" "${dest}" || {
+		if ! mv "${src}" "${dest}"; then
 			dotfiles::println 'Error: cannot back up %s to %s' "${src}" "${dest}" >&2
 			return 1
-		}
+		fi
 
 		dotfiles::println '  [backup] %s -> %s' "${src}" "${dest}"
+		return 0
+	}
+
+	# COPY (not move) current managed files into a new backup run.
+	# The source files remain in place.
+	# Used by --backup for explicit user-initiated snapshots.
+	#
+	# Usage: backup_now [basename...]
+	#   With arguments: back up only the specified basenames (e.g. ".zshrc")
+	#   Without:        back up all managed files from the manifest
+	#
+	# Returns: 0 on success, 1 if one or more copies failed
+	dotfiles::backup_now() {
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+		local -a targets=()
+
+		# Build the list of destination paths to copy
+		if [[ $# -gt 0 ]]; then
+			# User specified specific basenames
+			for name in "$@"; do
+				local found=0
+				if [[ -f "${manifest}" ]]; then
+					local _src _dest
+					while IFS=$'\t' read -r _src _dest; do
+						if [[ "${_dest##*/}" == "${name}" ]]; then
+							targets+=("${_dest}")
+							found=1
+							break
+						fi
+					done <"${manifest}"
+				fi
+				if ((found == 0)); then
+					targets+=("${HOME}/${name}")
+				fi
+			done
+		else
+			# Back up all managed files
+			if [[ ! -f "${manifest}" ]]; then
+				dotfiles::println 'No manifest found. Nothing to back up.'
+				return 0
+			fi
+			local _src dest
+			while IFS=$'\t' read -r _src dest; do
+				[[ -z "${dest}" ]] && continue
+				targets+=("${dest}")
+			done <"${manifest}"
+		fi
+
+		if [[ ${#targets[@]} -eq 0 ]]; then
+			dotfiles::println 'No managed files found to back up.'
+			return 0
+		fi
+
+		dotfiles::ensure_backup_run || return 1
+
+		local ok=0 skipped=0 failed=0
+
+		dotfiles::println '=> Backing up %d file(s) to %s' "${#targets[@]}" "${BACKUP_RUN_DIR}"
+
+		local dest base backup_dest
+		for dest in "${targets[@]}"; do
+			base="${dest##*/}"
+			backup_dest="${BACKUP_RUN_DIR}/${base}.bak"
+
+			# Skip symlinks (not user files)
+			if [[ -L "${dest}" ]]; then
+				dotfiles::println '    [skip] %s (symlink)' "${dest}"
+				skipped=$((skipped + 1))
+				continue
+			fi
+
+			# Skip missing files
+			if [[ ! -f "${dest}" ]]; then
+				dotfiles::println '    [skip] %s (does not exist)' "${dest}"
+				skipped=$((skipped + 1))
+				continue
+			fi
+
+			if ((DRY_RUN)); then
+				dotfiles::println '    [dry-run] cp %s %s' "${dest}" "${backup_dest}"
+				ok=$((ok + 1))
+				continue
+			fi
+
+			if cp "${dest}" "${backup_dest}"; then
+				dotfiles::println '    [backed up] %s' "${dest}"
+				ok=$((ok + 1))
+			else
+				dotfiles::println 'Error: cannot copy %s to %s' "${dest}" "${backup_dest}" >&2
+				failed=$((failed + 1))
+			fi
+		done
+
+		dotfiles::println '  Backup done: %d copied, %d skipped, %d failed.' \
+			"${ok}" "${skipped}" "${failed}"
+
+		if ((failed > 0)); then
+			return 1
+		fi
 		return 0
 	}
 
@@ -154,7 +248,9 @@ dotfiles::file_perm() {
 		# already linked
 		if [[ -L "${dest}" && "$(readlink "${dest}")" == "${source}" ]]; then
 			dotfiles::println '  [skip] %s (already linked)' "${dest}"
-			dotfiles::manifest_add "${source}" "${dest}"
+			if ! ((DRY_RUN)); then
+				dotfiles::manifest_add "${source}" "${dest}"
+			fi
 			return 0
 		fi
 
