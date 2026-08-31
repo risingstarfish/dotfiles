@@ -383,7 +383,8 @@ LOGGING
 INFORMATION
   -d, --diff                 Show diff between current files and incoming dotfiles
       --verify               Check all managed symlinks (exit 0 = healthy, 1 = broken)
-      --version              Show the version and git information of this program
+  -e, --examples             Show some example commands
+	  --version              Show the version and git information of this program
   -h, --help                 Show this help message
 
 ENVIRONMENT VARIABLES
@@ -592,6 +593,19 @@ EOF
 			dotfiles::println '  [verify] %d broken, %d ok.' "${broken}" "${ok}" >&2
 			return 1
 		fi
+	}
+
+	dotfiles::print_examples() {
+		local -r program="$(basename "$0")"
+		cat <<EOF
+
+TODO: short description of example
+TODO: command 
+
+bash ${program}
+
+
+EOF
 	}
 
 	# pictures
@@ -1509,6 +1523,10 @@ dotfiles::argparse() {
 			;;
 		--version)
 			dotfiles::print_version
+			exit 0
+			;;
+		-e | --examples)
+			dotfiles::print_examples
 			exit 0
 			;;
 		--verify)
