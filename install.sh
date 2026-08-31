@@ -88,7 +88,17 @@ readonly __INSTALL_SH_INCLUDED__=1
 		readonly SRC_PATH
 	}
 
-	dotfiles::set_ref() {
+	dotfiles::set_shell_dir() {
+		[[ -n "${SHELL_DIR:-}" ]] && return 0
+		readonly SHELL_DIR="${SRC_PATH}/shells"
+	}
+
+	dotfiles::set_app_dir() {
+		[[ -n "${APP_DIR:-}" ]] && return 0
+		readonly APP_DIR="${SRC_PATH}/apps"
+	}
+
+	dotfiles::set_github_ref() {
 		[[ -n "${GITHUB_REF:-}" ]] && return 0
 
 		GITHUB_REF="$(command git -C "${SRC_PATH}" config --local dotfiles.ref 2>/dev/null)"
@@ -172,24 +182,24 @@ readonly __INSTALL_SH_INCLUDED__=1
 	}
 
 	# Detect if script was run as sudo or root.
-	# Usage: set_admin
-	dotfiles::set_admin() {
-		[[ -n "${IS_ADMIN:-}" ]] && return 0
+	# Usage: set_elevated
+	dotfiles::set_elevated() {
+		[[ -n "${IS_ELEVATED:-}" ]] && return 0
 
-		if [[ "$EUID" -eq 0 || -n "${SUDO_USER:-}" ]]; then
-			readonly IS_ADMIN=0
+		if [[ "${EUID}" -eq 0 || -n "${SUDO_USER:-}" ]]; then
+			readonly IS_ELEVATED=1
 		elif [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]] && net session >/dev/null 2>&1; then
 			# net session fails with exit code 5 if not admin
-			readonly IS_ADMIN=0
+			readonly IS_ELEVATED=1
 		else
-			readonly IS_ADMIN=1
+			readonly IS_ELEVATED=0
 		fi
 	}
 
 	dotfiles::set_available_modules() {
-		[[ -n "${ALL_MODULES:-}" ]] && return 0
+		[[ -n "${AVAILABLE_MODULES:-}" ]] && return 0
 		# order matters for help message
-		ALL_MODULES=(
+		AVAILABLE_MODULES=(
 			# shells
 			"shells/zsh"
 			"shells/bash"
@@ -197,18 +207,18 @@ readonly __INSTALL_SH_INCLUDED__=1
 			"apps/git"
 			"apps/ssh"
 			"apps/curl"
+			"apps/wget"
 			#"apps/oh-my-posh"
 			"apps/shellcheck"
 			#apps/fastfetch
 			#"apps/tmux"
-			"apps/wget"
 		)
 
 		if [[ "$TARGET_OS" == "${OS_MAC}" ]]; then
-			ALL_MODULES+=("apps/iterm2")
+			AVAILABLE_MODULES+=("apps/iterm2")
 		fi
 
-		readonly ALL_MODULES
+		readonly AVAILABLE_MODULES
 	}
 }
 ####################
@@ -404,11 +414,11 @@ EOF
 		dotfiles::println 'AVAILABLE MODULES'
 		dotfiles::println
 
-		all_symlinks=$(find "$HOME" -maxdepth 3 -type l -exec ls -ld {} + 2>/dev/null || true)
 		local all_symlinks
+		all_symlinks=$(find "$HOME" -maxdepth 3 -type l -exec ls -ld {} + 2>/dev/null || true)
 		local current_category=""
 
-		for item in "${ALL_MODULES[@]}"; do
+		for item in "${AVAILABLE_MODULES[@]}"; do
 			local category="${item%%/*}" # everything before the first '/'
 			local module="${item##*/}"   # everything after the last '/'
 
@@ -442,10 +452,10 @@ EOF
 
 					while IFS= read -r src_file; do
 						[[ -z "$src_file" ]] && continue
-						((total_files++))
+						total_files=$((total_files + 1))
 
 						if echo "$all_symlinks" | grep -F -q "$src_file"; then
-							((linked_files++))
+							linked_files=$((linked_files + 1))
 						fi
 					done < <(find "$mod_dir" -maxdepth 1 -type f 2>/dev/null || true)
 
@@ -698,8 +708,8 @@ dotfiles::check_exists() {
 # windows
 {
 	# detect if windows user has sudo enabled
-	dotfiles::set_has_windows_sudo() {
-		[[ -n "${HAS_WINDOWS_SUDO:-}" ]] && return 0
+	dotfiles::set_windows_sudo() {
+		[[ -n "${WINDOWS_SUDO:-}" ]] && return 0
 
 		command -v sudo >/dev/null 2>&1 || return 1
 		command -v reg.exe >/dev/null 2>&1 || return 1 # NOTE: redundant?
@@ -708,9 +718,9 @@ dotfiles::check_exists() {
 		sudo_reg=$(MSYS_NO_PATHCONV=1 reg.exe query "${WINDOWS_SUDO_REG_LOC}" /v Enabled 2>/dev/null)
 		# output of 0x1, 0x2, or 0x3 means enabled
 		if [[ "${sudo_reg}" =~ 0x[1-3] ]]; then
-			readonly HAS_WINDOWS_SUDO=0
+			readonly WINDOWS_SUDO=0
 		else
-			readonly HAS_WINDOWS_SUDO=1
+			readonly WINDOWS_SUDO=1
 		fi
 	}
 
@@ -749,7 +759,7 @@ dotfiles::check_exists() {
 
 		local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script")
 
-		#if [[ ${IS_ADMIN} -eq 1 ]]; then
+		#if [[ ${IS_ELEVATED} -eq 1 ]]; then
 		#	ps_args+=("-IsElevated")
 		#fi
 
@@ -790,15 +800,16 @@ dotfiles::check_exists() {
 		fi
 
 		dotfiles::println 'Certain functionality may be missing or altered (e.g. instead of symlinking, files get copied).' >&2
-		if dotfiles::is_true "${HAS_WINDOWS_SUDO}"; then
+		if dotfiles::is_true "${WINDOWS_SUDO}"; then
 			dotfiles::println '   Tip: Re-run this script using `sudo` to enable native symlinks.' >&2
 		else
 			dotfiles::println '   Tip: Enable Windows Developer Mode or Windows Sudo to allow native symlinks.' >&2
 		fi
 
+		echo
 		local choice
 		while true; do
-			if ! read -r -p $'\nSwitch to the native PowerShell installer (install.ps1)? [Y/n/(q)uit]: ' choice; then
+			if ! read -r -p $'Switch to the native PowerShell installer (install.ps1)? [Y/n/(q)]: ' choice; then
 				dotfiles::println 'Error: No input available for prompt.' >&2
 				exit 1
 			fi
@@ -834,7 +845,7 @@ dotfiles::check_exists() {
 dotfiles::assign_mode() {
 	if [[ -n "$MODE" ]]; then
 		dotfiles::println 'Error: Cannot specify multiple actions. "%s" conflicts with "%s".' "$1" "$MODE" >&2
-		exit 1
+		exit 2
 	fi
 	MODE="$2"
 }
@@ -842,7 +853,7 @@ dotfiles::assign_mode() {
 # $1 = raw semicolon-separated string
 # $2 = name of the target array
 dotfiles::parse_module_list() {
-	local -n arr="$2"
+	local -n -a arr="$2"
 	local m
 	local mod
 	local valid
@@ -855,19 +866,19 @@ dotfiles::parse_module_list() {
 
 		if [[ "$m" == */* ]]; then
 			# submodule match (e.g., "apps/git")
-			for mod in "${ALL_MODULES[@]}"; do
+			for mod in "${AVAILABLE_MODULES[@]}"; do
 				[[ "$mod" == "$m" ]] && valid=1 && break
 			done
 		else
 			# top-level match (e.g., "apps")
-			for mod in "${ALL_MODULES[@]}"; do
+			for mod in "${AVAILABLE_MODULES[@]}"; do
 				[[ "${mod%%/*}" == "$m" ]] && valid=1 && break
 			done
 		fi
 
 		if [[ $valid -eq 0 ]]; then
 			dotfiles::println 'Error: Unknown module "%s".' "$m" >&2
-			exit 1
+			exit 2
 		fi
 		arr+=("$m")
 	done
@@ -939,7 +950,7 @@ dotfiles::argparse() {
 			dotfiles::parse_module_list "$2" INSTALL_MODULES
 			shift 2
 			;;
-		--install=*)
+		-i=* | --install=*)
 			dotfiles::parse_module_list "${1#*=}" INSTALL_MODULES
 			shift
 			;;
@@ -951,7 +962,7 @@ dotfiles::argparse() {
 			dotfiles::parse_module_list "$2" EXCLUDE_MODULES
 			shift 2
 			;;
-		--exclude=*)
+		-x=* | --exclude=*)
 			dotfiles::parse_module_list "${1#*=}" EXCLUDE_MODULES
 			shift
 			;;
@@ -1069,29 +1080,59 @@ dotfiles::argparse() {
 	fi
 }
 
-# Checks if a module should be installed based on INSTALL_MODULES and EXCLUDE_MODULES.
-# Returns 0 (success/true) if it should be installed, 1 (failure/false) if skipped.
+# Builds associative-array lookup sets from AVAILABLE_MODULES,
+# INSTALL_MODULES, and EXCLUDE_MODULES.
+# Must be called after argparse and set_available_modules.
+# Usage: build_module_sets
+#
+# Side effects:
+#   Sets AVAILABLE_SET, INSTALL_SET, EXCLUDE_SET (declare -A)
+dotfiles::build_module_sets() {
+	declare -gA AVAILABLE_SET=()
+	declare -gA INSTALL_SET=()
+	declare -gA EXCLUDE_SET=()
+
+	local m top
+	for m in "${AVAILABLE_MODULES[@]}"; do
+		AVAILABLE_SET["$m"]=1
+		top="${m%%/*}"
+		AVAILABLE_SET["$top"]=1
+	done
+
+	for m in "${INSTALL_MODULES[@]}"; do
+		INSTALL_SET["$m"]=1
+		top="${m%%/*}"
+		INSTALL_SET["$top"]=1
+	done
+
+	for m in "${EXCLUDE_MODULES[@]}"; do
+		EXCLUDE_SET["$m"]=1
+		top="${m%%/*}"
+		EXCLUDE_SET["$top"]=1
+	done
+}
+
+# Checks if a module should be installed.
+# Returns 0 if enabled, 1 if skipped.
 dotfiles::is_module_enabled() {
 	local target_module="$1"                # e.g., "apps/git"
 	local top_module="${target_module%%/*}" # e.g., "apps"
-	local item
 
-	# exclusions
-	if [[ ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
-		for item in "${EXCLUDE_MODULES[@]}"; do
-			if [[ "$item" == "$target_module" || "$item" == "$top_module" ]]; then
-				return 1
-			fi
-		done
+	# not available on this OS
+	if [[ ! -v AVAILABLE_SET[$target_module] && ! -v AVAILABLE_SET[$top_module] ]]; then
+		return 1
 	fi
 
-	# inclusions
-	if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
-		for item in "${INSTALL_MODULES[@]}"; do
-			if [[ "$item" == "$target_module" || "$item" == "$top_module" ]]; then
-				return 0
-			fi
-		done
+	# explicitly excluded
+	if [[ -v EXCLUDE_SET[$target_module] || -v EXCLUDE_SET[$top_module] ]]; then
+		return 1
+	fi
+
+	# explicitly included (only matters when INSTALL_SET is non-empty)
+	if [[ ${#INSTALL_SET[@]} -gt 0 ]]; then
+		if [[ -v INSTALL_SET[$target_module] || -v INSTALL_SET[$top_module] ]]; then
+			return 0
+		fi
 		return 1
 	fi
 
@@ -1099,11 +1140,9 @@ dotfiles::is_module_enabled() {
 }
 
 dotfiles::set_files_to_check() {
-	[[ -n "${SHELL_DIR:-}" || -n "${APP_DIR:-}" ]] && return 0
+	[[ -n "${FILES_TO_CHECK:-}" ]] && return 0
 
-	# base directory constants
-	readonly SHELL_DIR="${SRC_PATH}/shells"
-	readonly APP_DIR="${SRC_PATH}/apps"
+	FILES_TO_CHECK=()
 
 	# shell
 	declare -r -a shell_zsh_files=(
@@ -1133,6 +1172,7 @@ dotfiles::set_files_to_check() {
 	declare -a app_git_files=(
 		"${APP_DIR}/git/.gitignore"
 		"${APP_DIR}/git/.gitattributes"
+		"${APP_DIR}/git/.gitconfig"
 	)
 	declare -r -a app_iterm2_files=(
 		"${APP_DIR}/iterm2/Profiles.json"
@@ -1145,13 +1185,13 @@ dotfiles::set_files_to_check() {
 
 	case "${TARGET_OS}" in
 	"${OS_MAC}")
-		app_git_files+=("${APP_DIR}/git/.gitconfig.mac")
+		app_git_files+=("${APP_DIR}/git/.gitconfig.local.mac")
 		;;
 	"${OS_ARCHLINUX}")
-		app_git_files+=("${APP_DIR}/git/.gitconfig.archlinux")
+		app_git_files+=("${APP_DIR}/git/.gitconfig.local.archlinux")
 		;;
 	"${OS_WINDOWS}")
-		app_git_files+=("${APP_DIR}/git/.gitconfig.windows")
+		app_git_files+=("${APP_DIR}/git/.gitconfig.local.windows")
 		;;
 	esac
 
@@ -1163,6 +1203,8 @@ dotfiles::set_files_to_check() {
 	dotfiles::is_module_enabled "apps/git" && FILES_TO_CHECK+=("${app_git_files[@]}")
 	dotfiles::is_module_enabled "apps/shellcheck" && FILES_TO_CHECK+=("${app_shellcheck_files[@]}")
 	dotfiles::is_module_enabled "apps/iterm2" && FILES_TO_CHECK+=("${app_iterm2_files[@]}")
+
+	readonly FILES_TO_CHECK
 }
 
 dotfiles::set_log() {
@@ -1178,8 +1220,7 @@ dotfiles::set_log() {
 dotfiles::do_mode() {
 	case "$MODE" in
 	install)
-		# TODO: implement
-		# TODO: symlink, env, logging, check_exists, windows pwsh handoff
+		dotfiles::symlink_all
 		;;
 	clean)
 		# TODO: remove orphaned symlinks, then install/relink
@@ -1212,19 +1253,31 @@ main() {
 		dotfiles::install_from_git "$@" || exit 1
 	fi
 
-	dotfiles::set_ref # GITHUB_REF
+	dotfiles::set_shell_dir # SHELL_DIR
+	dotfiles::set_app_dir   # APP_DIR
+	if [[ ! -d "${SHELL_DIR}" ]]; then
+		dotfiles::println "Error: unable to locate shells/."
+		exit 1
+	fi
+	if [[ ! -d "${APP_DIR}" ]]; then
+		dotfiles::println "Error: unable to locate apps/."
+		exit 1
+	fi
+
+	dotfiles::set_github_ref # GITHUB_REF
 
 	dotfiles::set_env || { # TARGET_OS & TARGET_RUNTIME
 		dotfiles::println 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.'
 		dotfiles::prompt_continue "Some functionality may be limited."
 	}
 	if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
-		dotfiles::set_has_windows_sudo
+		dotfiles::set_windows_sudo
 	fi
-	dotfiles::set_admin             # IS_ADMIN
-	dotfiles::set_available_modules # ALL_MODULES
+	dotfiles::set_elevated          # IS_ELEVATED
+	dotfiles::set_available_modules # AVAILABLE_MODULES
 
 	dotfiles::argparse "$@"
+	dotfiles::build_module_sets
 	dotfiles::set_log # DOTFILES_LOG
 
 	lib_dir="${SRC_PATH}/lib"
@@ -1248,7 +1301,7 @@ main() {
 	fi
 
 	# switch to native powershell if non sudo windows bash
-	if [[ "${IS_ADMIN}" -eq 1 && "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
+	if [[ "${IS_ELEVATED}" -eq 0 && "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
 		case "${TARGET_RUNTIME}" in
 		"${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
 			if dotfiles::prompt_windows_handoff; then
@@ -1265,12 +1318,12 @@ main() {
 	dotfiles::check_exists "${FILES_TO_CHECK[@]}" || {
 		exit 1
 	}
-	dotfiles::println 'File(s) queued for install: %d' "${#FILES_TO_CHECK[@]}"
 
 	# TODO: logging
 
 	# dotfiles::print_start
 	# TODO: lib filesystem template git
+	# TODO: symlink and template
 	dotfiles::do_mode
 
 	dotfiles::print_end
