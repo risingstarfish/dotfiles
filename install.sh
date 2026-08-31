@@ -14,18 +14,15 @@ readonly __INSTALL_SH_INCLUDED__=1
 		printf 'Error: unable to resolve $HOME'
 		exit 1
 	fi
-	#  user global env
-	readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-${HOME}/.config/dotfiles/logs}" # post
-	readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-${HOME}/.cache/dotfiles}"   # post
-	# readonly DOTFILES_LOG="${DOTFILES_LOG:-1}" # cli modified --no-log
-	# pre script env. do not get modified by cli
-	readonly DOTFILES_INSTALL_DIR="${DOTFILES_INSTALL_DIR:-${HOME}/dotfiles}" # setup
-	readonly DOTFILES_INSTALL_REF="${DOTFILES_INSTALL_REF:-main}"             # setup
-	readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"                  # post
 
 	readonly REPO_URL="https://github.com/risingstarfish/dotfiles.git"
-	# env
+	#  user defined  env
+	readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-${HOME}/.config/dotfiles/logs}"
+	readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-${HOME}/.cache/dotfiles}"
+	readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"
+	# environment
 	readonly OS_ARCHLINUX="archlinux"
+	readonly OS_CACHYOS="cachyos"
 	readonly OS_DEBIAN="debian"
 	readonly OS_MAC="mac"
 	readonly OS_WINDOWS="windows"
@@ -99,10 +96,10 @@ readonly __INSTALL_SH_INCLUDED__=1
 	}
 
 	dotfiles::set_github_ref() {
-		[[ -n "${GITHUB_REF:-}" ]] && return 0
+		[[ -n "${DOTFILES_INSTALL_REF:-}" ]] && return 0
 
-		GITHUB_REF="$(command git -C "${SRC_PATH}" config --local dotfiles.ref 2>/dev/null)"
-		readonly GITHUB_REF="${GITHUB_REF:-main}"
+		DOTFILES_INSTALL_REF="$(command git -C "${SRC_PATH}" config --local dotfiles.ref 2>/dev/null)"
+		readonly DOTFILES_INSTALL_REF="${DOTFILES_INSTALL_REF:-main}"
 	}
 
 	# Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
@@ -168,7 +165,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 			# Unknown
 			if [[ "${OS:-}" == "Windows_NT" ]]; then
 				readonly TARGET_OS="${OS_WINDOWS}"
-				readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}" # redundant
+				readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
 			else
 				readonly TARGET_OS="${OS_UNKNOWN}"
 				readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
@@ -214,9 +211,9 @@ readonly __INSTALL_SH_INCLUDED__=1
 			#"apps/tmux"
 		)
 
-		if [[ "$TARGET_OS" == "${OS_MAC}" ]]; then
-			AVAILABLE_MODULES+=("apps/iterm2")
-		fi
+		#if [[ "$TARGET_OS" == "${OS_MAC}" ]]; then
+		#	AVAILABLE_MODULES+=("apps/iterm2")
+		#fi
 
 		readonly AVAILABLE_MODULES
 	}
@@ -229,7 +226,7 @@ dotfiles::bash_version_check() {
 	fi
 	# script requires bash >=4.0
 	if ((BASH_VERSINFO[0] < 4)); then
-		dotfiles::println 'Error: This script requires bash v4.0 or newer. You are running %s.' "${BASH_VERSION}"
+		dotfiles::println 'Error: This script requires bash v4.0 or newer. You are running %s.' "${BASH_VERSION}" >&2
 
 		if [[ "$(uname -s)" == "Darwin" ]]; then
 			dotfiles::println '  On macOS, the default bash is severely outdated (v3.2).' >&2
@@ -267,18 +264,18 @@ dotfiles::bash_version_check() {
 		fi
 
 		if [[ ! -f "${target_file}" ]]; then
-			dotfiles::println 'Error: Cannot source '%s': File does not exist or is a directory.' "${target_file}" >&2
+			dotfiles::println 'Error: Cannot source "%s": File does not exist or is a directory.' "${target_file}" >&2
 			return 1
 		fi
 
 		if [[ ! -r "${target_file}" ]]; then
-			dotfiles::println 'Error: Cannot source '%s': Read permission denied.' "${target_file}" >&2
+			dotfiles::println 'Error: Cannot source "%s": Read permission denied.' "${target_file}" >&2
 			return 1
 		fi
 
 		source "${target_file}" || {
 			local err_code=$?
-			dotfiles::println 'Error: File '%s' was read, but execution failed with exit code %d.' "${target_file}" "${err_code}" >&2
+			dotfiles::println 'Error: File "%s" was read, but execution failed with exit code %d.' "${target_file}" "${err_code}" >&2
 			return 1
 		}
 
@@ -337,49 +334,67 @@ OVERVIEW: Installs and synchronizes dotfiles, shell configuration, TODO: and opt
 USAGE: bash $(basename "$0") [options]
 
 ACTIONS
-  -u, --update              Update from git before performing any operations
-      --update-only         Update from git then exit
-  -c, --clean               Remove orphaned symlinks, then install/relink
-      --reset               Remove all symlinks managed by this tool
+  -u, --update               Update from git before performing any operations
+      --update-only          Update from git then exit
+  -r, --repair               Remove orphaned symlinks, then install/relink
+      --reset                Remove all symlinks managed by this tool
+      --clean-backups [N]    Remove backups older than <N> days (default: 7, 0 = all)
+      --clean-logs [N]       Remove logs older than <N> days (default: 7, 0 = all)
+      --clean-all            Remove all backups and logs
+	  --uninstall            Deletes symlinks, logs, and backups, then deletes install directory
 
 MODULES
-  -i, --install <module>    Install ONLY the specified modules, semicolon-separated
-  -x, --exclude <module>    Install all modules EXCEPT those specified, semicolon-separated
-  -l, --list                Display all available modules, status, and information
+  -i, --install <module...>  Install ONLY the specified modules <module>, semicolon-separated
+  -x, --exclude <module...>  Install all modules <module> EXCEPT those specified, semicolon-
+                             separated
+  -l, --list                 Display all available modules, status, and information
 
-SAFETY
-  -n, --dry-run             Print planned actions without modifying the disk
-  -I, --interactive         Prompt for confirmation before every action/modification
-      --noconfirm           Do not prompt for any confirmation
-  -f, --force               Overwrite existing files/links
-      --no-backup           Delete existing conflicting files instead of backing up	
+SETUP
+	  --dir <path>           Install directory (default: ~/dotfiles)
+      --ref <ref>            Git branch, tag, or commit to install (default: main)
+
+RESTORE
+      --restore [file...]    Restore file(s) from the most recent backup.
+                             Without arguments, lists restorable files.
+      --restore-all          Restore ALL files from the most recent backup run.
+      --from <run>           Restore from a specific run (e.g. 2026-07-16/14-52-31)  
+                             (default: most recent)
+      --backup-list          Show all available backup runs and their files.
+
+BEHAVIOUR
+  -n, --dry-run              Print planned actions without modifying the disk
+  -I, --interactive          Prompt for confirmation before every action/modification
+      --noconfirm            Do not prompt for any confirmation
+  -y, --yes                  Auto-accept yes to prompts. Alias to --noconfirm
+  -f, --force                Overwrite existing files/links
+  -K, --autorestart          Automatically restart shell at script end
+      --no-backup            Delete existing conflicting files instead of backing up	
 
 LOGGING
-  -v, --verbose             Print detailed step-by-step instructions
-  -q, --quiet               Suppress all standard output except errors
-      --log-level <level>   Set log verbosity | debug, info, warn, or error (default: info)
-      --no-log              Disable writing to the log file
+  -v, --verbose              Print detailed step-by-step instructions
+  -q, --quiet                Suppress all standard output except errors
+      --log-level <level>    Set log verbosity <level> | debug, info, warn, error (default: info)
+      --no-log               Disable writing to the log file
 
-PACKAGES & HOOKS
-      --no-deps             Skip dotfiles dependency installation
-      --no-hooks            Skip pre/post installation scripts
+///PACKAGES & HOOKS
+      ///--no-deps              Skip dotfiles dependency installation
+      ///--no-hooks             Skip pre/post installation scripts
 
 INFORMATION
-  -d, --diff                Show diff between current files and incoming dotfiles
-  -s, --status              Show current installation status of modules
-      --version             Show the version and git information of this program
-  -h, --help                Show this help message
+  -d, --diff                 Show diff between current files and incoming dotfiles
+      --verify               Check all managed symlinks (exit 0 = healthy, 1 = broken)
+      --version              Show the version and git information of this program
+  -h, --help                 Show this help message
 
 ENVIRONMENT VARIABLES
   Global (Always Active):
-    DOTFILES_LOG_DIR        Path to store log files (default: ~/.config/dotfiles/logs)
-    DOTFILES_CACHE_DIR      Path to store temporary cache (default: ~/.cache/dotfiles)
-    DOTFILES_LOG            Set to 0 or false to disable log file writing (default: 1)
-    DOTFILES_LOCAL_MODS     Set to 1 or true to stash uncommitted local changes (default: 0)
-
-  Setup Only:
-    DOTFILES_INSTALL_DIR    Target directory for installation (default: ~/dotfiles)
-    DOTFILES_INSTALL_REF    Specific git branch, tag, or commit to install (default: main)
+    DOTFILES_INSTALL_DIR     Target directory for installation (default: ~/dotfiles)
+    DOTFILES_INSTALL_REF     Specific git branch, tag, or commit to install (default: main)
+    DOTFILES_LOG_DIR         Path to store log files (default: ~/.config/dotfiles/logs)
+    DOTFILES_CACHE_DIR       Path to store temporary cache (default: ~/.cache/dotfiles)
+    DOTFILES_LOG             Set to 0 or false to disable log file writing (default: 1)
+    DOTFILES_LOCAL_MODS      Set to 1 or true to stash uncommitted local changes (default: 0)
+    DOTFILES_AUTORESTART     Set to 1 or true to restart shell at script finish (default: 0)
 
 EOF
 	}
@@ -403,80 +418,180 @@ Remote: ${dotfiles_remote}
 EOF
 	}
 
-	dotfiles::print_status() {
-		dotfiles::println 'TODO: implement.'
-	}
-
 	dotfiles::print_modules() {
 		dotfiles::set_available_modules
+
+		# read manifest once into an indexed array of source paths
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+		local -a manifest_sources=()
+		if [[ -f "${manifest}" ]]; then
+			while IFS=$'\t' read -r src dest; do
+				[[ -n "${src}" ]] && manifest_sources+=("${src}")
+			done <"${manifest}"
+		fi
+
+		# helper: is this source path in the manifest?
+		# sets in_manifest to 0 or 1
+		local in_manifest
+
+		# helper: get the dest for a source (empty string if no mapping)
+		local dest
 
 		dotfiles::println
 		dotfiles::println 'AVAILABLE MODULES'
 		dotfiles::println
 
-		local all_symlinks
-		all_symlinks=$(find "$HOME" -maxdepth 3 -type l -exec ls -ld {} + 2>/dev/null || true)
 		local current_category=""
 
 		for item in "${AVAILABLE_MODULES[@]}"; do
-			local category="${item%%/*}" # everything before the first '/'
-			local module="${item##*/}"   # everything after the last '/'
+			local category="${item%%/*}"
+			local module="${item##*/}"
+			local mod_dir="${SRC_PATH}/${item}"
 
-			# header if it changed
+			# category header
 			if [[ "$category" != "$current_category" ]]; then
 				[[ -n "$current_category" ]] && dotfiles::println
-				dotfiles::println "$category"
-				current_category="$category"
+				dotfiles::println "${category}"
+				current_category="${category}"
 			fi
 
-			local desc=""
-			case "$module" in
-			zsh) desc="Z shell configuration and plugins" ;;
-			bash) desc="Bare bash profile" ;;
-			git) desc="Global gitconfig and commit templates" ;;
-			ssh) desc="SSH key generation and config setup" ;;
-			curl) desc="Command line tool for transferring data" ;;
-			shellcheck) desc="Shell script analysis tool" ;;
-			wget) desc="Network utility to retrieve files" ;;
-			iterm2) desc="macOS terminal emulator configuration" ;;
-			*) desc="Configuration for $module" ;;
-			esac
+			# module header
+			if [[ ! -d "$mod_dir" ]]; then
+				printf '  %s:\n    (-) directory not found\n' "$module"
+				continue
+			fi
 
-			local status='?'
-			if [[ -n "$all_symlinks" ]]; then
-				local mod_dir="${SRC_PATH}/${item}"
+			printf '  %s:\n' "$module"
 
-				if [[ -d "$mod_dir" ]]; then
-					local total_files=0
-					local linked_files=0
+			# collect files in this module dir
+			local -a files=()
+			while IFS= read -r f; do
+				[[ -z "$f" ]] && continue
+				files+=("$f")
+			done < <(find "$mod_dir" -maxdepth 1 -type f 2>/dev/null | sort)
 
-					while IFS= read -r src_file; do
-						[[ -z "$src_file" ]] && continue
-						total_files=$((total_files + 1))
+			if [[ ${#files[@]} -eq 0 ]]; then
+				printf '    (–) no files\n'
+				continue
+			fi
 
-						if echo "$all_symlinks" | grep -F -q "$src_file"; then
-							linked_files=$((linked_files + 1))
-						fi
-					done < <(find "$mod_dir" -maxdepth 1 -type f 2>/dev/null || true)
+			local module_ok=0
+			local module_total=0
 
-					if [[ $total_files -gt 0 ]]; then
-						if [[ $linked_files -eq $total_files ]]; then
-							status="✓" # all files symlinked
-						elif [[ $linked_files -gt 0 ]]; then
-							status="~" # some files symlinked, some missing
-						fi
-					else
-						# fallback for modules with no files
-						if echo "$all_symlinks" | grep -F -q "${item}/"; then
-							status="✓"
-						fi
+			for src_file in "${files[@]}"; do
+				# only show files this tool manages (in manifest)
+				in_manifest=0
+				for ms in "${manifest_sources[@]}"; do
+					if [[ "$ms" == "$src_file" ]]; then
+						in_manifest=1
+						break
+					fi
+				done
+
+				if [[ ${in_manifest} -eq 0 ]]; then
+					orphans+=("${link}")
+				fi
+
+				# resolve dest to check if symlink is alive
+				dest="$(dotfiles::resolve_dest "$src_file")" || dest=""
+
+				local status="✗"
+				local fname="${src_file##*/}"
+
+				if [[ -n "$dest" ]]; then
+					if [[ -L "$dest" && -e "$dest" ]]; then
+						status="✓"
+					elif [[ -L "$dest" ]]; then
+						status="!" # symlink exists but target is gone (broken)
 					fi
 				fi
-			fi
 
-			printf "  (%s) %-15s %s\n" "$status" "$module" "$desc"
+				printf '    (%s) %s\n' "$status" "$fname"
+				module_total=$((module_total + 1))
+				[[ "$status" == "✓" ]] && module_ok=$((module_ok + 1))
+			done
+
+			# if no files in this module are managed, show a hint
+			if [[ ${module_total} -eq 0 ]]; then
+				printf '    (✗) not installed\n'
+			fi
 		done
 		dotfiles::println
+	}
+
+	# Print all backup runs and their files, newest first.
+	# Usage: print_backups
+	# Returns: always 0
+	dotfiles::print_backups() {
+		local -r base="${DOTFILES_CACHE_DIR}/backups"
+
+		if [[ ! -d "${base}" ]]; then
+			dotfiles::println 'No backups found.'
+			return 0
+		fi
+
+		local -a runs=()
+		# collect YYYY-MM-DD/HH-MM-SS dirs, sorted newest first
+		while IFS= read -r -d '' run; do
+			runs+=("$(echo "${run}" | sed "s|^${base}/||")")
+		done < <(find "${base}" -mindepth 2 -maxdepth 2 -type d -print0 2>/dev/null | sort -rz | tac -z 2>/dev/null ||
+			find "${base}" -mindepth 2 -maxdepth 2 -type d -print0 2>/dev/null | sort -rz)
+
+		if [[ ${#runs[@]} -eq 0 ]]; then
+			dotfiles::println 'No backup runs found.'
+			return 0
+		fi
+
+		dotfiles::println 'AVAILABLE BACKUPS %d run(s):' "${#runs[@]}"
+		dotfiles::println
+
+		local run
+		for run in "${runs[@]}"; do
+			printf '  %s/\n' "${run}"
+			local -a files
+			files=()
+			while IFS= read -r -d '' f; do
+				files+=("$(basename "$f")")
+			done < <(find "${base}/${run}" -maxdepth 1 -type f -print0 2>/dev/null | sort -z)
+
+			for f in "${files[@]}"; do
+				printf '    %s\n' "$f"
+			done
+			printf '\n'
+		done
+	}
+
+	# Returns 0 if all managed symlinks are valid, 1 otherwise.
+	# Prints a one-line summary (for scripts) or a table (for humans).
+	dotfiles::print_verification() {
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+
+		if [[ ! -f "${manifest}" ]]; then
+			dotfiles::println '  [verify] No manifest found. Nothing to verify.'
+			return 0
+		fi
+
+		local broken=0
+		local ok=0
+		local src dest
+
+		while IFS=$'\t' read -r src dest; do
+			[[ -z "${dest}" ]] && continue
+			if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
+				ok=$((ok + 1))
+			else
+				broken=$((broken + 1))
+				printf '  %s\n' "${dest}" >&2
+			fi
+		done <"${manifest}"
+
+		if [[ ${broken} -eq 0 ]]; then
+			dotfiles::println '  [verify] OK (%d links valid).' "${ok}" >&2
+			return 0
+		else
+			dotfiles::println '  [verify] %d broken, %d ok.' "${broken}" "${ok}" >&2
+			return 1
+		fi
 	}
 
 	# pictures
@@ -508,7 +623,7 @@ EOF
 EOF
 		}
 		dotfiles::print_end() {
-			if [[ -z "${NO_RESTART}" ]]; then
+			if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
 				cat <<'EOF'
 
 ╭───────────────────────────────────────────╮
@@ -632,10 +747,10 @@ EOF
 		# ── Dev override: rebase instead of force-checkout ──────────
 		if ((has_local_mods)) && dotfiles::is_true "${DOTFILES_LOCAL_MODS}"; then
 			dotfiles::println '=> Local modifications detected. Rebasing instead of force-checkout.'
-			dotfiles::println '  Your changes will be preserved on top of the latest %s.' "$GITHUB_REF"
+			dotfiles::println '  Your changes will be preserved on top of the latest %s.' "$DOTFILES_INSTALL_REF"
 
-			if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "$GITHUB_REF" 2>/dev/null; then
-				dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "$GITHUB_REF" >&2
+			if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "$DOTFILES_INSTALL_REF" 2>/dev/null; then
+				dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "$DOTFILES_INSTALL_REF" >&2
 				return 1
 			fi
 			if ! command git -C "${SRC_PATH}" rebase FETCH_HEAD 2>/dev/null; then
@@ -651,19 +766,19 @@ EOF
 		dotfiles::println '=> Updating dotfiles in %s' "${SRC_PATH}"
 
 		local fetch_ok=1
-		if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "$GITHUB_REF" 2>/dev/null; then
+		if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "$DOTFILES_INSTALL_REF" 2>/dev/null; then
 			fetch_ok=0
-			dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "$GITHUB_REF" >&2
+			dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "$DOTFILES_INSTALL_REF" >&2
 			dotfiles::prompt_continue "Your files may be overwritten\n" || exit 1
 			dotfiles::println '  Continuing with current local state.'
 		fi
 		if ((fetch_ok)); then
-			if ! command git -C "${SRC_PATH}" checkout "$GITHUB_REF" 2>/dev/null; then
-				dotfiles::println 'Error: Checkout of %s failed in %s' "$GITHUB_REF" "${SRC_PATH}" >&2
+			if ! command git -C "${SRC_PATH}" checkout "$DOTFILES_INSTALL_REF" 2>/dev/null; then
+				dotfiles::println 'Error: Checkout of %s failed in %s' "$DOTFILES_INSTALL_REF" "${SRC_PATH}" >&2
 				return 1
 			fi
 			if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2>/dev/null; then
-				dotfiles::println 'Error: Reset to %s failed in %s' "$GITHUB_REF" "${SRC_PATH}" >&2
+				dotfiles::println 'Error: Reset to %s failed in %s' "$DOTFILES_INSTALL_REF" "${SRC_PATH}" >&2
 				return 1
 			fi
 		fi
@@ -705,6 +820,48 @@ dotfiles::check_exists() {
 }
 
 #######################################
+# manifest
+{
+	# Append a source→dest pair to the manifest (deduplicated).
+	# Called by symlink_file after a successful link creation or confirmation.
+	# Usage: dotfiles::manifest_add <source> <dest>
+	dotfiles::manifest_add() {
+		local -r source="$1"
+		local -r dest="$2"
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+
+		# ensure parent dir exists
+		mkdir -p "$(dirname "${manifest}")" 2>/dev/null || true
+
+		# skip if already recorded
+		if grep -qF -e "${dest}" "${manifest}" 2>/dev/null; then
+			return 0
+		fi
+
+		printf '%s\t%s\n' "${source}" "${dest}" >>"${manifest}"
+	}
+
+	# Remove a dest entry from the manifest.
+	# Usage: dotfiles::manifest_remove <dest>
+	dotfiles::manifest_remove() {
+		local -r dest="$1"
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+
+		[[ -f "${manifest}" ]] || return 0
+		grep -vF -e "${dest}" "${manifest}" >"${manifest}.tmp" 2>/dev/null &&
+			mv "${manifest}.tmp" "${manifest}"
+	}
+
+	# Remove all manifest entries (called after a full clean).
+	# Usage: dotfiles::clear
+	dotfiles::manifest_clear() {
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+		[[ -f "${manifest}" ]] || return 0
+		: >"${manifest}"
+	}
+}
+
+#############################
 # windows
 {
 	# detect if windows user has sudo enabled
@@ -839,6 +996,435 @@ dotfiles::check_exists() {
 		done
 	}
 }
+# clean/reset
+{
+	# Remove all symlinks recorded in the manifest, plus any orphaned
+	# symlinks pointing into $SRC_PATH that are missing from the manifest.
+	#
+	# Usage: clean_symlinks
+	#
+	# Returns:
+	#   0 on success
+	#   1 if one or more removals failed
+	dotfiles::clean_symlinks() {
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+		local -a managed=()
+		local -a orphans=()
+		local src
+		local dest
+
+		# manifest entries
+		if [[ -f "${manifest}" ]]; then
+			while IFS=$'\t' read -r src dest; do
+				[[ -z "${dest}" ]] && continue
+				managed+=("${dest}")
+			done <"${manifest}"
+		fi
+
+		# safety net
+		local -a scan_dirs=("$HOME" "$HOME/.ssh")
+		if [[ "${TARGET_OS:-}" == "${OS_MAC}" ]]; then
+			scan_dirs+=("$HOME/Library/Application Support/iTerm2")
+		fi
+
+		local dir
+		local link
+		local target
+		for dir in "${scan_dirs[@]}"; do
+			[[ -d "$dir" ]] || continue
+			while IFS= read -r -d '' link; do
+				target="$(readlink "$link" 2>/dev/null)" || continue
+				[[ "$target" == "${SRC_PATH}/"* ]] || continue
+				# skip if already in managed list
+				local in_manifest=0
+				for d in "${managed[@]}"; do
+					[[ "$d" == "$link" ]] && in_manifest=1 && break
+				done
+				((in_manifest)) || orphans+=("${link}")
+			done < <(find "$dir" -maxdepth 2 -type l -print0 2>/dev/null)
+		done
+
+		local total=$((${#managed[@]} + ${#orphans[@]}))
+		if [[ ${total} -eq 0 ]]; then
+			dotfiles::println '  [clean-symlinks] No managed symlinks found.'
+			return 0
+		fi
+
+		dotfiles::println '  [clean-symlinks] Found %d managed, %d orphaned symlink(s).' \
+			"${#managed[@]}" "${#orphans[@]}"
+
+		#remove
+		local -a all_links=("${managed[@]}" "${orphans[@]}")
+		local removed=0
+		local failed=0
+
+		for link in "${all_links[@]}"; do
+			[[ -L "$link" ]] || continue # already gone
+			target="$(readlink "$link" 2>/dev/null)"
+			printf '    %s -> %s\n' "$link" "${target:-<gone>}"
+
+			if ((DRY_RUN)); then
+				dotfiles::println '    [dry-run] rm %s' "$link"
+				removed=$((removed + 1))
+				continue
+			fi
+
+			if ((INTERACTIVE)); then
+				local choice
+				if ! read -r -p '    Remove? [Y/n]: ' choice; then
+					dotfiles::println '    [skip] no input available.'
+					continue
+				fi
+				case "$choice" in
+				[nN])
+					dotfiles::println '    [skip] %s (user declined)' "$link"
+					continue
+					;;
+				esac
+			fi
+
+			if rm "$link" 2>/dev/null; then
+				dotfiles::manifest_remove "$link"
+				removed=$((removed + 1))
+			else
+				dotfiles::println 'Error: cannot remove %s' "$link" >&2
+				failed=$((failed + 1))
+			fi
+		done
+
+		# if we removed everything, truncate the manifest
+		if [[ ${#all_links[@]} -eq ${removed} ]]; then
+			dotfiles::manifest_clear
+		fi
+
+		dotfiles::println '  [clean-symlinks] Removed %d, failed %d.' "$removed" "$failed"
+		((failed > 0)) && return 1
+		return 0
+	}
+
+	# Remove all dated backup directories under $DOTFILES_CACHE_DIR/backups/
+	# Usage: clean_backups
+	#
+	# Returns:
+	#   0 on success (including "nothing to clean")
+	#   1 on error
+	dotfiles::clean_backups() {
+		local -r base="${DOTFILES_CACHE_DIR}/backups"
+		local -r days="${CLEAN_BACKUPS_DAYS:-0}"
+
+		if [[ ! -d "${base}" ]]; then
+			dotfiles::println '  [clean-backups] No backup directory found. Nothing to do.'
+			return 0
+		fi
+
+		if ((days == 0)); then
+			# remove everything
+			if ((DRY_RUN)); then
+				dotfiles::println '  [dry-run] rm -rf %s' "${base}"
+				return 0
+			fi
+			rm -rf "${base}" || {
+				dotfiles::println 'Error: failed to remove %s' "${base}" >&2
+				return 1
+			}
+			dotfiles::println '  [clean-backups] Removed all backups.'
+			return 0
+		fi
+
+		# remove day-directories older than N days
+		local removed=0
+		while IFS= read -r -d '' dir; do
+			removed=$((removed + 1))
+			if ((DRY_RUN)); then
+				dotfiles::println '  [dry-run] rm -rf %s' "$dir"
+			else
+				rm -rf "$dir"
+			fi
+		done < <(find "${base}" -mindepth 1 -maxdepth 1 -type d -mtime +"${days}" -print0 2>/dev/null)
+
+		dotfiles::println '  [clean-backups] Removed %d day(s) older than %d.' "${removed}" "${days}"
+		return 0
+	}
+
+	# Remove all log files under $DOTFILES_LOG_DIR/
+	# Usage: clean_logs
+	#
+	# Returns:
+	#   0 on success (including "nothing to clean")
+	#   1 on error
+	dotfiles::clean_logs() {
+		local -r days="${CLEAN_LOGS_DAYS}"
+		local -r base="${DOTFILES_LOG_DIR}"
+
+		if [[ ! -d "${base}" ]]; then
+			dotfiles::println '  [clean-logs] No log directory found. Nothing to do.'
+			return 0
+		fi
+
+		local -a targets=()
+		local removed=0
+
+		if [[ "${days}" == "0" ]]; then
+			# remove all log files
+			while IFS= read -r -d '' f; do
+				targets+=("$f")
+			done < <(find "${base}" -maxdepth 1 -type f -print0 2>/dev/null)
+		else
+			# remove files older than N days
+			while IFS= read -r -d '' f; do
+				targets+=("$f")
+			done < <(find "${base}" -maxdepth 1 -type f -mtime +"${days}" -print0 2>/dev/null)
+		fi
+
+		if [[ ${#targets[@]} -eq 0 ]]; then
+			dotfiles::println '  [clean-logs] No log files to remove.'
+			return 0
+		fi
+
+		for f in "${targets[@]}"; do
+			if ((DRY_RUN)); then
+				dotfiles::println '  [dry-run] rm %s' "$f"
+			else
+				rm -f "$f" || {
+					dotfiles::println 'Error: cannot remove %s' "$f" >&2
+					return 1
+				}
+			fi
+			removed=$((removed + 1))
+		done
+
+		dotfiles::println '  [clean-logs] Removed %d log file(s)%s.' \
+			"${removed}" "$([[ "${days}" != "0" ]] && printf ' older than %d day(s)' "${days}")"
+		return 0
+	}
+
+	dotfiles::repair_symlink() {
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+		local -a orphans=()
+		local src dest
+
+		# find orphaned managed symlinks
+		if [[ -f "${manifest}" ]]; then
+			while IFS=$'\t' read -r src dest; do
+				[[ -z "${dest}" ]] && continue
+				# orphan: link exists but target is gone, or link was removed by user
+				if [[ -L "${dest}" && ! -e "${dest}" ]]; then
+					orphans+=("${dest}")
+				elif [[ ! -L "${dest}" && -e "${dest}" ]]; then
+					# dest exists as a regular file (user replaced the link)
+					# NOT orphaned — skip; user is deliberately overriding
+					continue
+				fi
+			done <"${manifest}"
+		fi
+
+		# remove orphans
+		if [[ ${#orphans[@]} -gt 0 ]]; then
+			dotfiles::println '  [relink] Removing %d orphaned symlink(s):' "${#orphans[@]}"
+			local removed=0
+			for link in "${orphans[@]}"; do
+				printf '    %s\n' "$link"
+				if ((DRY_RUN)); then
+					dotfiles::println '    [dry-run] rm %s' "$link"
+				else
+					rm -f "$link"
+					dotfiles::manifest_remove "$link"
+				fi
+				removed=$((removed + 1))
+			done
+			dotfiles::println '  [relink] Removed %d orphan(s).' "$removed"
+		fi
+
+		dotfiles::symlink_all
+
+		dotfiles::println '  [relink] Done.'
+	}
+
+}
+
+# restoration
+{
+	# Restore a single file from a backup run.
+	# Removes the symlink (if present), places the original file back,
+	# and removes the manifest entry.
+	#
+	# Usage: restore_file <basename> <run_path>
+	#
+	# Arguments:
+	#   $1 (basename) : e.g. ".zshrc" (matches *.bak in the run dir)
+	#   $2 (run_path) : e.g. "2025-07-14/10-23-41"
+	#
+	# Returns:
+	#   0 on success
+	#   1 on error
+	dotfiles::restore_file() {
+		local -r name="$1"
+		local -r run="$2"
+		local -r base="${DOTFILES_CACHE_DIR}/backups"
+		local -r src="${base}/${run}/${name}.bak"
+
+		if [[ ! -f "${src}" ]]; then
+			dotfiles::println 'Error: no backup of "%s" in run %s.' "${name}" "${run}" >&2
+			return 1
+		fi
+
+		# determine destination: look up in manifest, fall back to $HOME
+		local dest="${HOME}/${name}"
+		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
+		if [[ -f "${manifest}" ]]; then
+			# actually look for the dest path that had this basename
+			while IFS=$'\t' read -r _src dest; do
+				if [[ "${dest##*/}" == "${name}" ]]; then
+					dest="${dest}"
+					break
+				fi
+			done <"${manifest}"
+		fi
+
+		dotfiles::println '  [restore] %s -> %s' "${src}" "${dest}"
+
+		# if dest is currently a symlink to our repo, remove it
+		if [[ -L "${dest}" ]]; then
+			local link_target
+			link_target="$(readlink "${dest}")"
+			if [[ "${link_target}" == "${SRC_PATH}/"* ]]; then
+				if ((DRY_RUN)); then
+					dotfiles::println '    [dry-run] rm symlink %s' "${dest}"
+				else
+					rm -f "${dest}"
+					dotfiles::manifest_remove "${dest}"
+				fi
+			fi
+		fi
+
+		# if dest exists as a regular file, back it up first (meta-backup)
+		if [[ -e "${dest}" && ! -L "${dest}" ]]; then
+			dotfiles::backup_file "${dest}" || return 1
+		fi
+
+		# copy backup back to dest
+		if ((DRY_RUN)); then
+			dotfiles::println '    [dry-run] cp %s %s' "${src}" "${dest}"
+			return 0
+		fi
+
+		cp "${src}" "${dest}" || {
+			dotfiles::println 'Error: cannot restore %s to %s.' "${src}" "${dest}" >&2
+			return 1
+		}
+
+		dotfiles::println '    [restored] %s' "${dest}"
+		return 0
+	}
+
+	# Find the most recent run that contains a given filename.
+	# Prints the run path (e.g. "2025-07-14/10-23-41") to stdout.
+	# Returns 1 if not found.
+	dotfiles::restore::find_run() {
+		local -r name="$1"
+		local -r base="${DOTFILES_CACHE_DIR}/backups"
+
+		[[ -d "${base}" ]] || return 1
+
+		# newest first: sort by day desc, then time desc
+		local run
+		while IFS= read -r -d '' run; do
+			if [[ -f "${run}/${name}.bak" ]]; then
+				printf '%s' "$(echo "${run}" | sed "s|^${base}/||")"
+				return 0
+			fi
+		done < <(find "${base}" -mindepth 2 -maxdepth 2 -type d -print0 2>/dev/null | sort -rz | tac -z 2>/dev/null ||
+			find "${base}" -mindepth 2 -maxdepth 2 -type d -print0 2>/dev/null | sort -rz)
+
+		return 1
+	}
+
+	# Orchestrates restore for one or more files.
+	# Usage: restore
+	#
+	# Precondition:
+	#   RESTORE_FILES, RESTORE_ALL, RESTORE_FROM are set by argparse.
+	#
+	# Returns:
+	#   0 on success
+	#   1 if one or more restorations failed
+	dotfiles::restore() {
+		local -a targets=()
+		local -r base="${DOTFILES_CACHE_DIR}/backups"
+		local run
+
+		if [[ ! -d "${base}" ]]; then
+			dotfiles::println 'Error: no backup directory found. Nothing to restore.' >&2
+			return 1
+		fi
+
+		# determine targets
+		if [[ ${RESTORE_ALL} -eq 1 ]]; then
+			# all files from the specified (or latest) run
+			if [[ -n "${RESTORE_FROM}" ]]; then
+				run="${RESTORE_FROM}"
+			else
+				run="$(find "${base}" -mindepth 2 -maxdepth 2 -type d -print0 2>/dev/null | sort -z | tac -z 2>/dev/null | head -z -1 | tr -d '\0')"
+				run="${run#"${base}"/}"
+				[[ -z "${run}" ]] && {
+					dotfiles::println 'Error: no backup runs found.' >&2
+					return 1
+				}
+			fi
+			# collect all files in that run
+			local f
+			while IFS= read -r -d '' f; do
+				local name
+				name="$(basename "$f")"
+				name="${name%.bak}"
+				targets+=("${name}")
+			done < <(find "${base}/${run}" -maxdepth 1 -type f -print0 2>/dev/null)
+			dotfiles::println '=> Restoring %d file(s) from run %s:' "${#targets[@]}" "${run}"
+		else
+			# specific file(s), each from its own most-recent run (or --from)
+			for name in "${RESTORE_FILES[@]}"; do
+				if [[ -n "${RESTORE_FROM}" ]]; then
+					run="${RESTORE_FROM}"
+				else
+					if ! run="$(dotfiles::restore::find_run "${name}")"; then
+						dotfiles::println 'Error: no backup of "%s" found in any run.' "${name}" >&2
+						return 1
+					fi
+				fi
+				targets+=("${name}")
+				dotfiles::println '=> Restoring "%s" from run %s:' "${name}" "${run}"
+			done
+		fi
+
+		# restore each
+		local ok=0
+		local failed=0
+
+		for name in "${targets[@]}"; do
+			local target_run
+			if [[ ${RESTORE_ALL} -eq 1 ]]; then
+				target_run="${run}"
+			else
+				if [[ -n "${RESTORE_FROM}" ]]; then
+					target_run="${RESTORE_FROM}"
+				else
+					target_run="$(dotfiles::restore::find_run "${name}")"
+				fi
+			fi
+
+			if dotfiles::restore_file "${name}" "${target_run}"; then
+				ok=$((ok + 1))
+			else
+				failed=$((failed + 1))
+			fi
+		done
+
+		dotfiles::println '  Restore done: %d/%d succeeded.' "${ok}" "$((ok + failed))"
+		((failed > 0)) && return 1
+		return 0
+	}
+
+}
 ####################
 # $1 = flag name for the error message
 # $2 = value to assign to MODE
@@ -853,7 +1439,7 @@ dotfiles::assign_mode() {
 # $1 = raw semicolon-separated string
 # $2 = name of the target array
 dotfiles::parse_module_list() {
-	local -n -a arr="$2"
+	local -n arr="$2"
 	local m
 	local mod
 	local valid
@@ -885,7 +1471,13 @@ dotfiles::parse_module_list() {
 }
 
 dotfiles::argparse() {
-	NO_RESTART=0
+	# setup
+	DOTFILES_INSTALL_DIR="${DOTFILES_INSTALL_DIR:-${HOME}/dotfiles}"
+	DOTFILES_INSTALL_REF="${DOTFILES_INSTALL_REF:-main}"
+	# behaviour
+	DOTFILES_AUTORESTART="${DOTFILES_AUTORESTART:-0}"
+	DOTFILES_LOG="${DOTFILES_LOG:-1}"
+
 	DRY_RUN=0
 	FORCE=0
 	UPDATE=0
@@ -893,17 +1485,24 @@ dotfiles::argparse() {
 	NO_BACKUP=0
 	NO_DEPS=0
 	NO_HOOKS=0
-	NO_LOG=0
 	NO_CONFIRM=0
 	VERBOSE=0
 	QUIET=0
 	MODE=""
+	REPAIR_SYMLINKS=0
+	CLEAN_BACKUPS_DAYS=""
+	CLEAN_LOGS_DAYS=""
 	LOG_LEVEL="info"
 	INSTALL_MODULES=()
 	EXCLUDE_MODULES=()
+	# restore
+	RESTORE_FILES=()
+	RESTORE_ALL=0
+	RESTORE_FROM=""
 
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
+		# information
 		-h | --help)
 			dotfiles::print_help
 			exit 0
@@ -912,11 +1511,17 @@ dotfiles::argparse() {
 			dotfiles::print_version
 			exit 0
 			;;
-		-s | --status)
-			dotfiles::print_status
-			exit 0
+		--verify)
+			local verify_rc=0
+			dotfiles::print_verification || verify_rc=$?
+			exit "${verify_rc}"
+			;;
+		-d | --diff)
+			dotfiles::assign_mode "--diff" "diff"
+			shift
 			;;
 
+		# actions
 		-u | --update)
 			UPDATE=1
 			shift
@@ -926,22 +1531,69 @@ dotfiles::argparse() {
 			dotfiles::println '=> Successfully updated!'
 			exit 0
 			;;
-		-c | --clean)
-			dotfiles::assign_mode "--clean" "clean"
+		# cleaning
+		-r | --repair)
+			REPAIR_SYMLINKS=1
 			shift
 			;;
 		--reset)
 			dotfiles::assign_mode "--reset" "reset"
 			shift
 			;;
-		-l | --list)
-			dotfiles::print_modules
-			exit 0
+		--clean-backups)
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				CLEAN_BACKUPS_DAYS="7"
+				shift
+			else
+				if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+					dotfiles::println 'Error: Argument for "%s" must be a non-negative integer (days). Got "%s".' "$1" "$2" >&2
+					exit 1
+				fi
+				CLEAN_BACKUPS_DAYS="$2"
+				shift 2
+			fi
 			;;
-		-d | --diff)
-			dotfiles::assign_mode "--diff" "diff"
+		--clean-backups=*)
+			if ! [[ "${1#*=}" =~ ^[0-9]+$ ]]; then
+				dotfiles::println 'Error: Argument for "%s" must be a non-negative integer (days). Got "%s".' "--clean-backups" "${1#*=}" >&2
+				exit 1
+			fi
+			CLEAN_BACKUPS_DAYS="${1#*=}"
 			shift
 			;;
+		--clean-logs)
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				CLEAN_LOGS_DAYS="7"
+				shift
+			else
+				if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+					dotfiles::println 'Error: Argument for "%s" must be a non-negative integer (days). Got "%s".' "$1" "$2" >&2
+					exit 1
+				fi
+				CLEAN_LOGS_DAYS="$2"
+				shift 2
+			fi
+			;;
+		--clean-logs=*)
+			if ! [[ "${1#*=}" =~ ^[0-9]+$ ]]; then
+				dotfiles::println 'Error: Argument for "%s" must be a non-negative integer (days). Got "%s".' "--clean-logs" "${1#*=}" >&2
+				exit 1
+			fi
+			CLEAN_LOGS_DAYS="${1#*=}"
+			shift
+			;;
+		--clean-all)
+			CLEAN_BACKUPS_DAYS="0"
+			CLEAN_LOGS_DAYS="0"
+			shift
+			;;
+		--uninstall)
+			# implies --reset; also removes the clone
+			dotfiles::assign_mode "--uninstall" "uninstall"
+			shift
+			;;
+
+			# modules
 		-i | --install)
 			if [[ -z "${2:-}" || "$2" == -* ]]; then
 				dotfiles::println 'Error: Missing argument for "%s".' "$1" >&2
@@ -966,22 +1618,83 @@ dotfiles::argparse() {
 			dotfiles::parse_module_list "${1#*=}" EXCLUDE_MODULES
 			shift
 			;;
+		-l | --list)
+			dotfiles::print_modules
+			exit 0
+			;;
 
+		# setup
+		--dir)
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				dotfiles::println 'Error: Missing argument for --dir.' "$1" >&2
+				exit 1
+			fi
+			DOTFILES_INSTALL_DIR="$2"
+			shift 2
+			;;
+		--dir=*)
+			DOTFILES_INSTALL_DIR="${1#*=}"
+			shift
+			;;
+		--ref)
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				dotfiles::println 'Error: Missing argument for --ref.' "$1" >&2
+				exit 1
+			fi
+			DOTFILES_INSTALL_REF="$2"
+			shift 2
+			;;
+		--ref=*)
+			DOTFILES_INSTALL_REF="${1#*=}"
+			shift
+			;;
+
+		# restore
+		--restore)
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				shift
+			else
+				RESTORE_FILES+=("$2")
+				shift 2
+			fi
+			;;
+		--restore-all)
+			RESTORE_ALL=1
+			shift
+			;;
+		--from)
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				dotfiles::println 'Error: Missing argument for --from.' >&2
+				exit 1
+			fi
+			RESTORE_FROM="$2"
+			shift 2
+			;;
+		--from=*)
+			RESTORE_FROM="${1#*=}"
+			shift
+			;;
+		--backup-list)
+			dotfiles::print_backups
+			exit 0
+			;;
+
+		# behaviour
 		-n | --dry-run)
 			DRY_RUN=1
 			shift
 			;;
 		-I | --interactive)
 			if [[ "${NO_CONFIRM}" -eq 1 ]]; then
-				dotfiles::println 'Error: --interactive conflicts with --noconfirm.' >&2
+				dotfiles::println 'Error: %s conflicts with --noconfirm.' "$1" >&2
 				exit 1
 			fi
 			INTERACTIVE=1
 			shift
 			;;
-		--noconfirm)
+		--noconfirm | -y | --yes)
 			if [[ "${INTERACTIVE}" -eq 1 ]]; then
-				dotfiles::println 'Error: --noconfirm conflicts with --interactive.' >&2
+				dotfiles::println 'Error: %s conflicts with --interactive.' "$1" >&2
 				exit 1
 			fi
 			NO_CONFIRM=1
@@ -991,11 +1704,16 @@ dotfiles::argparse() {
 			FORCE=1
 			shift
 			;;
+		-K | --autorestart)
+			DOTFILES_AUTORESTART=1
+			shift
+			;;
 		--no-backup)
 			NO_BACKUP=1
 			shift
 			;;
 
+		# logging
 		-v | --verbose)
 			VERBOSE=1
 			LOG_LEVEL="debug"
@@ -1036,21 +1754,17 @@ dotfiles::argparse() {
 			esac
 			;;
 		--no-log)
-			NO_LOG=1
+			DOTFILES_LOG=0
 			shift
 			;;
 
+		# packages
 		--no-deps)
 			NO_DEPS=1
 			shift
 			;;
 		--no-hooks)
 			NO_HOOKS=1
-			shift
-			;;
-
-		--no-restart)
-			NO_RESTART=1
 			shift
 			;;
 
@@ -1061,6 +1775,53 @@ dotfiles::argparse() {
 			;;
 		esac
 	done
+
+	# post validation
+	local has_maintenance=0
+	[[ -n "${CLEAN_BACKUPS_DAYS}" || -n "${CLEAN_LOGS_DAYS}" ]] && has_maintenance=1
+
+	# repair and reset are mutually exclusive
+	if [[ "${REPAIR_SYMLINKS}" -eq 1 && "${MODE}" == "reset" ]]; then
+		dotfiles::println 'Error: --repair conflicts with --reset.' >&2
+		exit 1
+	fi
+
+	# maintenance cannot combine with explicit install/exclude
+	if [[ ${has_maintenance} -eq 1 ]]; then
+		if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
+			dotfiles::println 'Error: --clean-* is not valid with --install.' >&2
+			exit 1
+		fi
+		if [[ ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
+			dotfiles::println 'Error: --clean-* is not valid with --exclude.' >&2
+			exit 1
+		fi
+	fi
+
+	# restore conflicts with install/exclude
+	local has_restore=0
+	[[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]] && has_restore=1
+
+	if [[ ${has_restore} -eq 1 ]]; then
+		if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
+			dotfiles::println 'Error: --restore is not valid with --install.' >&2
+			exit 1
+		fi
+		if [[ ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
+			dotfiles::println 'Error: --restore is not valid with --exclude.' >&2
+			exit 1
+		fi
+		if [[ "${MODE}" == "reset" ]]; then
+			dotfiles::println 'Error: --restore conflicts with --reset.' >&2
+			exit 1
+		fi
+	fi
+
+	# --from requires --restore or --restore-all
+	if [[ -n "${RESTORE_FROM}" && ${has_restore} -eq 0 ]]; then
+		dotfiles::println 'Error: --from requires --restore or --restore-all.' >&2
+		exit 1
+	fi
 
 	if [[ -z "$MODE" ]]; then
 		MODE="install"
@@ -1080,72 +1841,49 @@ dotfiles::argparse() {
 	fi
 }
 
-# Builds associative-array lookup sets from AVAILABLE_MODULES,
-# INSTALL_MODULES, and EXCLUDE_MODULES.
-# Must be called after argparse and set_available_modules.
-# Usage: build_module_sets
-#
-# Side effects:
-#   Sets AVAILABLE_SET, INSTALL_SET, EXCLUDE_SET (declare -A)
-dotfiles::build_module_sets() {
-	declare -gA AVAILABLE_SET=()
-	declare -gA INSTALL_SET=()
-	declare -gA EXCLUDE_SET=()
-
-	local m top
-	for m in "${AVAILABLE_MODULES[@]}"; do
-		AVAILABLE_SET["$m"]=1
-		top="${m%%/*}"
-		AVAILABLE_SET["$top"]=1
-	done
-
-	for m in "${INSTALL_MODULES[@]}"; do
-		INSTALL_SET["$m"]=1
-		top="${m%%/*}"
-		INSTALL_SET["$top"]=1
-	done
-
-	for m in "${EXCLUDE_MODULES[@]}"; do
-		EXCLUDE_SET["$m"]=1
-		top="${m%%/*}"
-		EXCLUDE_SET["$top"]=1
-	done
-}
-
 # Checks if a module should be installed.
 # Returns 0 if enabled, 1 if skipped.
 dotfiles::is_module_enabled() {
-	local target_module="$1"                # e.g., "apps/git"
-	local top_module="${target_module%%/*}" # e.g., "apps"
-
-	# not available on this OS
-	if [[ ! -v AVAILABLE_SET[$target_module] && ! -v AVAILABLE_SET[$top_module] ]]; then
-		return 1
-	fi
-
-	# explicitly excluded
-	if [[ -v EXCLUDE_SET[$target_module] || -v EXCLUDE_SET[$top_module] ]]; then
-		return 1
-	fi
-
-	# explicitly included (only matters when INSTALL_SET is non-empty)
-	if [[ ${#INSTALL_SET[@]} -gt 0 ]]; then
-		if [[ -v INSTALL_SET[$target_module] || -v INSTALL_SET[$top_module] ]]; then
-			return 0
+	local target_module="$1"                # e.g. "apps/git"
+	local top_module="${target_module%%/*}" # e.g. "apps"
+	# availability
+	local entry
+	local found=0
+	for entry in "${AVAILABLE_MODULES[@]}"; do
+		if [[ "$entry" == "$target_module" ]]; then
+			found=1
+			break
 		fi
+	done
+	if ((!found)); then
 		return 1
 	fi
 
+	# explicit exclude
+	for entry in "${EXCLUDE_MODULES[@]}"; do
+		if [[ "$entry" == "$target_module" || "$entry" == "$top_module" ]]; then
+			return 1
+		fi
+	done
+
+	# explicit include
+	if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
+		for entry in "${INSTALL_MODULES[@]}"; do
+			if [[ "$entry" == "$target_module" || "$entry" == "$top_module" ]]; then
+				return 0
+			fi
+		done
+		return 1 # INSTALL_MODULES non-empty but this module not listed
+	fi
+	# install everything
 	return 0
 }
 
 dotfiles::set_files_to_check() {
-	[[ -n "${FILES_TO_CHECK:-}" ]] && return 0
-
 	FILES_TO_CHECK=()
 
 	# shell
-	declare -r -a shell_zsh_files=(
+	local -r -a shell_zsh_files=(
 		"${SHELL_DIR}/zsh/.aliases"
 		"${SHELL_DIR}/zsh/.exports"
 		"${SHELL_DIR}/zsh/.functions"
@@ -1157,31 +1895,30 @@ dotfiles::set_files_to_check() {
 		"${SHELL_DIR}/zsh/.zstyles"
 		"${SHELL_DIR}/zsh/.paths"
 	)
-	declare -r -a shell_bash_files=(
+	local -r -a shell_bash_files=(
 		"${SHELL_DIR}/bash/.bashrc"
 		"${SHELL_DIR}/bash/.bash_profile"
 	)
 	# app
-	declare -r -a app_ssh_files=(
-		"${APP_DIR}/ssh/config" # TODO: chmod 600 when symlink
-		"${APP_DIR}/ssh/allowed_signers"
-	)
-
-	declare -r -a app_curl_files=("${APP_DIR}/curl/.curlrc")
-	declare -r -a app_wget_files=("${APP_DIR}/wget/.wgetrc")
-	declare -a app_git_files=(
+	local -a app_git_files=(
 		"${APP_DIR}/git/.gitignore"
 		"${APP_DIR}/git/.gitattributes"
 		"${APP_DIR}/git/.gitconfig"
 	)
-	declare -r -a app_iterm2_files=(
+	local -r -a app_ssh_files=(
+		"${APP_DIR}/ssh/config" # TODO: chmod 600 when symlink
+		"${APP_DIR}/ssh/allowed_signers"
+	)
+	local -r -a app_curl_files=("${APP_DIR}/curl/.curlrc")
+	local -r -a app_wget_files=("${APP_DIR}/wget/.wgetrc")
+	local -r -a app_shellcheck_files=("${APP_DIR}/shellcheck/.shellcheckrc")
+	local -r -a app_iterm2_files=(
 		"${APP_DIR}/iterm2/Profiles.json"
 		"${APP_DIR}/iterm2/schemas/0x96f.itermcolors"
 		"${APP_DIR}/iterm2/schemas/Argonaut.itermcolors"
 		"${APP_DIR}/iterm2/schemas/Aurora.itermcolors"
 		"${APP_DIR}/iterm2/schemas/Floraverse.itermcolors"
 	)
-	declare -r -a app_shellcheck_files=("${APP_DIR}/shellcheck/.shellcheckrc")
 
 	case "${TARGET_OS}" in
 	"${OS_MAC}")
@@ -1204,17 +1941,7 @@ dotfiles::set_files_to_check() {
 	dotfiles::is_module_enabled "apps/shellcheck" && FILES_TO_CHECK+=("${app_shellcheck_files[@]}")
 	dotfiles::is_module_enabled "apps/iterm2" && FILES_TO_CHECK+=("${app_iterm2_files[@]}")
 
-	readonly FILES_TO_CHECK
-}
-
-dotfiles::set_log() {
-	[[ -n "${DOTFILES_LOG:-}" ]] && return 0
-
-	if dotfiles::is_true "${NO_LOG}"; then
-		readonly DOTFILES_LOG=0
-	else
-		readonly DOTFILES_LOG="${DOTFILES_LOG:-1}"
-	fi
+	declare -r FILES_TO_CHECK
 }
 
 dotfiles::do_mode() {
@@ -1222,11 +1949,21 @@ dotfiles::do_mode() {
 	install)
 		dotfiles::symlink_all
 		;;
-	clean)
-		# TODO: remove orphaned symlinks, then install/relink
-		;;
 	reset)
-		# TODO: remove all symlinks managed by this tool
+		dotfiles::clean_symlinks
+		;;
+	uninstall)
+		dotfiles::clean_symlinks
+		dotfiles::manifest_clear
+		if ((DRY_RUN)); then
+			dotfiles::println '  [dry-run] rm -rf %s' "${SRC_PATH}"
+		else
+			dotfiles::println '=> Removing clone at %s' "${SRC_PATH}"
+			rm -rf "${SRC_PATH}" || {
+				dotfiles::println 'Error: cannot remove %s' "${SRC_PATH}" >&2
+				return 1
+			}
+		fi
 		;;
 	diff)
 		# TODO: show diff between current files and incoming dotfiles
@@ -1264,8 +2001,6 @@ main() {
 		exit 1
 	fi
 
-	dotfiles::set_github_ref # GITHUB_REF
-
 	dotfiles::set_env || { # TARGET_OS & TARGET_RUNTIME
 		dotfiles::println 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.'
 		dotfiles::prompt_continue "Some functionality may be limited."
@@ -1276,10 +2011,6 @@ main() {
 	dotfiles::set_elevated          # IS_ELEVATED
 	dotfiles::set_available_modules # AVAILABLE_MODULES
 
-	dotfiles::argparse "$@"
-	dotfiles::build_module_sets
-	dotfiles::set_log # DOTFILES_LOG
-
 	lib_dir="${SRC_PATH}/lib"
 	local -r -a lib_files=("${lib_dir}/filesystem.sh" "${lib_dir}/git.sh" "${lib_dir}/template.sh")
 	dotfiles::check_exists "${lib_files[@]}" || exit 1
@@ -1287,17 +2018,25 @@ main() {
 	dotfiles::source_file "${lib_dir}/filesystem.sh" || {
 		exit 1
 	}
-	dotfiles::source_file "${lib_dir}/git.sh" || {
-		exit 1
-	}
-	dotfiles::source_file "${lib_dir}/template.sh" || {
-		exit 1
-	}
+	#dotfiles::source_file "${lib_dir}/git.sh" || {
+	#	exit 1
+	#}
+	#dotfiles::source_file "${lib_dir}/template.sh" || {
+	#	exit 1
+	#}
+
+	dotfiles::argparse "$@"
+	if dotfiles::is_true "${DOTFILES_LOG}"; then
+		echo "TODO: init logging"
+	fi
+
+	dotfiles::set_github_ref # DOTFILES_INSTALL_REF
 
 	dotfiles::print_banner
 
 	if [[ "${UPDATE}" -eq 1 ]]; then
 		dotfiles::update || exit 1
+		dotfiles::println '=> Successfully updated!'
 	fi
 
 	# switch to native powershell if non sudo windows bash
@@ -1319,6 +2058,32 @@ main() {
 		exit 1
 	}
 
+	# dispatch
+	local has_action=0
+	[[ -n "${CLEAN_LOGS_DAYS}" ]] && has_action=1
+	[[ -n "${CLEAN_BACKUPS_DAYS}" ]] && has_action=1
+	[[ "${REPAIR_SYMLINKS}" -eq 1 ]] && has_action=1
+	[[ "${MODE}" == "reset" ]] && has_action=1
+	[[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]] && has_action=1
+
+	if [[ ${has_action} -eq 1 ]]; then
+		# maintenance
+		[[ -n "${CLEAN_LOGS_DAYS}" ]] && dotfiles::clean_logs
+		[[ -n "${CLEAN_BACKUPS_DAYS}" ]] && dotfiles::clean_backups
+
+		# symlink / restore actions (mutually exclusive, validated in argparse)
+		if [[ "${MODE}" == "reset" ]]; then
+			dotfiles::clean_symlinks
+		elif [[ "${REPAIR_SYMLINKS}" -eq 1 ]]; then
+			dotfiles::repair_symlink
+		elif [[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]]; then
+			dotfiles::restore
+		fi
+
+		dotfiles::println '=> Done.'
+		exit 0
+	fi
+
 	# TODO: logging
 
 	# dotfiles::print_start
@@ -1327,7 +2092,7 @@ main() {
 	dotfiles::do_mode
 
 	dotfiles::print_end
-	if [[ -z "${NO_RESTART:-}" ]]; then
+	if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
 		exec zsh
 	fi
 

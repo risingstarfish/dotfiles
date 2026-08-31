@@ -9,8 +9,217 @@ fi
 readonly __FILESYSTEM_SH_INCLUDED__=1
 
 ####################
+# Returns the desired permission string for a given source path.
+# Prints nothing (returns 1) if no special permission is required.
+#
+# Usage: file_perm <source_path>
+# Output: e.g. "600", "644", "755"
+# Returns: 0 if a permission was found, 1 otherwise.
+dotfiles::file_perm() {
+	local -r source="$1"
+	local relative="${source#"${SRC_PATH}"/}"
+
+	case "${relative}" in
+	apps/ssh/config)
+		printf '%s' "600"
+		;;
+	apps/ssh/allowed_signers)
+		printf '%s' "600"
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
+
 # symlink
 {
+	# Resolve the backup directory for this run.
+	# Creates the full path: $DOTFILES_CACHE_DIR/backups/YYYY-MM-DD/HH-MM-SS/
+	#
+	# Usage: backup_dir
+	# Output: prints the absolute path to the current run's backup directory.
+	# Returns: 0 on success, 1 if directory cannot be created.
+	dotfiles::backup_dir() {
+		local -r day="$(date '+%Y-%m-%d')"
+		local -r time="$(date '+%H-%M-%S')"
+		local -r dir="${DOTFILES_CACHE_DIR}/backups/${day}/${time}"
+
+		if ((DRY_RUN)); then
+			printf '%s' "${dir}"
+			return 0
+		fi
+
+		mkdir -p "${dir}" || {
+			dotfiles::println 'Error: cannot create backup directory: %s' "${dir}" >&2
+			return 1
+		}
+
+		printf '%s' "${dir}"
+	}
+
+	# Move an existing file into the current run's backup directory.
+	# The file keeps its basename; the run directory provides uniqueness.
+	#
+	# Usage: backup_file <path>
+	#
+	# Arguments:
+	#   $1 (path) : Absolute path to the existing file to back up.
+	#
+	# Returns:
+	#   0 on success (including DRY_RUN and "file does not exist")
+	#   1 on error
+	dotfiles::backup_file() {
+		local -r src="$1"
+
+		if [[ -z "${src}" ]]; then
+			dotfiles::println 'Error: backup_file requires a path argument.' >&2
+			return 1
+		fi
+
+		# nothing to back up
+		if [[ ! -f "${src}" ]]; then
+			return 0
+		fi
+
+		local backup_dir
+		if ! backup_dir="$(dotfiles::backup_dir)"; then
+			return 1
+		fi
+
+		local -r base="${src##*/}"
+		local -r dest="${backup_dir}/${base}.bak"
+
+		if ((DRY_RUN)); then
+			dotfiles::println '  [backup] %s -> %s' "${src}" "${dest}"
+			return 0
+		fi
+
+		mv "${src}" "${dest}" || {
+			dotfiles::println 'Error: cannot back up %s to %s' "${src}" "${dest}" >&2
+			return 1
+		}
+
+		dotfiles::println '  [backup] %s -> %s' "${src}" "${dest}"
+		return 0
+	}
+
+	# Create a symlink from source to dest, honouring FORCE, NO_BACKUP,
+	# DRY_RUN, and INTERACTIVE flags.
+	# Idempotent: if dest already points to source, it is a no-op.
+	#
+	# Usage: symlink_file <source> <dest>
+	#
+	# Arguments:
+	#   $1 (source) : Absolute path to the source file (must exist).
+	#   $2 (dest)   : Absolute path where the symlink will be created.
+	#
+	# Returns:
+	#   0 on success (including "already linked" and "user skipped")
+	#   1 on error
+	dotfiles::symlink_file() {
+		local source="$1"
+		local dest="$2"
+
+		echo
+		# validate
+		if [[ -z "${source}" || -z "${dest}" ]]; then
+			dotfiles::println 'Error: symlink_file requires both source and dest.' >&2
+			return 1
+		fi
+
+		if [[ ! -f "${source}" ]]; then
+			dotfiles::println 'Error: source does not exist: %s' "${source}" >&2
+			return 1
+		fi
+
+		# enforce permissions
+		local perm
+		if perm="$(dotfiles::file_perm "${source}")"; then
+			local current
+			current="$(stat -f '%Lp' "${source}" 2>/dev/null || stat -c '%a' "${source}" 2>/dev/null)"
+			if [[ "${current}" != "${perm}" ]]; then
+				if ((DRY_RUN)); then
+					dotfiles::println '  [dry-run] chmod %s %s' "${perm}" "${source}"
+				else
+					chmod "${perm}" "${source}" || {
+						dotfiles::println 'Error: chmod %s failed on %s' "${perm}" "${source}" >&2
+						return 1
+					}
+					dotfiles::println '  [chmod] %s -> %s' "${perm}" "${source}"
+				fi
+			fi
+		fi
+
+		# already linked
+		if [[ -L "${dest}" && "$(readlink "${dest}")" == "${source}" ]]; then
+			dotfiles::println '  [skip] %s (already linked)' "${dest}"
+			dotfiles::manifest_add "${source}" "${dest}"
+			return 0
+		fi
+
+		# ensure parent directory exists
+		local dest_dir
+		dest_dir="$(dirname "${dest}")"
+		if [[ ! -d "${dest_dir}" ]]; then
+			if ((DRY_RUN)); then
+				dotfiles::println '  [dry-run] mkdir -p %s' "${dest_dir}"
+			else
+				mkdir -p "${dest_dir}" || {
+					dotfiles::println 'Error: cannot create directory: %s' "${dest_dir}" >&2
+					return 1
+				}
+			fi
+		fi
+
+		# handle existing destination
+		if [[ -e "${dest}" || -L "${dest}" ]]; then
+			if ((FORCE)) || ((NO_BACKUP)); then
+				if ((DRY_RUN)); then
+					dotfiles::println '  [dry-run] rm -f %s' "${dest}"
+				else
+					rm -f "${dest}" || {
+						dotfiles::println 'Error: cannot remove: %s' "${dest}" >&2
+						return 1
+					}
+				fi
+			else
+				# default: back up to cache dir
+				dotfiles::backup_file "${dest}" || return 1
+			fi
+		fi
+
+		# interactive confirmation
+		if ((INTERACTIVE)); then
+			local choice
+			printf '  Create symlink: %s -> %s\n' "${dest}" "${source}" >&2
+			if ! read -r -p '  Continue? [Y/n]: ' choice; then
+				dotfiles::println 'Error: no input available for prompt.' >&2
+				return 1
+			fi
+			case "${choice}" in
+			[nN])
+				dotfiles::println '  [skip] %s (user declined)' "${dest}"
+				return 0
+				;;
+			esac
+		fi
+
+		# create symlink
+		if ((DRY_RUN)); then
+			dotfiles::println '  [dry-run] ln -s %s %s' "${source}" "${dest}"
+		else
+			ln -s "${source}" "${dest}" || {
+				dotfiles::println 'Error: failed to symlink %s -> %s' "${dest}" "${source}" >&2
+				return 1
+			}
+			dotfiles::println '  [new] %s -> %s' "${dest}" "${source}"
+			dotfiles::manifest_add "${source}" "${dest}"
+		fi
+
+		return 0
+	}
+
 	# Resolve the destination path for a source file in the dotfiles repo.
 	# Maps repo-relative paths to their target locations under $HOME.
 	# Usage: resolve_dest <source_path>
@@ -98,7 +307,7 @@ readonly __FILESYSTEM_SH_INCLUDED__=1
 			;;
 		# .shellcheck
 		apps/shellcheck/.shellcheckrc)
-			printf '%s' "${HOME}/.config/shellcheck/.shellcheckrc"
+			printf '%s' "${HOME}/.shellcheckrc"
 			;;
 		# iterm2
 		apps/iterm2/Profiles.json)
@@ -112,119 +321,6 @@ readonly __FILESYSTEM_SH_INCLUDED__=1
 			return 1
 			;;
 		esac
-	}
-
-	# Create a symlink from source to dest, honouring FORCE, NO_BACKUP,
-	# DRY_RUN, and INTERACTIVE flags.
-	# Idempotent: if dest already points to source, it is a no-op.
-	# Usage: symlink_file <source> <dest>
-	#
-	# Arguments:
-	#   $1 (source) : Absolute path to the source file (must exist).
-	#   $2 (dest)   : Absolute path where the symlink will be created.
-	#
-	# Returns:
-	#   0 on success (including "already linked" and "user skipped")
-	#   1 on error (missing source, permission denied, etc.)
-	dotfiles::symlink_file() {
-		local source="$1"
-		local dest="$2"
-
-		if [[ -z "${source}" || -z "${dest}" ]]; then
-			dotfiles::println 'Error: symlink_file requires both source and dest.' >&2
-			return 1
-		fi
-
-		if [[ ! -f "${source}" ]]; then
-			dotfiles::println 'Error: source does not exist: %s' "${source}" >&2
-			return 1
-		fi
-
-		# already linked correctly
-		if [[ -L "${dest}" && "$(readlink "${dest}")" == "${source}" ]]; then
-			dotfiles::println '  [skip] %s (already linked)' "${dest}"
-			return 0
-		fi
-
-		# ensure parent directory of dest exists
-		local dest_dir
-		dest_dir="$(dirname "${dest}")"
-		if [[ ! -d "${dest_dir}" ]]; then
-			if ((DRY_RUN)); then
-				dotfiles::println '  [dry-run] mkdir -p %s' "${dest_dir}"
-			else
-				mkdir -p "${dest_dir}" || {
-					dotfiles::println 'Error: cannot create directory: %s' "${dest_dir}" >&2
-					return 1
-				}
-			fi
-		fi
-
-		# dest already exists
-		if [[ -e "${dest}" || -L "${dest}" ]]; then
-			if ((FORCE)); then
-				dotfiles::println '  [force] removing existing: %s' "${dest}"
-				if ((DRY_RUN)); then
-					dotfiles::println '  [dry-run] rm -f %s' "${dest}"
-				else
-					rm -f "${dest}" || {
-						dotfiles::println 'Error: cannot remove: %s' "${dest}" >&2
-						return 1
-					}
-				fi
-			elif ((NO_BACKUP)); then
-				dotfiles::println '  [no-backup] removing existing: %s' "${dest}"
-				if ((DRY_RUN)); then
-					dotfiles::println '  [dry-run] rm -f %s' "${dest}"
-				else
-					rm -f "${dest}" || {
-						dotfiles::println 'Error: cannot remove: %s' "${dest}" >&2
-						return 1
-					}
-				fi
-			else
-				# default: back up
-				local backup="${dest}.bak"
-				dotfiles::println '  [backup] %s -> %s' "${dest}" "${backup}"
-				if ((DRY_RUN)); then
-					dotfiles::println '  [dry-run] mv %s %s' "${dest}" "${backup}"
-				else
-					mv "${dest}" "${backup}" || {
-						dotfiles::println 'Error: cannot back up %s to %s' "${dest}" "${backup}" >&2
-						return 1
-					}
-				fi
-			fi
-		fi
-
-		# interactive confirmation
-		if ((INTERACTIVE)); then
-			local choice
-			printf '  Create symlink: %s -> %s\n' "${dest}" "${source}" >&2
-			if ! read -r -p '  Continue? [Y/n]: ' choice; then
-				dotfiles::println 'Error: no input available for prompt.' >&2
-				return 1
-			fi
-			case "${choice}" in
-			[nN])
-				dotfiles::println '  [skip] %s (user declined)' "${dest}"
-				return 0
-				;;
-			esac
-		fi
-
-		# create symlink
-		if ((DRY_RUN)); then
-			dotfiles::println '  [dry-run] ln -s %s %s' "${source}" "${dest}"
-		else
-			ln -s "${source}" "${dest}" || {
-				dotfiles::println 'Error: failed to symlink %s -> %s' "${dest}" "${source}" >&2
-				return 1
-			}
-			dotfiles::println '  [new] %s -> %s' "${dest}" "${source}"
-		fi
-
-		return 0
 	}
 
 	# Symlink every file in FILES_TO_CHECK to its resolved destination.
