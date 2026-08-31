@@ -143,7 +143,7 @@ $serverArgs = @(
     "--gpu-layers", $NgL,
     "--host", $HostIP,
     "--port", $Port,
-    "--parallel", "2",
+    "--parallel", "1",
     "--chat-template-file", $ChatTemplate,
     "--cache-type-k", "q8_0",
     "--cache-type-v", "q8_0",
