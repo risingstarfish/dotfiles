@@ -53,38 +53,22 @@ cd "$SCRIPT_DIR" || {
 }
 ###################
 # print banner
-if [[ -f "$SCRIPT_DIR/lib/banner.sh" ]]; then
-	source "$SCRIPT_DIR/lib/banner.sh"
-fi
-
-source "$SCRIPT_DIR/lib/bootstrap.sh" || {
-	printf "\n\e[31m[ERROR]\e[0m Failed to source bootstrap.sh. Exiting...\n" >&2
-	exit 1
-}
-
-source_deps "log.sh" || exit 1
-unset -f source_deps
 
 if [[ -z "${LOCAL_ZSH:-}" ]]; then
 	declare -r LOCAL_ZSH="$HOME/.zshrc.local"
 fi
 
 # validate input and check for help flag
-source "$SCRIPT_DIR/usage.sh" "$(basename "$0")" "$@" || exit 1
 
 ###############
 # main
 
-log::step "Validating environment"
 
 # Set default path if not already provided by an external script
 if [[ ! -f "$LOCAL_ZSH" ]]; then
-	log::error "$LOCAL_ZSH could not be found."
-	log::error "Run \e[36m'bash install.sh'\e[0m first before attempting to change the mode/variables."
 	exit 1
 fi
 
-log::success "Found local configuration: $LOCAL_ZSH"
 # Check if 'debug' was passed as the first argument
 ENABLE_DEBUG=false
 ENABLE_PROFILING=false
@@ -104,7 +88,6 @@ declare -a TOGGLES=(
 	"ENABLE_PROFILING:$ENABLE_PROFILING"
 )
 
-log::step "Applying configuration toggles"
 
 tmp_file=$(mktemp)
 cat "$LOCAL_ZSH" >"$tmp_file"
@@ -117,23 +100,14 @@ for toggle in "${TOGGLES[@]}"; do
 
 	echo ""
 	if [[ "$enabled" == true ]]; then
-		log::success "${var_name} enabled!"
 		# uncomment the line
 		sed -i.bak "s/^# *${var_name}=true/${var_name}=true/" "$tmp_file"
 	else
-		log::info "${var_name} disabled locally."
 		# comment out the line
 		sed -i.bak "s/^${var_name}=true/#${var_name}=true/" "$tmp_file"
 	fi
 
 	new_content="$(cat "$tmp_file")"
-
-	# Check if sed actually changed anything
-	if [[ "$old_content" != "$new_content" ]]; then
-		log::success "${var_name} successfully updated."
-	else
-		log::info "${var_name} was already in the requested state (no changes made)."
-	fi
 
 	rm -f "${tmp_file}.bak"
 done
