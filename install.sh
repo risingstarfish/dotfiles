@@ -345,8 +345,7 @@ ACTIONS
 
 MODULES
   -i, --install <module...>  Install ONLY the specified modules <module>, semicolon-separated
-  -x, --exclude <module...>  Install all modules <module> EXCEPT those specified, semicolon-
-                             separated
+  -x, --exclude <module...>  Install all modules EXCEPT specified <module>, semicolon-separated
   -l, --list                 Display all available modules, status, and information
 
 SETUP
@@ -2034,16 +2033,8 @@ main() {
 		"${lib_dir}/filesystem.sh"
 	)
 	dotfiles::check_exists "${lib_files[@]}" || exit 1
-
-	dotfiles::source_file "${lib_dir}/filesystem.sh" || {
-		exit 1
-	}
-	#dotfiles::source_file "${lib_dir}/git.sh" || {
-	#	exit 1
-	#}
-	#dotfiles::source_file "${lib_dir}/template.sh" || {
-	#	exit 1
-	#}
+	dotfiles::source_file "${lib_dir}/filesystem.sh" || exit 1
+	
 
 	dotfiles::argparse "$@"
 	if dotfiles::is_true "${DOTFILES_LOG}"; then
