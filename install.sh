@@ -206,7 +206,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 				filtered_modules+=("${mod}")
 			fi
 		done
- 
+
 		AVAILABLE_MODULES=("${filtered_modules[@]}")
 	}
 
