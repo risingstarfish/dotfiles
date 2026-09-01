@@ -23,9 +23,6 @@ dotfiles::file_perm() {
 	apps/ssh/config)
 		printf '%s' "600"
 		;;
-	apps/ssh/allowed_signers)
-		printf '%s' "600"
-		;;
 	*)
 		return 1
 		;;
@@ -335,84 +332,81 @@ dotfiles::file_perm() {
 
 		case "${relative}" in
 		# zsh
-		shells/zsh/.aliases)
+		shells/zsh/aliases)
 			printf '%s' "${HOME}/.aliases"
 			;;
-		shells/zsh/.exports)
+		shells/zsh/exports)
 			printf '%s' "${HOME}/.exports"
 			;;
-		shells/zsh/.functions)
+		shells/zsh/functions)
 			printf '%s' "${HOME}/.functions"
 			;;
-		shells/zsh/.p10k.zsh)
+		shells/zsh/p10k.zsh)
 			printf '%s' "${HOME}/.p10k.zsh"
 			;;
-		shells/zsh/.paths)
+		shells/zsh/paths)
 			printf '%s' "${HOME}/.paths"
 			;;
-		shells/zsh/.zimrc)
+		shells/zsh/zimrc)
 			printf '%s' "${HOME}/.zimrc"
 			;;
-		shells/zsh/.zsh_options)
+		shells/zsh/zsh_options)
 			printf '%s' "${HOME}/.zsh_options"
 			;;
-		shells/zsh/.zshrc)
+		shells/zsh/zshrc)
 			printf '%s' "${HOME}/.zshrc"
 			;;
-		shells/zsh/.zshrc.toggles)
+		shells/zsh/zshrc.toggles)
 			printf '%s' "${HOME}/.zshrc.toggles"
 			;;
-		shells/zsh/.zstyles)
+		shells/zsh/zstyles)
 			printf '%s' "${HOME}/.zstyles"
 			;;
 		# bash
-		shells/bash/.bash_profile)
+		shells/bash/bash_profile)
 			printf '%s' "${HOME}/.bash_profile"
 			;;
-		shells/bash/.bashrc)
+		shells/bash/bashrc)
 			printf '%s' "${HOME}/.bashrc"
 			;;
 
 		# git
-		apps/git/.gitconfig)
+		apps/git/gitconfig)
 			printf '%s' "${HOME}/.gitconfig"
 			;;
-		apps/git/.gitconfig.local.*)
+		apps/git/gitconfig.local.*)
 			printf '%s' "${HOME}/.gitconfig.local"
 			;;
-		apps/git/.gitignore)
+		apps/git/gitignore)
 			printf '%s' "${HOME}/.gitignore"
 			;;
-		apps/git/.gitattributes)
+		apps/git/gitattributes)
 			printf '%s' "${HOME}/.gitattributes"
 			;;
 		# ssh
 		apps/ssh/config)
 			printf '%s' "${HOME}/.ssh/config"
 			;;
-		apps/ssh/allowed_signers)
-			printf '%s' "${HOME}/.ssh/allowed_signers"
-			;;
 		# curl
-		apps/curl/.curlrc)
+		apps/curl/curlrc)
 			printf '%s' "${HOME}/.curlrc"
 			;;
 		# wget
-		apps/wget/.wgetrc)
+		apps/wget/wgetrc)
 			printf '%s' "${HOME}/.wgetrc"
 			;;
 		# .shellcheck
-		apps/shellcheck/.shellcheckrc)
+		apps/shellcheck/shellcheckrc)
 			printf '%s' "${HOME}/.shellcheckrc"
 			;;
-		# iterm2
-		apps/iterm2/Profiles.json)
-			printf '%s' "${HOME}/Library/Application Support/iTerm2/Profiles.json"
-			;;
-		apps/iterm2/schemas/*)
-			local filename="${relative##*/}"
-			printf '%s' "${HOME}/Library/Application Support/iTerm2/schemas/${filename}"
-			;;
+		# # iterm2
+		# apps/iterm2/Profiles.json)
+		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/Profiles.json"
+		# 	;;
+		# apps/iterm2/schemas/*)
+		# 	local filename="${relative##*/}"
+		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/schemas/${filename}"
+		# 	;;
 		*)
 			return 1
 			;;

@@ -189,29 +189,82 @@ readonly __INSTALL_SH_INCLUDED__=1
 		fi
 	}
 
+	# Removes a specific module and all its children
+	dotfiles::remove_module() {
+		local target="$1"
+		local filtered_modules=()
+
+		for mod in "${AVAILABLE_MODULES[@]}"; do
+			# Keep the module if it doesn't match the target exactly
+			# AND doesn't start with "target/"
+			if [[ "${mod}" != "${target}" && "${mod}" != "${target}/"* ]]; then
+				filtered_modules+=("${mod}")
+			fi
+		done
+
+		AVAILABLE_MODULES=("${filtered_modules[@]}")
+	}
+
+	# Replaces '*' with TARGET_OS, but only keeps the module if the resulting path exists
+	replace_os_wildcards() {
+		local updated_modules=()
+		local os_mod
+		local runtime_mod # fallback
+
+		for mod in "${AVAILABLE_MODULES[@]}"; do
+			# Check if the module contains an asterisk
+			if [[ "${mod}" == *"*"* ]]; then
+				os_mod="${mod//\*/${TARGET_OS}}"
+				if [[ -e "${SRC_PATH}/${os_mod}" ]]; then
+					updated_modules+=("${os_mod}")
+				else # try runtime
+					runtime_mod="${mod//\*/${TARGET_RUNTIME}}"
+					if [[ -e "${SRC_PATH}/${runtime_mod}" ]]; then
+						updated_modules+=("${runtime_mod}")
+					fi
+				fi
+			else
+				updated_modules+=("${mod}")
+			fi
+		done
+
+		AVAILABLE_MODULES=("${updated_modules[@]}")
+	}
+
 	dotfiles::set_available_modules() {
 		[[ -n "${AVAILABLE_MODULES:-}" ]] && return 0
 		# order matters for help message
 		AVAILABLE_MODULES=(
-			# shells
-			"shells/zsh"
-			"shells/bash"
-			# apps
-			"apps/git"
-			"apps/ssh"
-			"apps/curl"
-			"apps/wget"
-			#"apps/oh-my-posh"
-			"apps/shellcheck"
-			#apps/fastfetch
-			#"apps/tmux"
+			"shells/zsh/zshrc"
+			"shells/zsh/zsh_options"
+			"shells/zsh/zstyles"
+			"shells/zsh/zimrc"
+			"shells/zsh/p10k.zsh"
+			"shells/zsh/exports"
+			"shells/zsh/paths"
+			"shells/zsh/aliases"
+			"shells/zsh/functions"
+			"shells/zsh/zshrc.toggles"
+
+			"shells/bash/bashrc"
+			"shells/bash/bash_profile"
+
+			"apps/git/gitconfig"
+			"apps/git/gitconfig.*"
+			"apps/git/gitignore"
+			"apps/git/gitattributes"
+
+			"apps/ssh/config"
+
+			"apps/tmux/tmux.conf.*"
+			"apps/curl/curlrc"
+			"apps/wget/wgetrc"
+			"apps/shellcheck/shellcheckrc"
 		)
 
-		#if [[ "$TARGET_OS" == "${OS_MAC}" ]]; then
-		#	AVAILABLE_MODULES+=("apps/iterm2")
-		#fi
-
-		readonly AVAILABLE_MODULES
+		replace_os_wildcards
+		# dotfiles::remove_module()
+		declare -r AVAILABLE_MODULES
 	}
 }
 ####################
@@ -343,7 +396,7 @@ ACTIONS
       --uninstall            Deletes symlinks, logs, and backups, then deletes install directory.
 
 MODULES
-  -i, --install <module...>  Install ONLY the specified modules <module>, semicolon-separated.
+  -i, --include <module...>  Install ONLY the specified modules <module>, semicolon-separated.
   -x, --exclude <module...>  Install all modules EXCEPT specified <module>, semicolon-separated.
   -l, --list                 Display all available modules, status, and information.
 
@@ -439,95 +492,59 @@ EOF
 	dotfiles::print_modules() {
 		dotfiles::set_available_modules
 
-		# read manifest once into an indexed array of source paths
 		local -a manifest_sources=()
+		local -a manifest_dests=()
 		if [[ -f "${MANIFEST}" ]]; then
 			while IFS=$'\t' read -r src dest; do
-				[[ -n "${src}" ]] && manifest_sources+=("${src}")
+				[[ -n "${src}" ]] && {
+					manifest_sources+=("${src}")
+					manifest_dests+=("${dest}")
+				}
 			done <"${MANIFEST}"
 		fi
 
-		# helper: is this source path in the manifest?
-		# sets in_manifest to 0 or 1
-		local in_manifest
-
-		# helper: get the dest for a source (empty string if no mapping)
-		local dest
-
-		dotfiles::println
 		dotfiles::println 'AVAILABLE MODULES'
 		dotfiles::println
 
 		local current_category=""
+		local current_module_dir=""
 
 		for item in "${AVAILABLE_MODULES[@]}"; do
 			local category="${item%%/*}"
-			local module="${item##*/}"
-			local mod_dir="${SRC_PATH}/${item}"
+			local module_dir="${item%/*}"
+			local filename="${item##*/}"
+			local src_file="${SRC_PATH}/${item}"
 
 			# category header
 			if [[ "$category" != "$current_category" ]]; then
 				[[ -n "$current_category" ]] && dotfiles::println
 				dotfiles::println "${category}"
 				current_category="${category}"
+				current_module_dir=""
 			fi
 
-			# module header
-			if [[ ! -d "$mod_dir" ]]; then
-				printf '  %s:\n    (-) directory not found\n' "$module"
-				continue
+			# sub-directory header (once per group)
+			if [[ "$module_dir" != "$current_module_dir" ]]; then
+				printf '  %s:\n' "${module_dir#*/}"
+				current_module_dir="${module_dir}"
 			fi
 
-			printf '  %s:\n' "$module"
-
-			# collect files in this module dir
-			local -a files=()
-			while IFS= read -r f; do
-				[[ -z "$f" ]] && continue
-				files+=("$f")
-			done < <(find "$mod_dir" -maxdepth 1 -type f 2>/dev/null | sort)
-
-			if [[ ${#files[@]} -eq 0 ]]; then
-				printf '    (–) no files\n'
-				continue
-			fi
-
-			local module_ok=0
-			local module_total=0
-
-			for src_file in "${files[@]}"; do
-				# only show files this tool manages (in manifest)
-				in_manifest=0
-				for ms in "${manifest_sources[@]}"; do
-					if [[ "$ms" == "$src_file" ]]; then
-						in_manifest=1
-						break
-					fi
-				done
-
-				# resolve dest to check if symlink is alive
-				dest="$(dotfiles::resolve_dest "$src_file")" || dest=""
-
-				local status="✗"
-				local fname="${src_file##*/}"
-
-				if [[ -n "$dest" ]]; then
+			# manifest lookup
+			local status="✗"
+			local i
+			for i in "${!manifest_sources[@]}"; do
+				if [[ "${manifest_sources[$i]}" == "$src_file" ]]; then
+					local dest="${manifest_dests[$i]}"
 					if [[ -L "$dest" && -e "$dest" ]]; then
 						status="✓"
 					elif [[ -L "$dest" ]]; then
-						status="!" # symlink exists but target is gone (broken)
+						status="!"
 					fi
+					break
 				fi
-
-				printf '    (%s) %s\n' "$status" "$fname"
-				module_total=$((module_total + 1))
-				[[ "$status" == "✓" ]] && module_ok=$((module_ok + 1))
 			done
 
-			# if no files in this module are managed, show a hint
-			if [[ ${module_total} -eq 0 ]]; then
-				printf '    (✗) not installed\n'
-			fi
+			printf '    (%s) %s\n' "$status" "$filename"
 		done
 		dotfiles::println
 	}
@@ -1572,16 +1589,20 @@ dotfiles::parse_module_list() {
 
 	IFS=';' read -ra mods <<<"$1"
 	for m in "${mods[@]}"; do
+		# trim whitespace
+		m="${m#"${m%%[![:space:]]*}"}"
+		m="${m%"${m##*[![:space:]]}"}"
 		[[ -z "$m" ]] && continue
-		valid=0
 
+		valid=0
 		if [[ "$m" == */* ]]; then
-			# submodule match (e.g., "apps/git")
 			for mod in "${AVAILABLE_MODULES[@]}"; do
-				[[ "$mod" == "$m" ]] && valid=1 && break
+				if [[ "$mod" == "$m" || "$mod" == "$m/"* ]]; then
+					valid=1
+					break
+				fi
 			done
 		else
-			# top-level match (e.g., "apps")
 			for mod in "${AVAILABLE_MODULES[@]}"; do
 				[[ "${mod%%/*}" == "$m" ]] && valid=1 && break
 			done
@@ -1589,6 +1610,7 @@ dotfiles::parse_module_list() {
 
 		if [[ $valid -eq 0 ]]; then
 			dotfiles::println 'Error: Unknown module "%s".' "$m" >&2
+			dotfiles::println '  Run with --list to see valid module names.' >&2
 			exit 2
 		fi
 		arr+=("$m")
@@ -1667,7 +1689,7 @@ dotfiles::argparse() {
 	CLEAN_BACKUPS_DAYS=""
 	CLEAN_LOGS_DAYS=""
 	LOG_LEVEL="info"
-	INSTALL_MODULES=()
+	INCLUDE_MODULES=()
 	EXCLUDE_MODULES=()
 	# restore
 	RESTORE_FILES=()
@@ -1787,16 +1809,16 @@ dotfiles::argparse() {
 			;;
 
 			# modules
-		-i | --install)
+		-i | --include)
 			if [[ -z "${2:-}" || "$2" == -* ]]; then
 				dotfiles::println 'Error: Missing argument for %s.' "$1" >&2
 				exit 1
 			fi
-			dotfiles::parse_module_list "$2" INSTALL_MODULES
+			dotfiles::parse_module_list "$2" INCLUDE_MODULES
 			shift 2
 			;;
-		-i=* | --install=*)
-			dotfiles::parse_module_list "${1#*=}" INSTALL_MODULES
+		-i=* | --include=*)
+			dotfiles::parse_module_list "${1#*=}" INCLUDE_MODULES
 			shift
 			;;
 		-x | --exclude)
@@ -1978,8 +2000,8 @@ dotfiles::argparse() {
 
 	# maintenance cannot combine with explicit install/exclude
 	if [[ ${has_maintenance} -eq 1 ]]; then
-		if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
-			dotfiles::println 'Error: --clean-* is not valid with --install.' >&2
+		if [[ ${#INCLUDE_MODULES[@]} -gt 0 ]]; then
+			dotfiles::println 'Error: --clean-* is not valid with --include.' >&2
 			exit 1
 		fi
 		if [[ ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
@@ -1993,8 +2015,8 @@ dotfiles::argparse() {
 	[[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]] && has_restore=1
 
 	if [[ ${has_restore} -eq 1 ]]; then
-		if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
-			dotfiles::println 'Error: --restore is not valid with --install.' >&2
+		if [[ ${#INCLUDE_MODULES[@]} -gt 0 ]]; then
+			dotfiles::println 'Error: --restore is not valid with --include.' >&2
 			exit 1
 		fi
 		if [[ ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
@@ -2017,119 +2039,63 @@ dotfiles::argparse() {
 		MODE="install"
 	fi
 
-	if [[ "$MODE" != "install" && ${#INSTALL_MODULES[@]} -gt 0 ]]; then
-		dotfiles::println 'Error: --install is not valid with --%s.' "$MODE" >&2
+	if [[ "$MODE" != "install" && ${#INCLUDE_MODULES[@]} -gt 0 ]]; then
+		dotfiles::println 'Error: --include is not valid with --%s.' "$MODE" >&2
 		exit 1
 	fi
 	if [[ "$MODE" != "install" && ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
 		dotfiles::println 'Error: --exclude is not valid with --%s.' "$MODE" >&2
 		exit 1
 	fi
-	if [[ ${#INSTALL_MODULES[@]} -gt 0 && ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
-		dotfiles::println 'Error: --install and --exclude are mutually exclusive.' >&2
+	if [[ ${#INCLUDE_MODULES[@]} -gt 0 && ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
+		dotfiles::println 'Error: --include and --exclude are mutually exclusive.' >&2
 		exit 1
 	fi
 }
 
-# Checks if a module should be installed.
-# Returns 0 if enabled, 1 if skipped.
-dotfiles::is_module_enabled() {
-	local target_module="$1"                # e.g. "apps/git"
-	local top_module="${target_module%%/*}" # e.g. "apps"
-	# availability
-	local entry
-	local found=0
-	for entry in "${AVAILABLE_MODULES[@]}"; do
-		if [[ "$entry" == "$target_module" ]]; then
-			found=1
-			break
-		fi
-	done
-	if ((!found)); then
-		return 1
-	fi
-
-	# explicit exclude
-	for entry in "${EXCLUDE_MODULES[@]}"; do
-		if [[ "$entry" == "$target_module" || "$entry" == "$top_module" ]]; then
-			return 1
-		fi
-	done
-
-	# explicit include
-	if [[ ${#INSTALL_MODULES[@]} -gt 0 ]]; then
-		for entry in "${INSTALL_MODULES[@]}"; do
-			if [[ "$entry" == "$target_module" || "$entry" == "$top_module" ]]; then
-				return 0
-			fi
-		done
-		return 1 # INSTALL_MODULES non-empty but this module not listed
-	fi
-	# install everything
-	return 0
-}
-
+# Builds the final list of absolute file paths to process.
+# Filters AVAILABLE_MODULES based on --install / --exclude, then
+# prepends SRC_PATH to produce absolute paths.
+#
+# Precondition:
+#   AVAILABLE_MODULES is populated (and readonly).
+#   INCLUDE_MODULES / EXCLUDE_MODULES are populated by argparse.
+#
+# Postcondition:
+#   FILES_TO_CHECK is a readonly array of absolute paths.
 dotfiles::set_files_to_check() {
 	FILES_TO_CHECK=()
+	local mod
+	local inc
+	local exc
 
-	# shell
-	local -r -a shell_zsh_files=(
-		"${SHELL_DIR}/zsh/.aliases"
-		"${SHELL_DIR}/zsh/.exports"
-		"${SHELL_DIR}/zsh/.functions"
-		"${SHELL_DIR}/zsh/.p10k.zsh"
-		"${SHELL_DIR}/zsh/.zimrc"
-		"${SHELL_DIR}/zsh/.zsh_options"
-		"${SHELL_DIR}/zsh/.zshrc"
-		"${SHELL_DIR}/zsh/.zshrc.toggles"
-		"${SHELL_DIR}/zsh/.zstyles"
-		"${SHELL_DIR}/zsh/.paths"
-	)
-	local -r -a shell_bash_files=(
-		"${SHELL_DIR}/bash/.bashrc"
-		"${SHELL_DIR}/bash/.bash_profile"
-	)
-	# app
-	local -a app_git_files=(
-		"${APP_DIR}/git/.gitignore"
-		"${APP_DIR}/git/.gitattributes"
-		"${APP_DIR}/git/.gitconfig"
-	)
-	local -r -a app_ssh_files=(
-		"${APP_DIR}/ssh/config" # TODO: chmod 600 when symlink
-		"${APP_DIR}/ssh/allowed_signers"
-	)
-	local -r -a app_curl_files=("${APP_DIR}/curl/.curlrc")
-	local -r -a app_wget_files=("${APP_DIR}/wget/.wgetrc")
-	local -r -a app_shellcheck_files=("${APP_DIR}/shellcheck/.shellcheckrc")
-	local -r -a app_iterm2_files=(
-		"${APP_DIR}/iterm2/Profiles.json"
-		"${APP_DIR}/iterm2/schemas/0x96f.itermcolors"
-		"${APP_DIR}/iterm2/schemas/Argonaut.itermcolors"
-		"${APP_DIR}/iterm2/schemas/Aurora.itermcolors"
-		"${APP_DIR}/iterm2/schemas/Floraverse.itermcolors"
-	)
+	for mod in "${AVAILABLE_MODULES[@]}"; do
+		# ── --install filter: only include listed modules ──
+		if [[ ${#INCLUDE_MODULES[@]} -gt 0 ]]; then
+			local included=0
+			for inc in "${INCLUDE_MODULES[@]}"; do
+				if [[ "${mod}" == "${inc}" || "${mod}" == "${inc}/"* ]]; then
+					included=1
+					break
+				fi
+			done
+			((included)) || continue
+		fi
 
-	case "${TARGET_OS}" in
-	"${OS_MAC}")
-		app_git_files+=("${APP_DIR}/git/.gitconfig.local.mac")
-		;;
-	"${OS_ARCHLINUX}")
-		app_git_files+=("${APP_DIR}/git/.gitconfig.local.archlinux")
-		;;
-	"${OS_WINDOWS}")
-		app_git_files+=("${APP_DIR}/git/.gitconfig.local.windows")
-		;;
-	esac
+		# ── --exclude filter: skip listed modules ──
+		if [[ ${#EXCLUDE_MODULES[@]} -gt 0 ]]; then
+			local excluded=0
+			for exc in "${EXCLUDE_MODULES[@]}"; do
+				if [[ "${mod}" == "${exc}" || "${mod}" == "${exc}/"* ]]; then
+					excluded=1
+					break
+				fi
+			done
+			((excluded)) && continue
+		fi
 
-	dotfiles::is_module_enabled "shells/zsh" && FILES_TO_CHECK+=("${shell_zsh_files[@]}")
-	dotfiles::is_module_enabled "shells/bash" && FILES_TO_CHECK+=("${shell_bash_files[@]}")
-	dotfiles::is_module_enabled "apps/ssh" && FILES_TO_CHECK+=("${app_ssh_files[@]}")
-	dotfiles::is_module_enabled "apps/curl" && FILES_TO_CHECK+=("${app_curl_files[@]}")
-	dotfiles::is_module_enabled "apps/wget" && FILES_TO_CHECK+=("${app_wget_files[@]}")
-	dotfiles::is_module_enabled "apps/git" && FILES_TO_CHECK+=("${app_git_files[@]}")
-	dotfiles::is_module_enabled "apps/shellcheck" && FILES_TO_CHECK+=("${app_shellcheck_files[@]}")
-	dotfiles::is_module_enabled "apps/iterm2" && FILES_TO_CHECK+=("${app_iterm2_files[@]}")
+		FILES_TO_CHECK+=("${SRC_PATH}/${mod}")
+	done
 
 	declare -r FILES_TO_CHECK
 }
@@ -2180,6 +2146,7 @@ main() {
 	}
 	if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
 		dotfiles::set_windows_sudo || true
+		export MSYS=winsymlinks:nativestrict
 	fi
 	dotfiles::set_elevated          # IS_ELEVATED
 	dotfiles::set_available_modules # AVAILABLE_MODULES
