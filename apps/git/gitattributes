@@ -4,7 +4,7 @@
 Common
 ################
 # Auto detect text files and perform LF normalization
-*          text=auto
+*          text=LF
 
 #
 # The above will handle all files NOT found below

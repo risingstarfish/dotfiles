@@ -1,4 +1,4 @@
-# --- Local Git Configuration ---
+# --- Local Configuration (managed by dotfiles) ---
 [credential]
     helper = libsecret
 [gpg "ssh"]
