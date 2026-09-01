@@ -196,6 +196,114 @@ dotfiles::file_perm() {
 		return 0
 	}
 
+	# Resolve the destination path for a source file in the dotfiles repo.
+	# Maps repo-relative paths to their target locations under $HOME.
+	# Usage: resolve_dest <source_path>
+	#
+	# Arguments:
+	#   $1 (source_path) : Absolute path to the source file within the repo.
+	#
+	# Output:
+	#   Prints the resolved destination path to stdout.
+	#
+	# Returns:
+	#   0 if a mapping was found
+	#   1 if no mapping exists for the given path
+	dotfiles::resolve_dest() {
+		local -r source="$1"
+		local relative="${source#"${SRC_PATH}"/}"
+
+		case "${relative}" in
+		# zsh
+		shells/zsh/aliases)
+			printf '%s' "${HOME}/.aliases"
+			;;
+		shells/zsh/exports)
+			printf '%s' "${HOME}/.exports"
+			;;
+		shells/zsh/functions)
+			printf '%s' "${HOME}/.functions"
+			;;
+		shells/zsh/p10k.zsh)
+			printf '%s' "${HOME}/.p10k.zsh"
+			;;
+		shells/zsh/paths)
+			printf '%s' "${HOME}/.paths"
+			;;
+		shells/zsh/zimrc)
+			printf '%s' "${HOME}/.zimrc"
+			;;
+		shells/zsh/zsh_options)
+			printf '%s' "${HOME}/.zsh_options"
+			;;
+		shells/zsh/zshrc)
+			printf '%s' "${HOME}/.zshrc"
+			;;
+		shells/zsh/zshrc.toggles)
+			printf '%s' "${HOME}/.zshrc.toggles"
+			;;
+		shells/zsh/zstyles)
+			printf '%s' "${HOME}/.zstyles"
+			;;
+		# bash
+		shells/bash/bash_profile)
+			printf '%s' "${HOME}/.bash_profile"
+			;;
+		shells/bash/bashrc)
+			printf '%s' "${HOME}/.bashrc"
+			;;
+
+		# git
+		apps/git/gitconfig)
+			printf '%s' "${HOME}/.gitconfig"
+			;;
+		apps/git/gitconfig.local.*)
+			printf '%s' "${HOME}/.gitconfig.local"
+			;;
+		apps/git/gitignore)
+			printf '%s' "${HOME}/.gitignore"
+			;;
+		apps/git/gitattributes)
+			printf '%s' "${HOME}/.gitattributes"
+			;;
+		# ssh
+		apps/ssh/config)
+			printf '%s' "${HOME}/.ssh/config"
+			;;
+		apps/ssh/allowed_signers.gen)
+			printf '%s' "${HOME}/.ssh/allowed_signers"
+			;;
+		# tmux
+		apps/tmux/tmux.conf.*)
+			printf '%s' "${HOME}/.tmux.conf"
+			;;
+
+		# curl
+		apps/curl/curlrc)
+			printf '%s' "${HOME}/.curlrc"
+			;;
+		# wget
+		apps/wget/wgetrc)
+			printf '%s' "${HOME}/.wgetrc"
+			;;
+		# .shellcheck
+		apps/shellcheck/shellcheckrc)
+			printf '%s' "${HOME}/.shellcheckrc"
+			;;
+		# iterm2
+		# apps/iterm2/Profiles.json)
+		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/Profiles.json"
+		# 	;;
+		# apps/iterm2/schemas/*)
+		# 	local filename="${relative##*/}"
+		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/schemas/${filename}"
+		# 	;;
+		*)
+			return 1
+			;;
+		esac
+	}
+
 	# Create a symlink from source to dest, honouring FORCE, NO_BACKUP,
 	# DRY_RUN, and INTERACTIVE flags.
 	# Idempotent: if dest already points to source, it is a no-op.
@@ -314,116 +422,11 @@ dotfiles::file_perm() {
 		return 0
 	}
 
-	# Resolve the destination path for a source file in the dotfiles repo.
-	# Maps repo-relative paths to their target locations under $HOME.
-	# Usage: resolve_dest <source_path>
-	#
-	# Arguments:
-	#   $1 (source_path) : Absolute path to the source file within the repo.
-	#
-	# Output:
-	#   Prints the resolved destination path to stdout.
-	#
-	# Returns:
-	#   0 if a mapping was found
-	#   1 if no mapping exists for the given path
-	dotfiles::resolve_dest() {
-		local -r source="$1"
-		local relative="${source#"${SRC_PATH}"/}"
-
-		case "${relative}" in
-		# zsh
-		shells/zsh/aliases)
-			printf '%s' "${HOME}/.aliases"
-			;;
-		shells/zsh/exports)
-			printf '%s' "${HOME}/.exports"
-			;;
-		shells/zsh/functions)
-			printf '%s' "${HOME}/.functions"
-			;;
-		shells/zsh/p10k.zsh)
-			printf '%s' "${HOME}/.p10k.zsh"
-			;;
-		shells/zsh/paths)
-			printf '%s' "${HOME}/.paths"
-			;;
-		shells/zsh/zimrc)
-			printf '%s' "${HOME}/.zimrc"
-			;;
-		shells/zsh/zsh_options)
-			printf '%s' "${HOME}/.zsh_options"
-			;;
-		shells/zsh/zshrc)
-			printf '%s' "${HOME}/.zshrc"
-			;;
-		shells/zsh/zshrc.toggles)
-			printf '%s' "${HOME}/.zshrc.toggles"
-			;;
-		shells/zsh/zstyles)
-			printf '%s' "${HOME}/.zstyles"
-			;;
-		# bash
-		shells/bash/bash_profile)
-			printf '%s' "${HOME}/.bash_profile"
-			;;
-		shells/bash/bashrc)
-			printf '%s' "${HOME}/.bashrc"
-			;;
-
-		# git
-		apps/git/gitconfig)
-			printf '%s' "${HOME}/.gitconfig"
-			;;
-		apps/git/gitconfig.local.*)
-			printf '%s' "${HOME}/.gitconfig.local"
-			;;
-		apps/git/gitignore)
-			printf '%s' "${HOME}/.gitignore"
-			;;
-		apps/git/gitattributes)
-			printf '%s' "${HOME}/.gitattributes"
-			;;
-		# ssh
-		apps/ssh/config)
-			printf '%s' "${HOME}/.ssh/config"
-			;;
-		# tmux
-		apps/tmux/tmux.conf.*)
-			printf '%s' "${HOME}/.tmux.conf"
-			;;
-
-		# curl
-		apps/curl/curlrc)
-			printf '%s' "${HOME}/.curlrc"
-			;;
-		# wget
-		apps/wget/wgetrc)
-			printf '%s' "${HOME}/.wgetrc"
-			;;
-		# .shellcheck
-		apps/shellcheck/shellcheckrc)
-			printf '%s' "${HOME}/.shellcheckrc"
-			;;
-		# # iterm2
-		# apps/iterm2/Profiles.json)
-		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/Profiles.json"
-		# 	;;
-		# apps/iterm2/schemas/*)
-		# 	local filename="${relative##*/}"
-		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/schemas/${filename}"
-		# 	;;
-		*)
-			return 1
-			;;
-		esac
-	}
-
 	# Symlink every file in SYMLINK_FILES to its resolved destination.
 	# Usage: symlink_all
 	#
 	# Precondition:
-	#   SYMLINK_FILES must be populated (see set_files_to_check)
+	#   SYMLINK_FILES must be populated (see set_file_types)
 	#
 	# Returns:
 	#   0 if all symlinks were created or already existed
@@ -508,7 +511,7 @@ dotfiles::file_perm() {
 			fi
 		fi
 
-		# ── First install: dest doesn't exist ──
+		# dest doesn't exist
 		if [[ ! -f "${dest}" ]]; then
 			if ((DRY_RUN)); then
 				dotfiles::println '  [dry-run] create %s (from %s)' "${dest}" "$(basename "${source}")"
@@ -525,14 +528,14 @@ dotfiles::file_perm() {
 			return 0
 		fi
 
-		# ── Existing file: verify sentinels ──
+		# verify sentinels
 		if ! grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" ||
 			! grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
 			dotfiles::println '  [skip] %s (no sentinel markers found — not managed)' "${dest}"
 			return 0
 		fi
 
-		# ── Compare tool-managed block ──
+		# compare tool-managed block
 		local current_block
 		current_block="$(awk -v top="${MERGE_TOP_SENTINEL}" -v bottom="${MERGE_BOTTOM_SENTINEL}" '
 			$0 == top    { in_block=1; next }
@@ -551,14 +554,14 @@ dotfiles::file_perm() {
 			return 0
 		fi
 
-		# ── Extract user section (everything after bottom sentinel) ──
+		# extract user section
 		local user_section
 		user_section="$(awk -v sentinel="${MERGE_BOTTOM_SENTINEL}" '
 			seen     { print }
 			$0 == sentinel { seen=1 }
 		' "${dest}")"
 
-		# ── Write merged result ──
+		# write
 		if ((DRY_RUN)); then
 			dotfiles::println '  [dry-run] update %s (tool block changed)' "${dest}"
 			return 0
@@ -634,4 +637,119 @@ dotfiles::file_perm() {
 		return 0
 	}
 
+	# Executes a .gen script. The script is responsible for creating
+	# its own output at the resolved destination.
+	# Idempotent: if dest already exists and is non-empty, it is a no-op.
+	#
+	# Usage: generate_file <source_gen> <dest>
+	#
+	# Arguments:
+	#   $1 (source_gen) : Absolute path to the .gen file (must exist).
+	#   $2 (dest)       : Absolute path where the generated output is expected to appear.
+	#
+	# Returns:
+	#   0 on success (including "already generated" and "user skipped")
+	#   1 on error (missing source, script failed)
+	dotfiles::generate_file() {
+		local source="$1"
+		local dest="$2"
+
+		if [[ -z "${source}" || -z "${dest}" ]]; then
+			dotfiles::println 'Error: generate_file requires both source and dest.' >&2
+			return 1
+		fi
+
+		if [[ ! -f "${source}" ]]; then
+			dotfiles::println 'Error: generator script does not exist: %s' "${source}" >&2
+			return 1
+		fi
+
+		# idempotency: if dest already exists and is non-empty, skip
+		if [[ -f "${dest}" && -s "${dest}" ]]; then
+			dotfiles::println '  [skip] %s (already generated)' "${dest}"
+			if ! ((DRY_RUN)); then
+				dotfiles::manifest_add "${source}" "${dest}" "generated"
+			fi
+			return 0
+		fi
+
+		if ((DRY_RUN)); then
+			dotfiles::println '  [dry-run] bash %s' "${source}"
+			return 0
+		fi
+
+		# interactive confirmation
+		if ((INTERACTIVE)); then
+			local choice
+			printf '  Generate: %s (output -> %s)\n' "${source##*/}" "${dest}" >&2
+			if ! read -r -p '  Continue? [Y/n]: ' choice; then
+				dotfiles::println 'Error: no input available for prompt.' >&2
+				return 1
+			fi
+			case "${choice}" in
+			[nN])
+				dotfiles::println '  [skip] %s (user declined)' "${dest}"
+				return 0
+				;;
+			esac
+		fi
+
+		if ! command bash "${source}"; then
+			dotfiles::println 'Error: generator %s failed.' "${source}" >&2
+			return 1
+		fi
+
+		if [[ ! -f "${dest}" ]]; then
+			dotfiles::println 'Warning: generator ran but %s was not created.' "${dest}" >&2
+		fi
+
+		dotfiles::println '  [generated] %s' "${dest}"
+		dotfiles::manifest_add "${source}" "${dest}" "generated"
+
+		return 0
+	}
+
+	# Execute every .gen file in GENERATE_FILES.
+	# Usage: generate_all
+	#
+	# Precondition:
+	#   GENERATE_FILES must be populated (see set_file_types)
+	#
+	# Returns:
+	#   0 if all generators succeeded or were skipped
+	#   1 if one or more failed
+	dotfiles::generate_all() {
+		if [[ ${#GENERATE_FILES[@]} -eq 0 ]]; then
+			return 0
+		fi
+
+		local total=${#GENERATE_FILES[@]}
+		local ok=0
+		local failed=0
+		local source dest
+
+		dotfiles::println '=> Generating %d file(s)…' "${total}"
+
+		for source in "${GENERATE_FILES[@]}"; do
+			if ! dest="$(dotfiles::resolve_dest "${source}")"; then
+				dotfiles::println 'Warning: no dest mapping for %s — skipping.' "${source}" >&2
+				failed=$((failed + 1))
+				continue
+			fi
+
+			if dotfiles::generate_file "${source}" "${dest}"; then
+				ok=$((ok + 1))
+			else
+				failed=$((failed + 1))
+			fi
+		done
+
+		dotfiles::println '  Generate done: %d/%d succeeded.' "${ok}" "${total}"
+		if ((failed > 0)); then
+			dotfiles::println '  %d file(s) failed.' "${failed}" >&2
+			return 1
+		fi
+
+		return 0
+	}
 }
