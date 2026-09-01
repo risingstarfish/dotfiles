@@ -388,8 +388,7 @@ OVERVIEW: Installs and synchronizes dotfiles, shell configuration, TODO: and opt
 USAGE: bash $(basename "$0") [options]
 
 ACTIONS
-  -u, --update               Update from git before performing any operations.
-      --update-only          Update from git then exit.
+  -u, --update               Update from Git before performing any operations.
   -r, --repair               Remove orphaned symlinks, then install/relink.
       --reset                Remove all symlinks managed by this tool.
   -b, --backup [file...]     Copy current managed file(s) to the backup directory. Without 
@@ -405,6 +404,7 @@ MODULES
   -l, --list                 Display all available modules, status, and information.
 
 GIT
+  -p, --pull                 Update from Git.
       --ref <ref>            Git branch, tag, or commit to install. (default: main)
 
 RESTORE
@@ -472,12 +472,12 @@ EOF
 
 	# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/version.sh
 	dotfiles::print_version() {
-		local -r dotfiles_install_dir
-		local -r dotfiles_branch
-		local -r dotfiles_remote
-		local -r dotfiles_version
-		local -r dotfiles_commit_hash
-		local -r dotfiles_version_commit_msg
+		local dotfiles_install_dir
+		local dotfiles_branch
+		local dotfiles_remote
+		local dotfiles_version
+		local dotfiles_commit_hash
+		local dotfiles_version_commit_msg
 		local -r dotfiles_version_last_checked=$(date +%Y-%m-%d\ %H:%M:%S\ %Z) || dotfiles_version_last_checked="<unknown>"
 
 		dotfiles_install_dir=$(dotfiles::git_or_unknown "<unknown>" rev-parse --show-toplevel)
@@ -874,6 +874,7 @@ EOF
 
 		return 0
 	}
+
 }
 
 # Check if provided paths exist.
@@ -1711,14 +1712,19 @@ dotfiles::detect_local_files() {
 	return 0
 }
 
-dotfiles::clean_all() {
+dotfiles::clean_installs() {
 	dotfiles::clean_symlinks
 	dotfiles::detect_local_files
 }
 
-dotfiles::uninstall() {
-	dotfiles::println "=> Beginning uninstallation"
+dotfiles::install() {
+	dotfiles::symlink_all
+	dotfiles::copy_all
+	exit 0
 
+}
+
+dotfiles::uninstall() {
 	if ((NOCONFIRM)); then
 		: # -y / --noconfirm: skip prompt
 	elif ((DRY_RUN)); then
@@ -1729,7 +1735,7 @@ dotfiles::uninstall() {
 		while true; do
 			if ! read -r -p 'Do you really want to uninstall? [y/N]: ' choice; then
 				dotfiles::println 'Error: No input available for prompt.' >&2
-				exit 1
+				return 1
 			fi
 			case "${choice}" in
 			[yY])
@@ -1746,7 +1752,7 @@ dotfiles::uninstall() {
 		done
 	fi
 
-	dotfiles::clean_all
+	dotfiles::clean_installs
 
 	if ((DRY_RUN)); then
 		dotfiles::println '  [dry-run] rm -rf %s' "${SRC_PATH}"
@@ -1755,12 +1761,11 @@ dotfiles::uninstall() {
 		dotfiles::println '=> Removing clone at %s' "${SRC_PATH}"
 		if ! rm -rf "${SRC_PATH}"; then
 			dotfiles::println 'Error: cannot remove %s' "${SRC_PATH}" >&2
-			exit 1
+			return 1
 		fi
 	fi
 
-	dotfiles::println 'Uninstall complete!'
-	exit 0
+	return 0
 }
 
 dotfiles::argparse() {
@@ -1826,10 +1831,6 @@ dotfiles::argparse() {
 		# actions
 		-u | --update)
 			UPDATE=1
-			shift
-			;;
-		--update-only)
-			UPDATE_ONLY=1
 			shift
 			;;
 		# cleaning
@@ -1937,7 +1938,11 @@ dotfiles::argparse() {
 			exit 0
 			;;
 
-		# setup
+		# git
+		-p | --pull)
+			UPDATE_ONLY=1
+			shift
+			;;
 		--ref)
 			if [[ -z "${2:-}" || "$2" == -* ]]; then
 				dotfiles::println 'Error: Missing argument for %s.' "$1" >&2
@@ -2084,7 +2089,22 @@ dotfiles::argparse() {
 	done
 
 	if ((UNINSTALL)); then
-		dotfiles::uninstall # noreturn
+		dotfiles::println "=> Beginning uninstallation"
+
+		dotfiles::uninstall || {
+			cat <<EOF
+  You can attempt to run the uninstallation again. If it continues to fail, you may need to
+  manually delete all relevant directories:
+    Install   |  \""${SRC_PATH}"\"
+	Log       |  \""${DOTFILES_LOG_DIR}"\"
+	Cache     |  \""${DOTFILES_CACHE_DIR}"\"
+
+EOF
+			exit 1
+		}
+		dotfiles::println 'Uninstall complete!' # TODO: no clue if this prints
+		exit 0
+
 	fi
 
 	# post validation
@@ -2273,9 +2293,10 @@ main() {
 
 	dotfiles::print_banner
 
-	if [[ "${UPDATE}" -eq 1 ]]; then
+	if [[ "${UPDATE}" -eq 1 || "${UPDATE_ONLY}" -eq 1 ]]; then
 		if dotfiles::update; then
 			dotfiles::println '=> Successfully updated!'
+
 			if ((UPDATE_ONLY)); then
 				exit 0
 			fi
@@ -2328,7 +2349,7 @@ main() {
 
 		# symlink / restore actions (mutually exclusive, validated in argparse)
 		if [[ "${MODE}" == "reset" ]]; then
-			dotfiles::clean_all
+			dotfiles::clean_installs
 		elif [[ "${REPAIR_SYMLINKS}" -eq 1 ]]; then
 			dotfiles::repair_symlink
 		elif [[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]]; then

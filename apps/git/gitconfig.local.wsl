@@ -1,8 +1,6 @@
-# --- Local Configuration (managed by dotfiles) ---
 [credential]
     helper = libsecret
 [gpg "ssh"]
     program = /mnt/C/Windows/System32/OpenSSH/ssh-keygen.exe
 [core]
     sshCommand = /mnt/C/Windows/System32/OpenSSH/ssh.exe
-# --- Do not edit this line or above ---

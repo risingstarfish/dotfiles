@@ -1,8 +1,6 @@
-# --- Local Configuration (managed by dotfiles) ---
 [credential]
     helper = ~/opt/Git/mingw64/bin/git-credential-manager.exe
 [gpg "ssh"]
     program = C:/Windows/System32/OpenSSH/ssh-keygen.exe
 [core]
     sshCommand = C:/Windows/System32/OpenSSH/ssh.exe
-# --- Do not edit this line or above ---
