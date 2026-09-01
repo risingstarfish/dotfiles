@@ -1,3 +1,1 @@
-mac: echo "$(git config --get user.email) namespaces=\"git\" $(cat ~/.ssh/id_ed25519_github_sign.pub)" >> ~/.ssh/allowed_signers
-windows:
-linux: 
+echo "$(git config --get user.email) namespaces=\"git\" $(cat ~/.ssh/id_ed25519_github_sign.pub)" >> ~/.ssh/allowed_signers
