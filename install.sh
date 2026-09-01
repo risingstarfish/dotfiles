@@ -794,7 +794,7 @@ EOF
 		}
 
 		dotfiles::println '=> Cloning %s (ref: %s) to %s' "${REPO_URL}" "${ref}" "${install_dir}"
-		command git clone --depth=1 -b "$ref" "$REPO_URL" "${install_dir}" || {
+		command git clone --depth=1 -b "${ref}" "${REPO_URL}" "${install_dir}" || {
 			dotfiles::println 'Error: Clone failed for %s (ref: %s)' "${REPO_URL}" "${ref}" >&2
 			return 1
 		}
@@ -840,8 +840,8 @@ EOF
 		fi
 
 		# fetch
-		if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "${ref}" 2>/dev/null; then
-			dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "${ref}" >&2
+		if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "${DOTFILES_REF}" 2>/dev/null; then
+			dotfiles::println 'Error: Fetch failed (ref: %s). Check network or repo URL.' "${DOTFILES_REF}" >&2
 			return 1
 		fi
 
@@ -859,14 +859,14 @@ EOF
 			# Hard reset to the fetched ref.
 			# Works for branches, tags, and raw commit SHAs alike.
 			if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2>/dev/null; then
-				dotfiles::println 'Error: Reset to %s failed in %s' "${ref}" "${SRC_PATH}" >&2
+				dotfiles::println 'Error: Reset to %s failed in %s' "${DOTFILES_REF}" "${SRC_PATH}" >&2
 				return 1
 			fi
 
 			# Optionally keep the local branch pointer in sync (branches only).
 			# This is cosmetic; reset --hard already moves the working tree.
-			if command git -C "${SRC_PATH}" show-ref --verify --quiet "refs/heads/${ref}" 2>/dev/null; then
-				command git -C "${SRC_PATH}" branch -f "${ref}" FETCH_HEAD 2>/dev/null || true
+			if command git -C "${SRC_PATH}" show-ref --verify --quiet "refs/heads/${DOTFILES_REF}" 2>/dev/null; then
+				command git -C "${SRC_PATH}" branch -f "${DOTFILES_REF}" FETCH_HEAD 2>/dev/null || true
 			fi
 		fi
 
