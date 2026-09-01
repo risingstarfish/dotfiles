@@ -4,15 +4,15 @@
 function mkcd() {
 	# Check if no arguments are provided
 	if [[ -z "$1" ]]; then
-		echo "Usage: mkcd <directory_name>"
-		echo "Error: No directory name provided."
+		printf 'Usage: mkcd <directory_name>\n'
+		printf 'Error: No directory name provided.\n'
 		return 1
 	fi
 
 	# Check if more than one argument is provided
-	if [[ "$#" -gt 1 ]]; then
-		echo "Usage: mkcd <directory_name>"
-		echo "Error: Too many arguments. Please provide only one directory name."
+	if [[ "$" -gt 1 ]]; then
+		printf 'Usage: mkcd <directory_name>\n'
+		printf 'Error: Too many arguments. Please provide only one directory name.\n'
 		return 1
 	fi
 
@@ -20,25 +20,49 @@ function mkcd() {
 
 	# Check if the directory already exists
 	if [[ -d "$target_dir" ]]; then
-		echo "Directory '$target_dir' already exists. Changing into it."
+		printf 'Directory %s already exists. Changing into it.\n' "${target_dir}"
 		if cd "$target_dir"; then
-			echo "Successfully changed to: $(pwd)"
+			printf 'Successfully changed to: %s\n' "$(pwd)"
 			return 0
 		else
-			echo "Error: Could not change to directory '$target_dir' (permissions issue?)."
+			printf 'Error: Could not change to directory %s\n' "${target_dir}"
 			return 1
 		fi
 	fi
 
 	# Attempt to create the directory and then change into it
 	if mkdir -p "$target_dir" && cd "$target_dir"; then
-		echo "Successfully created and changed to: $(pwd)"
+		printf 'Successfully created and changed to: %s\n' "$(pwd)"
 	else
-		echo "Error: Could not create or change to directory '$target_dir'."
+		printf 'Error: Could not create or change to directory %s.\n' "${target_dir}"
 		return 1
 	fi
 }
 
+# Internal helper function to prompt for email and generate the key
+_generate_github_ssh_key() {
+	local key_type="$1"
+	local email="${GITHUB_PUBLIC_EMAIL:-}"
+
+	if [[ -z "$email" ]]; then
+		printf '$GITHUB_PUBLIC_EMAIL is unset. Enter GitHub email: '
+		read -r email
+	else
+		printf 'Using $GITHUB_PUBLIC_EMAIL: %s\n' "${GITHUB_PUBLIC_EMAIL}"
+	fi
+
+	ssh-keygen -t "$key_type" -C "\"$email\""
+}
+
+# Create a standard ed25519 SSH key for GitHub
+github_ssh_key() {
+	_generate_github_ssh_key "ed25519"
+}
+
+# Create an ed25519-sk hardware security key for GitHub
+github_ssh_sk() {
+	_generate_github_ssh_key "ed25519-sk"
+}
 
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/cp
 # cp function that uses rsync
@@ -53,10 +77,9 @@ function mkcd() {
 #     -e /dev/null: only work on local files (disable remote shells).
 #     --progress: display progress.
 cpv() {
-    rsync -pogbr -hhh --backup-dir="/tmp/rsync-${USERNAME}" -e /dev/null --progress "$@"
+	rsync -pogbr -hhh --backup-dir="/tmp/rsync-${USERNAME}" -e /dev/null --progress "$@"
 }
 compdef _files cpv
-
 
 # Determine size of a file or total size of a directory
 function fs() {
