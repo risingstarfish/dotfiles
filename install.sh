@@ -20,8 +20,12 @@ readonly __INSTALL_SH_INCLUDED__=1
 	readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-${HOME}/.config/dotfiles/logs}"
 	readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-${HOME}/.cache/dotfiles}"
 	readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"
+	readonly DOTFILES_IGNORE_HANDOFF="${DOTFILES_IGNORE_HANDOFF:-0}"
 
 	readonly MANIFEST="${DOTFILES_CACHE_DIR}/manifest.tsv"
+	readonly MERGE_TOP_SENTINEL="# --- Local Configuration (managed by dotfiles) ---"
+	readonly MERGE_BOTTOM_SENTINEL="# --- Do not edit this line or above ---"
+
 	# environment
 	readonly OS_ARCHLINUX="archlinux"
 	readonly OS_CACHYOS="cachyos"
@@ -250,7 +254,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 			"shells/bash/bash_profile"
 
 			"apps/git/gitconfig"
-			"apps/git/gitconfig.*"
+			"apps/git/gitconfig.local.*"
 			"apps/git/gitignore"
 			"apps/git/gitattributes"
 
@@ -448,6 +452,9 @@ ENVIRONMENT VARIABLES
     DOTFILES_LOCAL_MODS      Set to 1 or true to stash uncommitted local changes. (default: 0)
     DOTFILES_AUTORESTART     Set to 1 or true to restart shell at script finish. (default: 0)
 
+  Windows Specific:
+    DOTFILES_IGNORE_HANDOFF  Set to 1 or true to ignore the Windows Powershell notice. (default 0)
+
 EOF
 	}
 
@@ -495,7 +502,7 @@ EOF
 		local -a manifest_sources=()
 		local -a manifest_dests=()
 		if [[ -f "${MANIFEST}" ]]; then
-			while IFS=$'\t' read -r src dest; do
+			while IFS=$'\t' read -r src dest ftype; do
 				[[ -n "${src}" ]] && {
 					manifest_sources+=("${src}")
 					manifest_dests+=("${dest}")
@@ -529,7 +536,6 @@ EOF
 				current_module_dir="${module_dir}"
 			fi
 
-			# manifest lookup
 			local status="✗"
 			local i
 			for i in "${!manifest_sources[@]}"; do
@@ -543,6 +549,22 @@ EOF
 					break
 				fi
 			done
+
+			# fallback check disk directly
+			if [[ "${status}" == "✗" ]]; then
+				local resolved_dest
+				if resolved_dest="$(dotfiles::resolve_dest "${src_file}")"; then
+					if [[ -L "${resolved_dest}" ]]; then
+						if [[ -e "${resolved_dest}" ]]; then
+							status="✓"
+						else
+							status="!"
+						fi
+					elif [[ -f "${resolved_dest}" ]]; then
+						status="✓" # merged/copy file exists
+					fi
+				fi
+			fi
 
 			printf '    (%s) %s\n' "$status" "$filename"
 		done
@@ -611,14 +633,29 @@ EOF
 		local ok=0
 		local src dest
 
-		while IFS=$'\t' read -r src dest; do
+		while IFS=$'\t' read -r src dest ftype; do
 			[[ -z "${dest}" ]] && continue
-			if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
-				ok=$((ok + 1))
-			else
-				broken=$((broken + 1))
-				printf '  %s\n' "${dest}" >&2
-			fi
+			case "${ftype:-symlink}" in
+			merged)
+				# healthy if file exists and has both sentinels
+				if [[ -f "${dest}" ]] &&
+					grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" &&
+					grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
+					ok=$((ok + 1))
+				else
+					broken=$((broken + 1))
+					printf '  [merged] %s\n' "${dest}" >&2
+				fi
+				;;
+			*)
+				if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
+					ok=$((ok + 1))
+				else
+					broken=$((broken + 1))
+					printf '  %s\n' "${dest}" >&2
+				fi
+				;;
+			esac
 		done <"${MANIFEST}"
 
 		if [[ ${broken} -eq 0 ]]; then
@@ -882,6 +919,7 @@ dotfiles::check_exists() {
 	dotfiles::manifest_add() {
 		local -r source="$1"
 		local -r dest="$2"
+		local -r ftype="${3:-symlink}"
 
 		# ensure parent dir exists
 		mkdir -p "$(dirname "${MANIFEST}")" 2>/dev/null || true
@@ -892,7 +930,7 @@ dotfiles::check_exists() {
 			fi
 		fi
 
-		printf '%s\t%s\n' "${source}" "${dest}" >>"${MANIFEST}"
+		printf '%s\t%s\t%s\n' "${source}" "${dest}" "${ftype}" >>"${MANIFEST}"
 	}
 
 	# Remove a dest entry from the manifest.
@@ -1078,8 +1116,10 @@ dotfiles::check_exists() {
 
 		# manifest entries
 		if [[ -f "${MANIFEST}" ]]; then
-			while IFS=$'\t' read -r src dest; do
+			while IFS=$'\t' read -r src dest ftype; do
 				[[ -z "${dest}" ]] && continue
+				# only track symlinks; merged files are handled separately
+				[[ "${ftype:-symlink}" == "merged" ]] && continue
 				managed+=("${dest}")
 			done <"${MANIFEST}"
 		fi
@@ -1280,8 +1320,9 @@ dotfiles::check_exists() {
 		# pass 1
 		# find orphaned managed symlinks
 		if [[ -f "${MANIFEST}" ]]; then
-			while IFS=$'\t' read -r src dest; do
+			while IFS=$'\t' read -r src dest ftype; do
 				[[ -z "${dest}" ]] && continue
+				[[ "${ftype:-symlink}" == "merged" ]] && continue
 				# orphan: symlink exists but target is gone
 				if [[ -L "${dest}" && ! -e "${dest}" ]]; then
 					orphans+=("${dest}")
@@ -1317,7 +1358,7 @@ dotfiles::check_exists() {
 			# Already healthy: symlink exists, target exists, points to us
 			if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${source}" ]]; then
 				if ! ((DRY_RUN)); then
-					dotfiles::manifest_add "${source}" "${dest}"
+					dotfiles::manifest_add "${source}" "${dest}" "symlink"
 				fi
 				continue
 			fi
@@ -1383,15 +1424,13 @@ dotfiles::check_exists() {
 	# Returns:
 	#   0 on success
 	#   1 on error
-	# lib/restore.sh
-
 	dotfiles::restore_file() {
 		local -r name="${1:-}"
 		local -r run="${2:-}"
 		local -r base="${DOTFILES_CACHE_DIR}/backups"
-		local -r src="${base}/${run}/${name}.bak"
+		local -r backup_src="${base}/${run}/${name}.bak"
 
-		if [[ ! -f "${src}" ]]; then
+		if [[ ! -f "${backup_src}" ]]; then
 			dotfiles::println 'Error: no backup of "%s" in run %s.' "${name}" "${run}" >&2
 			return 1
 		fi
@@ -1399,8 +1438,8 @@ dotfiles::check_exists() {
 		# Determine destination from manifest, fall back to $HOME/<name>
 		local dest="${HOME}/${name}"
 		if [[ -f "${MANIFEST}" ]]; then
-			local _src _dest
-			while IFS=$'\t' read -r _src _dest; do
+			local _src _dest _ftype
+			while IFS=$'\t' read -r _src _dest _ftype; do
 				if [[ "${_dest##*/}" == "${name}" ]]; then
 					dest="${_dest}"
 					break
@@ -1408,9 +1447,9 @@ dotfiles::check_exists() {
 			done <"${MANIFEST}"
 		fi
 
-		dotfiles::println '  [restore] %s -> %s' "${src}" "${dest}"
+		dotfiles::println '  [restore] %s -> %s' "${backup_src}" "${dest}"
 
-		# ── Handle existing destination ──────────────────────────────
+		# handle existing destination
 
 		if [[ -L "${dest}" ]]; then
 			local link_target
@@ -1443,16 +1482,14 @@ dotfiles::check_exists() {
 			fi
 		fi
 
-		# ── Copy backup into place ───────────────────────────────────
-
+		# copy backup into place
 		if ((DRY_RUN)); then
 			dotfiles::println '    [dry-run] cp %s %s' "${src}" "${dest}"
-			return 0
-		fi
-
-		if ! cp "${src}" "${dest}"; then
-			dotfiles::println 'Error: cannot restore %s to %s.' "${src}" "${dest}" >&2
-			return 1
+		else
+			if ! cp "${src}" "${dest}"; then
+				dotfiles::println 'Error: cannot restore %s to %s.' "${src}" "${dest}" >&2
+				return 1
+			fi
 		fi
 
 		dotfiles::println '    [restored] %s' "${dest}"
@@ -1617,6 +1654,68 @@ dotfiles::parse_module_list() {
 	done
 }
 
+# Warn about merged/local files that still exist on disk.
+# Primary source: COPY_FILES (readonly, set by set_file_types in main).
+# Secondary source: manifest "merged" entries (in case manifest survived
+#   a failed clean_symlinks and contains entries no longer in COPY_FILES).
+#
+# Precondition:
+#   COPY_FILES is populated (or empty). MANIFEST may or may not exist.
+#
+# Returns: always 0 (informational only)
+dotfiles::detect_local_files() {
+	local -a remaining_locals=()
+	local src
+	local dest
+
+	if [[ ${#COPY_FILES[@]} -gt 0 ]]; then
+		for src in "${COPY_FILES[@]}"; do
+			if dest="$(dotfiles::resolve_dest "${src}")"; then
+				[[ -f "${dest}" ]] && remaining_locals+=("${dest}")
+			fi
+		done
+	fi
+
+	# manifest "merged" entries
+	if [[ -f "${MANIFEST}" ]]; then
+		local _src _dest _ftype
+		while IFS=$'\t' read -r _src _dest _ftype; do
+			if [[ "${_ftype:-}" == "merged" && -f "${_dest}" ]]; then
+				remaining_locals+=("${_dest}")
+			fi
+		done <"${MANIFEST}"
+	fi
+
+	# de-duplicate
+	local -a unique_locals=()
+	local _f _u
+	local dup
+	for _f in "${remaining_locals[@]}"; do
+		dup=0
+		for _u in "${unique_locals[@]}"; do
+			[[ "${_u}" == "${_f}" ]] && dup=1 && break
+		done
+		((dup)) || unique_locals+=("${_f}")
+	done
+
+	if [[ ${#unique_locals[@]} -gt 0 ]]; then
+		dotfiles::println ''
+		dotfiles::println '  Note: local configuration file(s) still exist:'
+		for _f in "${unique_locals[@]}"; do
+			dotfiles::println '    %s' "${_f}"
+		done
+		dotfiles::println '  They may contain personal credentials.'
+		dotfiles::println '  Remove them manually if you no longer need them.'
+	fi
+
+	return 0
+}
+
+dotfiles::clean_all() {
+	dotfiles::clean_symlinks
+	dotfiles::detect_local_files
+}
+
 dotfiles::uninstall() {
 	dotfiles::println "=> Beginning uninstallation"
 
@@ -1647,7 +1746,7 @@ dotfiles::uninstall() {
 		done
 	fi
 
-	dotfiles::clean_symlinks
+	dotfiles::clean_all
 
 	if ((DRY_RUN)); then
 		dotfiles::println '  [dry-run] rm -rf %s' "${SRC_PATH}"
@@ -2100,22 +2199,31 @@ dotfiles::set_files_to_check() {
 	declare -r FILES_TO_CHECK
 }
 
-dotfiles::do_mode() {
-	case "$MODE" in
-	install)
-		dotfiles::symlink_all
-		;;
-	reset)
-		dotfiles::clean_symlinks
-		;;
-	diff)
-		# TODO: show diff between current files and incoming dotfiles
-		;;
-	*)
-		dotfiles::println 'Error: Unknown mode "%s"' "$MODE" >&2
-		exit 1
-		;;
-	esac
+# Classifies FILES_TO_CHECK into SYMLINK_FILES and COPY_FILES.
+# Rule: basename ending in ".local" → copy/merge; everything else → symlink.
+#
+# Precondition:
+#   FILES_TO_CHECK is populated (readonly).
+#
+# Postcondition:
+#   SYMLINK_FILES = readonly array of absolute paths (for symlink_all)
+#   COPY_FILES    = readonly array of absolute paths (for apply_merged_files)
+dotfiles::set_file_types() {
+	[[ -n "${SYMLINK_FILES:-}" || -n "${COPY_FILES:-}" ]] && return 0
+
+	SYMLINK_FILES=()
+	COPY_FILES=()
+
+	local file
+	local base
+	for file in "${FILES_TO_CHECK[@]}"; do
+		base="${file##*/}"
+		if [[ "${base}" == *.local || "${base}" == *.local.* ]]; then
+			COPY_FILES+=("${file}")
+		else
+			SYMLINK_FILES+=("${file}")
+		fi
+	done
 }
 
 ################
@@ -2146,7 +2254,7 @@ main() {
 	}
 	if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
 		dotfiles::set_windows_sudo || true
-		export MSYS=winsymlinks:nativestrict
+		export MSYS=winsymlinks:nativestrict # enable native symlinking
 	fi
 	dotfiles::set_elevated          # IS_ELEVATED
 	dotfiles::set_available_modules # AVAILABLE_MODULES
@@ -2182,20 +2290,24 @@ main() {
 	fi
 
 	# switch to native powershell if non sudo windows bash
-	if [[ "${IS_ELEVATED}" -eq 0 && "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
-		case "${TARGET_RUNTIME}" in
-		"${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
-			if dotfiles::prompt_windows_handoff; then
-				dotfiles::windows_handoff
-			fi
-			;;
-		*) ;;
-		esac
+	if ! dotfiles::is_true "${DOTFILES_IGNORE_HANDOFF:-}"; then
+		if [[ "${IS_ELEVATED}" -eq 0 && "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
+			case "${TARGET_RUNTIME}" in
+			"${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
+				if dotfiles::prompt_windows_handoff; then
+					dotfiles::windows_handoff
+				fi
+				;;
+			*) ;;
+			esac
+		fi
 	fi
 
 	# figure out what files are needed based on args
 	dotfiles::println '=> Verifying files...'
 	dotfiles::set_files_to_check # FILES_TO_CHECK
+	dotfiles::set_file_types     #SYMLINK_FILES COPY_FILES
+
 	dotfiles::check_exists "${FILES_TO_CHECK[@]}" || {
 		exit 1
 	}
@@ -2216,7 +2328,7 @@ main() {
 
 		# symlink / restore actions (mutually exclusive, validated in argparse)
 		if [[ "${MODE}" == "reset" ]]; then
-			dotfiles::clean_symlinks
+			dotfiles::clean_all
 		elif [[ "${REPAIR_SYMLINKS}" -eq 1 ]]; then
 			dotfiles::repair_symlink
 		elif [[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]]; then
@@ -2235,10 +2347,8 @@ main() {
 
 	# TODO: logging
 
-	# dotfiles::print_start
-	# TODO: lib filesystem template git
-	# TODO: symlink and template
-	dotfiles::do_mode
+	dotfiles::symlink_all
+	dotfiles::copy_all
 
 	dotfiles::print_end
 	if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
@@ -2250,152 +2360,152 @@ main() {
 main "$@" || exit 1
 ####################
 
-# logging
-{
-	readonly LOG_LEVEL_DEBUG=0
-	readonly LOG_LEVEL_INFO=1
-	readonly LOG_LEVEL_SUCCESS=2
-	readonly LOG_LEVEL_WARNING=3
-	readonly LOG_LEVEL_ERROR=4
-	readonly LOG_LEVEL_FATAL=5
+# # logging
+# {
+# 	readonly LOG_LEVEL_DEBUG=0
+# 	readonly LOG_LEVEL_INFO=1
+# 	readonly LOG_LEVEL_SUCCESS=2
+# 	readonly LOG_LEVEL_WARNING=3
+# 	readonly LOG_LEVEL_ERROR=4
+# 	readonly LOG_LEVEL_FATAL=5
 
-	log::detail::format() {
-		if [[ $# -gt 1 ]]; then
-			# shellcheck disable=SC2059
-			printf "$1" "${@:2}"
-		else
-			printf '%s' "${1:-}"
-		fi
-	}
+# 	log::detail::format() {
+# 		if [[ $# -gt 1 ]]; then
+# 			# shellcheck disable=SC2059
+# 			printf "$1" "${@:2}"
+# 		else
+# 			printf '%s' "${1:-}"
+# 		fi
+# 	}
 
-	# handles colors for terminal, plain text for file.
-	log::detail::emit() {
-		local level_name="$1"
-		local stream="$2"
-		local msg="$3"
+# 	# handles colors for terminal, plain text for file.
+# 	log::detail::emit() {
+# 		local level_name="$1"
+# 		local stream="$2"
+# 		local msg="$3"
 
-		local color_code=""
-		local reset_code=""
-		if [[ "${COLOUR_DEPTH}" != "none" ]]; then
-			# colour if the *actual* stream is a terminal
-			if [[ "$stream" -eq 2 ]] && [[ -t 2 ]]; then
-				: # stderr is a TTY
-			elif [[ "$stream" -eq 1 ]] && [[ -t 1 ]]; then
-				: # stdout is a TTY
-			else
-				return_after_file=1 # skip colour, still write to file
-			fi
-		fi
+# 		local color_code=""
+# 		local reset_code=""
+# 		if [[ "${COLOUR_DEPTH}" != "none" ]]; then
+# 			# colour if the *actual* stream is a terminal
+# 			if [[ "$stream" -eq 2 ]] && [[ -t 2 ]]; then
+# 				: # stderr is a TTY
+# 			elif [[ "$stream" -eq 1 ]] && [[ -t 1 ]]; then
+# 				: # stdout is a TTY
+# 			else
+# 				return_after_file=1 # skip colour, still write to file
+# 			fi
+# 		fi
 
-		if [[ -z "$return_after_file" ]]; then
-			case "$level_name" in
-			DEBUG) color_code="${COLOUR[BOLD_GREY]}" ;;
-			INFO) color_code="${COLOUR[BOLD_BLUE]}" ;;
-			SUCCESS) color_code="${COLOUR[BOLD_GREEN]}" ;;
-			WARNING) color_code="${COLOUR[BOLD_YELLOW]}" ;;
-			ERROR | FATAL | DEVELOPER) color_code="${COLOUR[BOLD_RED]}" ;;
-			esac
-			reset_code="${COLOUR[RESET]}"
-		fi
-		# terminal output
-		if [[ "$stream" -eq 2 ]]; then
-			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}" >&2
-		else
-			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}"
-		fi
+# 		if [[ -z "$return_after_file" ]]; then
+# 			case "$level_name" in
+# 			DEBUG) color_code="${COLOUR[BOLD_GREY]}" ;;
+# 			INFO) color_code="${COLOUR[BOLD_BLUE]}" ;;
+# 			SUCCESS) color_code="${COLOUR[BOLD_GREEN]}" ;;
+# 			WARNING) color_code="${COLOUR[BOLD_YELLOW]}" ;;
+# 			ERROR | FATAL | DEVELOPER) color_code="${COLOUR[BOLD_RED]}" ;;
+# 			esac
+# 			reset_code="${COLOUR[RESET]}"
+# 		fi
+# 		# terminal output
+# 		if [[ "$stream" -eq 2 ]]; then
+# 			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}" >&2
+# 		else
+# 			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}"
+# 		fi
 
-		# file
-		if [[ -n "${INSTALL_LOG_FILE:-}" ]]; then
-			local ts
-			ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-			printf "[%s] [ %s ] %s\n" "$ts" "$level_name" "$msg" >>"$INSTALL_LOG_FILE"
-		fi
-	}
+# 		# file
+# 		if [[ -n "${INSTALL_LOG_FILE:-}" ]]; then
+# 			local ts
+# 			ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+# 			printf "[%s] [ %s ] %s\n" "$ts" "$level_name" "$msg" >>"$INSTALL_LOG_FILE"
+# 		fi
+# 	}
 
-	log::info() {
-		((ACTIVE_LOG_LEVEL > LOG_LEVEL_INFO)) && return 0
-		local msg
-		msg="$(log::detail::format "$@")"
-		log::detail::emit "INFO" 1 "$msg"
-	}
+# 	log::info() {
+# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_INFO)) && return 0
+# 		local msg
+# 		msg="$(log::detail::format "$@")"
+# 		log::detail::emit "INFO" 1 "$msg"
+# 	}
 
-	log::success() {
-		((ACTIVE_LOG_LEVEL > LOG_LEVEL_SUCCESS)) && return 0
-		local msg
-		msg="$(log::detail::format "$@")"
-		log::detail::emit "SUCCESS" 1 "$msg"
-	}
+# 	log::success() {
+# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_SUCCESS)) && return 0
+# 		local msg
+# 		msg="$(log::detail::format "$@")"
+# 		log::detail::emit "SUCCESS" 1 "$msg"
+# 	}
 
-	log::warning() {
-		((ACTIVE_LOG_LEVEL > LOG_LEVEL_WARNING)) && return 0
-		local msg
-		msg="$(log::detail::format "$@")"
-		log::detail::emit "WARNING" 2 "$msg"
-	}
+# 	log::warning() {
+# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_WARNING)) && return 0
+# 		local msg
+# 		msg="$(log::detail::format "$@")"
+# 		log::detail::emit "WARNING" 2 "$msg"
+# 	}
 
-	log::error() {
-		((ACTIVE_LOG_LEVEL > LOG_LEVEL_ERROR)) && return 0
-		local msg
-		msg="$(log::detail::format "$@")"
-		log::detail::emit "ERROR" 2 "$msg"
-	}
+# 	log::error() {
+# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_ERROR)) && return 0
+# 		local msg
+# 		msg="$(log::detail::format "$@")"
+# 		log::detail::emit "ERROR" 2 "$msg"
+# 	}
 
-	log::fatal() {
-		local msg
-		msg="$(log::detail::format "$@")"
-		log::detail::emit "FATAL" 2 "$msg"
-		exit 1
-	}
+# 	log::fatal() {
+# 		local msg
+# 		msg="$(log::detail::format "$@")"
+# 		log::detail::emit "FATAL" 2 "$msg"
+# 		exit 1
+# 	}
 
-	# Output detailed error message in COLOUR["BOLD_RED"]
-	# Usage: log::dev_fatal <message_or_format> [args...]
-	#
-	# Arguments:
-	#   $1 (format) : The error message, or a printf-style format string.
-	#   $@ (args)   : (Optional) Arguments to populate the format string.
-	#
-	# Returns:
-	#   Outputs the formatted error string to stderr and exists.
-	#
-	# Examples:
-	#   [ DEV_ERROR ] file: main.sh(25) `main`: Uh oh! An unspecified developer error occurred.
-	log::dev_fatal() {
-		# set stack level (immediate caller)
-		local -i level=1
-		local -i line_level=$((level - 1))
+# 	# Output detailed error message in COLOUR["BOLD_RED"]
+# 	# Usage: log::dev_fatal <message_or_format> [args...]
+# 	#
+# 	# Arguments:
+# 	#   $1 (format) : The error message, or a printf-style format string.
+# 	#   $@ (args)   : (Optional) Arguments to populate the format string.
+# 	#
+# 	# Returns:
+# 	#   Outputs the formatted error string to stderr and exists.
+# 	#
+# 	# Examples:
+# 	#   [ DEV_ERROR ] file: main.sh(25) `main`: Uh oh! An unspecified developer error occurred.
+# 	log::dev_fatal() {
+# 		# set stack level (immediate caller)
+# 		local -i level=1
+# 		local -i line_level=$((level - 1))
 
-		local -r caller_file="${BASH_SOURCE[$level]:-Unknown}"
-		local -r caller_line="${BASH_LINENO[$line_level]:-Unknown}"
-		local -r caller_func="${FUNCNAME[$level]:-main}"
-		local -r base_file="${caller_file##*/}"
+# 		local -r caller_file="${BASH_SOURCE[$level]:-Unknown}"
+# 		local -r caller_line="${BASH_LINENO[$line_level]:-Unknown}"
+# 		local -r caller_func="${FUNCNAME[$level]:-main}"
+# 		local -r base_file="${caller_file##*/}"
 
-		local msg
-		msg="$(log::detail::format "$@")"
-		msg="${msg:-Uh oh! An unspecified developer error occurred.}"
+# 		local msg
+# 		msg="$(log::detail::format "$@")"
+# 		msg="${msg:-Uh oh! An unspecified developer error occurred.}"
 
-		local -r trace_msg="file: ${base_file}(${caller_line}) \`${caller_func}()\`: ${msg}"
-		log::detail::emit "DEVELOPER" 2 "$trace_msg"
+# 		local -r trace_msg="file: ${base_file}(${caller_line}) \`${caller_func}()\`: ${msg}"
+# 		log::detail::emit "DEVELOPER" 2 "$trace_msg"
 
-		exit 1
-	}
-}
+# 		exit 1
+# 	}
+# }
 
-filesystem::install_symlink "$HOME" "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*
+# filesystem::install_symlink "$HOME" "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*
 
-log::step "Setting up local configuration templates"
+# log::step "Setting up local configuration templates"
 
-# FIXME: platform specific
-declare -r LOCAL_ZSH="$HOME/.zshrc.local"
-declare -r ZSH_TEMPLATE="$TEMPLATE_DIR/.zshrc.template"
+# # FIXME: platform specific
+# declare -r LOCAL_ZSH="$HOME/.zshrc.local"
+# declare -r ZSH_TEMPLATE="$TEMPLATE_DIR/.zshrc.template"
 
-declare -r LOCAL_GITCONFIG="$HOME/.gitconfig.local"
+# declare -r LOCAL_GITCONFIG="$HOME/.gitconfig.local"
 
-template::install "$LOCAL_ZSH" "$ZSH_TEMPLATE" || missing_deps=1
-template::validate "$LOCAL_ZSH" "${INVALID_TOKEN}" || missing_deps=1
+# template::install "$LOCAL_ZSH" "$ZSH_TEMPLATE" || missing_deps=1
+# template::validate "$LOCAL_ZSH" "${INVALID_TOKEN}" || missing_deps=1
 
-if [[ "$os_suffix" != "unknown" ]]; then
-	gitconfig_src="$TEMPLATE_DIR/.gitconfig.${RUNTIME_SUFFIX}"
+# if [[ "$os_suffix" != "unknown" ]]; then
+# 	gitconfig_src="$TEMPLATE_DIR/.gitconfig.${RUNTIME_SUFFIX}"
 
-	filesystem::install_local "$gitconfig_src" "$LOCAL_GITCONFIG" || missing_deps=1
-	#TODO: zsh
-fi
+# 	filesystem::install_local "$gitconfig_src" "$LOCAL_GITCONFIG" || missing_deps=1
+# 	#TODO: zsh
+# fi

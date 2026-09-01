@@ -106,23 +106,24 @@ dotfiles::file_perm() {
 	#
 	# Returns: 0 on success, 1 if one or more copies failed
 	dotfiles::backup_now() {
-		local -r manifest="${DOTFILES_CACHE_DIR}/manifest.tsv"
 		local -a targets=()
 
+		local src
+		local dest
+		local ftype
 		# Build the list of destination paths to copy
 		if [[ $# -gt 0 ]]; then
 			# User specified specific basenames
 			for name in "$@"; do
 				local found=0
-				if [[ -f "${manifest}" ]]; then
-					local _src _dest
-					while IFS=$'\t' read -r _src _dest; do
-						if [[ "${_dest##*/}" == "${name}" ]]; then
-							targets+=("${_dest}")
+				if [[ -f "${MANIFEST}" ]]; then
+					while IFS=$'\t' read -r src dest ftype; do
+						if [[ "${dest##*/}" == "${name}" ]]; then
+							targets+=("${dest}")
 							found=1
 							break
 						fi
-					done <"${manifest}"
+					done <"${MANIFEST}"
 				fi
 				if ((found == 0)); then
 					targets+=("${HOME}/${name}")
@@ -130,15 +131,15 @@ dotfiles::file_perm() {
 			done
 		else
 			# Back up all managed files
-			if [[ ! -f "${manifest}" ]]; then
+			if [[ ! -f "${MANIFEST}" ]]; then
 				dotfiles::println 'No manifest found. Nothing to back up.'
 				return 0
 			fi
-			local _src dest
-			while IFS=$'\t' read -r _src dest; do
+
+			while IFS=$'\t' read -r src dest ftype; do
 				[[ -z "${dest}" ]] && continue
 				targets+=("${dest}")
-			done <"${manifest}"
+			done <"${MANIFEST}"
 		fi
 
 		if [[ ${#targets[@]} -eq 0 ]]; then
@@ -246,7 +247,7 @@ dotfiles::file_perm() {
 		if [[ -L "${dest}" && "$(readlink "${dest}")" == "${source}" ]]; then
 			dotfiles::println '  [skip] %s (already linked)' "${dest}"
 			if ! ((DRY_RUN)); then
-				dotfiles::manifest_add "${source}" "${dest}"
+				dotfiles::manifest_add "${source}" "${dest}" "symlink"
 			fi
 			return 0
 		fi
@@ -307,7 +308,7 @@ dotfiles::file_perm() {
 				return 1
 			}
 			dotfiles::println '  [new] %s -> %s' "${dest}" "${source}"
-			dotfiles::manifest_add "${source}" "${dest}"
+			dotfiles::manifest_add "${source}" "${dest}" "symlink"
 		fi
 
 		return 0
@@ -413,29 +414,30 @@ dotfiles::file_perm() {
 		esac
 	}
 
-	# Symlink every file in FILES_TO_CHECK to its resolved destination.
+	# Symlink every file in SYMLINK_FILES to its resolved destination.
 	# Usage: symlink_all
 	#
 	# Precondition:
-	#   FILES_TO_CHECK must be populated (see set_files_to_check)
+	#   SYMLINK_FILES must be populated (see set_files_to_check)
 	#
 	# Returns:
 	#   0 if all symlinks were created or already existed
 	#   1 if one or more symlinks failed
 	dotfiles::symlink_all() {
-		if [[ ${#FILES_TO_CHECK[@]} -eq 0 ]]; then
+		if [[ ${#SYMLINK_FILES[@]} -eq 0 ]]; then
 			dotfiles::println 'No files to symlink.'
 			return 0
 		fi
 
-		local total=${#FILES_TO_CHECK[@]}
+		local total=${#SYMLINK_FILES[@]}
 		local ok=0
 		local failed=0
-		local source dest
+		local source
+		local dest
 
 		dotfiles::println '=> Symlinking %d file(s)…' "${total}"
 
-		for source in "${FILES_TO_CHECK[@]}"; do
+		for source in "${SYMLINK_FILES[@]}"; do
 			if ! dest="$(dotfiles::resolve_dest "${source}")"; then
 				dotfiles::println 'Warning: no dest mapping for %s — skipping.' "${source}" >&2
 				failed=$((failed + 1))
@@ -457,4 +459,174 @@ dotfiles::file_perm() {
 
 		return 0
 	}
+
+	# Merges a template into a user-managed .local file using sentinel markers.
+	# The tool owns the block between sentinels; the user owns everything below.
+	#
+	# Usage: copy_file <source> <dest>
+	#
+	# Returns:
+	#   0 on success (including "up to date" and "no sentinels, skipped")
+	#   1 on error
+	dotfiles::copy_file() {
+		local -r source="$1"
+		local -r dest="$2"
+
+		# validate
+		if [[ -z "${source}" || -z "${dest}" ]]; then
+			dotfiles::println 'Error: copy_file requires both source and dest.' >&2
+			return 1
+		fi
+
+		if [[ ! -f "${source}" ]]; then
+			dotfiles::println 'Error: source does not exist: %s' "${source}" >&2
+			return 1
+		fi
+
+		# refuse to modify symlinks
+		if [[ -L "${dest}" ]]; then
+			dotfiles::println 'Error: %s is a symlink. Refusing to modify.' "${dest}" >&2
+			return 1
+		fi
+
+		# ensure parent directory
+		local dest_dir
+		dest_dir="$(dirname "${dest}")"
+		if [[ ! -d "${dest_dir}" ]]; then
+			if ((DRY_RUN)); then
+				dotfiles::println '  [dry-run] mkdir -p %s' "${dest_dir}"
+			else
+				mkdir -p "${dest_dir}" || {
+					dotfiles::println 'Error: cannot create directory: %s' "${dest_dir}" >&2
+					return 1
+				}
+			fi
+		fi
+
+		# ── First install: dest doesn't exist ──
+		if [[ ! -f "${dest}" ]]; then
+			if ((DRY_RUN)); then
+				dotfiles::println '  [dry-run] create %s (from %s)' "${dest}" "$(basename "${source}")"
+				return 0
+			fi
+			{
+				printf '%s\n' "${MERGE_TOP_SENTINEL}"
+				cat "${source}"
+				printf '\n%s\n' "${MERGE_BOTTOM_SENTINEL}"
+			} >"${dest}" || return 1
+			chmod 600 "${dest}"
+			dotfiles::println '  [merged] created %s' "${dest}"
+			dotfiles::manifest_add "${source}" "${dest}" "merged"
+			return 0
+		fi
+
+		# ── Existing file: verify sentinels ──
+		if ! grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" ||
+			! grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
+			dotfiles::println '  [skip] %s (no sentinel markers found — not managed)' "${dest}"
+			return 0
+		fi
+
+		# ── Compare tool-managed block ──
+		local current_block
+		current_block="$(awk -v top="${MERGE_TOP_SENTINEL}" -v bottom="${MERGE_BOTTOM_SENTINEL}" '
+			$0 == top    { in_block=1; next }
+			$0 == bottom { in_block=0 }
+			in_block     { print }
+		' "${dest}")"
+
+		local new_block
+		new_block="$(cat "${source}")"
+
+		if [[ "${current_block}" == "${new_block}" ]]; then
+			dotfiles::println '  [skip] %s (up to date)' "${dest}"
+			if ! ((DRY_RUN)); then
+				dotfiles::manifest_add "${source}" "${dest}" "merged"
+			fi
+			return 0
+		fi
+
+		# ── Extract user section (everything after bottom sentinel) ──
+		local user_section
+		user_section="$(awk -v sentinel="${MERGE_BOTTOM_SENTINEL}" '
+			seen     { print }
+			$0 == sentinel { seen=1 }
+		' "${dest}")"
+
+		# ── Write merged result ──
+		if ((DRY_RUN)); then
+			dotfiles::println '  [dry-run] update %s (tool block changed)' "${dest}"
+			return 0
+		fi
+
+		local tmp
+		tmp="$(mktemp "${dest}.tmp.XXXXXX")" || return 1
+
+		{
+			printf '%s\n' "${MERGE_TOP_SENTINEL}"
+			printf '%s\n' "${new_block}"
+			printf '\n%s\n' "${MERGE_BOTTOM_SENTINEL}"
+			if [[ -n "${user_section}" ]]; then
+				printf '\n%s\n' "${user_section}"
+			fi
+		} >"${tmp}" || {
+			rm -f "${tmp}"
+			return 1
+		}
+
+		chmod 600 "${tmp}"
+		mv -- "${tmp}" "${dest}" || {
+			rm -f "${tmp}"
+			return 1
+		}
+
+		dotfiles::println '  [merged] updated %s (user section preserved)' "${dest}"
+		dotfiles::manifest_add "${source}" "${dest}" "merged"
+		return 0
+	}
+
+	# Copy/merge every file in COPY_FILES to its resolved destination.
+	# Usage: copy_all
+	#
+	# Precondition:
+	#   COPY_FILES must be populated (see set_file_types)
+	#
+	# Returns:
+	#   0 if all copies succeeded or were skipped
+	#   1 if one or more copies failed
+	dotfiles::copy_all() {
+		if [[ ${#COPY_FILES[@]} -eq 0 ]]; then
+			return 0
+		fi
+
+		local total=${#COPY_FILES[@]}
+		local ok=0
+		local failed=0
+		local source dest
+
+		dotfiles::println '=> Merging %d local file(s)…' "${total}"
+
+		for source in "${COPY_FILES[@]}"; do
+			if ! dest="$(dotfiles::resolve_dest "${source}")"; then
+				dotfiles::println 'Warning: no dest mapping for %s — skipping.' "${source}" >&2
+				failed=$((failed + 1))
+				continue
+			fi
+
+			if dotfiles::copy_file "${source}" "${dest}"; then
+				ok=$((ok + 1))
+			else
+				failed=$((failed + 1))
+			fi
+		done
+
+		dotfiles::println '  Merge done: %d/%d succeeded.' "${ok}" "${total}"
+		if ((failed > 0)); then
+			dotfiles::println '  %d file(s) failed.' "${failed}" >&2
+			return 1
+		fi
+
+		return 0
+	}
+
 }
