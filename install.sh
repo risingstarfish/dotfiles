@@ -388,8 +388,8 @@ OVERVIEW: Installs and synchronizes dotfiles, shell configuration, TODO: and opt
 USAGE: bash $(basename "$0") [options]
 
 ACTIONS
-  -u, --update               Update from Git before performing any operations.
-  -r, --repair               Remove orphaned symlinks, then install/relink.
+  -u, --update               Update from Git and copy/link.
+  -r, --repair               Remove orphaned symlinks, then copy/link.
       --reset                Remove all symlinks managed by this tool.
   -b, --backup [file...]     Copy current managed file(s) to the backup directory. Without 
                              arguments, backs up all managed files.
@@ -404,7 +404,7 @@ MODULES
   -l, --list                 Display all available modules, status, and information.
 
 GIT
-  -p, --pull                 Update from Git.
+  -p, --pull                 Update from Git. (note: can be combined with --ref)
       --ref <ref>            Git branch, tag, or commit to install. (default: main)
 
 RESTORE
@@ -832,9 +832,7 @@ EOF
 				printf '  Use .local override files for personal customisation:\n'
 				printf '    e.g.  tmux.conf  ->  tmux.conf.local\n'
 				printf '\n'
-				printf '  Revert your changes or move them to a .local file, then re-run:\n'
-				printf '    bash %s --update\n' "$(basename "$0")"
-				printf '\n'
+				printf '  Revert your changes or move them to a .local file, then re-run.\n'
 				printf '  (dev: set DOTFILES_LOCAL_MODS=1 to bypass this check)\n'
 				printf '\n'
 			} >&2
@@ -1713,18 +1711,19 @@ dotfiles::detect_local_files() {
 }
 
 dotfiles::clean_installs() {
-	dotfiles::clean_symlinks
+	dotfiles::clean_symlinks || return 1
 	dotfiles::detect_local_files
 }
 
 dotfiles::install() {
+	dotfiles::println "=> Beginning install!"
 	dotfiles::symlink_all
+	dotfiles::println '=> Install complete!' # TODO: no clue if this prints
 	dotfiles::copy_all
-	exit 0
-
 }
 
 dotfiles::uninstall() {
+	dotfiles::println "=> Beginning uninstall!"
 	if ((NOCONFIRM)); then
 		: # -y / --noconfirm: skip prompt
 	elif ((DRY_RUN)); then
@@ -1752,7 +1751,7 @@ dotfiles::uninstall() {
 		done
 	fi
 
-	dotfiles::clean_installs
+	dotfiles::clean_installs || return 1
 
 	if ((DRY_RUN)); then
 		dotfiles::println '  [dry-run] rm -rf %s' "${SRC_PATH}"
@@ -1765,6 +1764,7 @@ dotfiles::uninstall() {
 		fi
 	fi
 
+	dotfiles::println 'Uninstall complete!' # TODO: no clue if this prints
 	return 0
 }
 
@@ -2089,8 +2089,6 @@ dotfiles::argparse() {
 	done
 
 	if ((UNINSTALL)); then
-		dotfiles::println "=> Beginning uninstallation"
-
 		dotfiles::uninstall || {
 			cat <<EOF
   You can attempt to run the uninstallation again. If it continues to fail, you may need to
@@ -2102,7 +2100,6 @@ dotfiles::argparse() {
 EOF
 			exit 1
 		}
-		dotfiles::println 'Uninstall complete!' # TODO: no clue if this prints
 		exit 0
 
 	fi
@@ -2349,16 +2346,16 @@ main() {
 
 		# symlink / restore actions (mutually exclusive, validated in argparse)
 		if [[ "${MODE}" == "reset" ]]; then
-			dotfiles::clean_installs
+			dotfiles::clean_installs || exit 1
 		elif [[ "${REPAIR_SYMLINKS}" -eq 1 ]]; then
-			dotfiles::repair_symlink
+			dotfiles::repair_symlink || exit 1
 		elif [[ ${#RESTORE_FILES[@]} -gt 0 || ${RESTORE_ALL} -eq 1 ]]; then
-			dotfiles::restore
+			dotfiles::restore || exit 1
 		elif [[ ${DO_BACKUP} -eq 1 ]]; then
 			if [[ ${#BACKUP_FILES[@]} -gt 0 ]]; then
-				dotfiles::backup_now "${BACKUP_FILES[@]}"
+				dotfiles::backup_now "${BACKUP_FILES[@]}" || exit 1
 			else
-				dotfiles::backup_now
+				dotfiles::backup_now || exit 1
 			fi
 		fi
 
@@ -2368,8 +2365,7 @@ main() {
 
 	# TODO: logging
 
-	dotfiles::symlink_all
-	dotfiles::copy_all
+	dotfiles::install
 
 	dotfiles::print_end
 	if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
