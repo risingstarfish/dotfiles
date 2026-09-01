@@ -388,6 +388,11 @@ dotfiles::file_perm() {
 		apps/ssh/config)
 			printf '%s' "${HOME}/.ssh/config"
 			;;
+		# tmux
+		apps/tmux/tmux.conf.*)
+			printf '%s' "${HOME}/.tmux.conf"
+			;;
+
 		# curl
 		apps/curl/curlrc)
 			printf '%s' "${HOME}/.curlrc"

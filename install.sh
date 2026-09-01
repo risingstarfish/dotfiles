@@ -26,6 +26,7 @@ readonly __INSTALL_SH_INCLUDED__=1
 	readonly MERGE_TOP_SENTINEL="# --- Local Configuration (managed by dotfiles) ---"
 	readonly MERGE_BOTTOM_SENTINEL="# --- Do not edit this line or above ---"
 
+	readonly DEFAULT_NUM_BACKUP_PRINT="5"
 	# environment
 	readonly OS_ARCHLINUX="archlinux"
 	readonly OS_CACHYOS="cachyos"
@@ -413,7 +414,7 @@ RESTORE
       --restore-all          Restore ALL files from the most recent backup run.
       --from <run>           Restore from a specific run (e.g. 2026-07-16/14-52-31).  
                              (default: most recent)
-      --backup-list          Show all available backup runs and their files.
+      --backup-list <N>      Show <N> available backup runs and their files. (default: 5)
 
 BEHAVIOUR
   -n, --dry-run              Print planned actions without modifying the disk.
@@ -571,10 +572,8 @@ EOF
 		dotfiles::println
 	}
 
-	# Print all backup runs and their files, newest first.
-	# Usage: print_backups
-	# Returns: always 0
 	dotfiles::print_backups() {
+		local -r num_print="${1:-${DEFAULT_NUM_BACKUP_PRINT}}"
 		local -r base="${DOTFILES_CACHE_DIR}/backups"
 
 		if [[ ! -d "${base}" ]]; then
@@ -582,7 +581,7 @@ EOF
 			return 0
 		fi
 
-		# collect YYYY-MM-DD/HH-MM-SS dirs, sorted newest first
+		# collect YYYY-MM-DD dirs, sorted newest first
 		local -a days=()
 		local -a runs=()
 
@@ -602,7 +601,18 @@ EOF
 			return 0
 		fi
 
-		dotfiles::println 'AVAILABLE BACKUPS %d run(s):' "${#runs[@]}"
+		local total_runs="${#runs[@]}"
+
+		# Cap the runs array to the max number specified by num_print
+		if [[ ${total_runs} -gt ${num_print} ]]; then
+			runs=("${runs[@]:0:num_print}")
+		fi
+
+		if [[ ${total_runs} -gt ${num_print} ]]; then
+			dotfiles::println 'AVAILABLE BACKUPS (Showing latest %d of %d runs):' "${#runs[@]}" "${total_runs}"
+		else
+			dotfiles::println 'AVAILABLE BACKUPS %d run(s):' "${#runs[@]}"
+		fi
 		dotfiles::println
 
 		local run
@@ -1987,7 +1997,23 @@ dotfiles::argparse() {
 			shift
 			;;
 		--backup-list)
-			dotfiles::print_backups
+			if [[ -z "${2:-}" || "$2" == -* ]]; then
+				:
+			else
+				if ! [[ "$2" =~ ^[0-9]+$ ]]; then
+					dotfiles::println 'Error: Argument for %s must be a non-negative integer (days). Got "%s".' "$1" "$2" >&2
+					exit 1
+				fi
+			fi
+			dotfiles::print_backups "${2:-${DEFAULT_NUM_BACKUP_PRINT}}"
+			exit 0
+			;;
+		--backup-list=*)
+			if ! [[ "${1#*=}" =~ ^[0-9]+$ ]]; then
+				dotfiles::println 'Error: Argument for %s must be a non-negative integer (days). Got "%s".' "--backup-list" "${1#*=}" >&2
+				exit 1
+			fi
+			dotfiles::print_backups "$1"
 			exit 0
 			;;
 
