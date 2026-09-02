@@ -10,7 +10,7 @@ param (
     [int]$NgL = 999,
     
     [ValidateRange(4096, 262144)]
-    [int]$CtxSize = 262144,
+    [int]$CtxSize = 131072,
 
     [ValidateSet("xhigh", "medium", "low")]
     [string]$Reasoning = "medium",
@@ -25,6 +25,7 @@ param (
 )
 
 Set-StrictMode -Version Latest
+$defaultModel = "Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf"
 
 # env check
 $RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
@@ -44,13 +45,24 @@ if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
 
     Write-Host ""
     Write-Host "Available models in $($env:AI_MODELS):" -ForegroundColor Cyan
-    $models = @(Get-ChildItem -Path $env:AI_MODELS -Filter "*.gguf" -ErrorAction SilentlyContinue | Sort-Object Name)
-    if ($models.Count -eq 0) {
+    $modelFiles = @(Get-ChildItem -Path $env:AI_MODELS -Filter "*.gguf" -ErrorAction SilentlyContinue | Sort-Object Name)
+    if ($modelFiles.Count -eq 0) {
         Write-Host "  (no .gguf files found)" -ForegroundColor DarkGray
     }
+
+    # collapse split shards (name-00001-of-00003.gguf) into one entry per model
+    $shardPattern = '-\d{5}-of-\d{5}$'
+    $groups = @($modelFiles | Group-Object -Property { $_.BaseName -replace $shardPattern, '' })
+    $models = @($groups | ForEach-Object { $_.Group[0] })
+
     $idx = 1
-    foreach ($m in $models) {
-        Write-Host "  [$idx] $($m.Name)" -ForegroundColor White
+    foreach ($g in $groups) {
+        $f = $g.Group[0]
+        if ($g.Count -gt 1) {
+            Write-Host "  [$idx] $($f.Name)  (split: $($g.Count) parts)" -ForegroundColor White
+        } else {
+            Write-Host "  [$idx] $($f.Name)" -ForegroundColor White
+        }
         $idx++
     }
     Write-Host "  [p] Paste a custom path" -ForegroundColor DarkGray
@@ -74,9 +86,11 @@ if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
     }
 }
 
+
 # chat template: only for Qwen3.8, skip for Flash-Next
 $modelFileName = [System.IO.Path]::GetFileName($ModelFilePath)
 $isFlashNext = $modelFileName -match '(?i)flash[-_]?next'
+$isMtp = $modelFileName -match '(?i)mtp'
 
 if (-not $isFlashNext) {
     if ([string]::IsNullOrWhiteSpace($ChatTemplate)) {
@@ -121,14 +135,16 @@ if (-not $isFlashNext -and -not (Test-Path $ChatTemplate)) {
 # port
 $bindAddr = if ($HostIP -eq "0.0.0.0") {
     [System.Net.IPAddress]::Any
-} else {
+}
+else {
     [System.Net.IPAddress]::Parse($HostIP)
 }
 try {
     $listener = [System.Net.Sockets.TcpListener]::new($bindAddr, $Port)
     $listener.Start()
     $listener.Stop()
-} catch [System.Net.Sockets.SocketException] {
+}
+catch [System.Net.Sockets.SocketException] {
     Write-Host "Error: Port $Port is already in use on $HostIP." -ForegroundColor Red
     exit 1
 }
@@ -203,16 +219,24 @@ if (-not $isFlashNext) {
     $serverArgs += "--chat-template-file", $ChatTemplate
 }
 
-if ($isIkLlama) {
-    $serverArgs += "--spec-type", "mtp:n_max=3,p_min=0.75"
+# speculative decoding (MTP) only when the model advertises it
+if ($isMtp) {
+    if ($isIkLlama) {
+        $serverArgs += "--spec-type", "mtp:n_max=3,p_min=0.75"
+    }
+    else {
+        $serverArgs += "--spec-type", "draft-mtp"
+        $serverArgs += "--spec-draft-n-max", "3"
+    }
 }
-else {
-    $serverArgs += "--spec-type", "draft-mtp"
-    $serverArgs += "--spec-draft-n-max", "3"
+
+# CORS + prompt caching are unrelated to MTP — keep them always (non-ik builds)
+if (-not $isIkLlama) {
     $serverArgs += "--cors-origins", "http://localhost"
     $serverArgs += "--cors-credentials"
     $serverArgs += "--cache-prompt"
 }
+
 
 $llamaArgs = $serverArgs + $modelArgs
 
@@ -225,6 +249,10 @@ Write-Host "  [ Mode   ] $Mode" -ForegroundColor Green
 if (-not $isFlashNext) {
     Write-Host "  [ ChatT  ] $ChatTemplate" -ForegroundColor Green
 }
+if ($isMtp) {
+    Write-Host "  [ MTP    ] on" -ForegroundColor Green
+}
+
 Write-Host ""
 
 # log setup
@@ -261,6 +289,7 @@ trap {
     exit 130
 }
 
+# FIXME: no coloured output from llama-server
 while ($retryCount -lt $maxRetries -and -not $success) {
     Write-Host ""
     Write-Host "Starting $llamaBinary (Attempt $($retryCount + 1) of $displayMax)..." -ForegroundColor Green
