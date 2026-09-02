@@ -18,6 +18,7 @@ alias ....='cd ../../..'     # 3
 alias .....='cd ../../../..' # 4
 alias -- -='cd -'            # revert directories
 alias H='cd ~'
+alias dots='cd ~/dotfiles'
 alias dev='cd ~/opt'
 alias star='cd ~/repos/risingstarfish'
 
