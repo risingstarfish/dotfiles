@@ -257,11 +257,12 @@
 				# Check if the module contains an asterisk
 				if [[ "${mod}" == *"*"* ]]; then
 					os_mod="${mod//\*/${TARGET_OS}}"
-					if [[ -e "${SRC_PATH}/${os_mod}" ]]; then
+
+					if [[ -e "${MODULE_DIR}/${os_mod}" ]]; then
 						updated_modules+=("${os_mod}")
 					else # try runtime
 						runtime_mod="${mod//\*/${TARGET_RUNTIME}}"
-						if [[ -e "${SRC_PATH}/${runtime_mod}" ]]; then
+						if [[ -e "${MODULE_DIR}/${runtime_mod}" ]]; then
 							updated_modules+=("${runtime_mod}")
 						fi
 					fi
@@ -290,7 +291,6 @@
 				"zsh/zshrc.toggles"
 
 				"bash/bashrc"
-				"bash/bash_profile"
 
 				"git/gitconfig"
 				"git/gitconfig.local.*"
@@ -299,6 +299,10 @@
 
 				"ssh/config"
 				"ssh/allowed_signers.gen"
+
+				"topgrade/topgrade.toml"
+
+				"fastfetch/config.jsonc.*"
 
 				"tmux/tmux.conf.*"
 
@@ -485,7 +489,7 @@ LOGGING
 INFORMATION
   -d, --diff                 Show diff between current files and incoming dotfiles.
       --verify               Check all managed symlinks. (exit 0 = healthy, 1 = broken)
-  -e, --examples             Show some example commands.
+      --examples             Show some example commands.
       --version              Show the version and git information of this program.
   -h, --help                 Show this help message.
 
@@ -729,38 +733,49 @@ EOF
 				return 0
 			fi
 
-			local broken=0
-			local ok=0
-			local src dest
+			local -a broken_merged_files=()
+			local -a broken_generated_files=()
+			local -a broken_symlink_files=()
+
+			local broke_merged=0
+			local broke_generated=0
+			local broke_symlink=0
+
+			local ok_merged=0
+			local ok_generated=0
+			local ok_symlink=0
+
+			local src
+			local dest
 
 			while IFS=$'\t' read -r src dest ftype; do
 				[[ -z "${dest}" ]] && continue
-				case "${ftype:-symlink}" in
+				case "${ftype}" in
 				merged)
 					# healthy if file exists and has both sentinels
 					if [[ -f "${dest}" ]] &&
 						grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" &&
 						grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
-						ok=$((ok + 1))
+						ok_merged=$((ok_merged + 1))
 					else
-						broken=$((broken + 1))
-						printf '  [merged] %s\n' "${dest}" >&2
+						broken_merged_files+=("${dest}")
+						dotfiles::println '  [merged] %s (missing or broken sentinels)' "${dest}" >&2
 					fi
 					;;
 				generated)
 					if [[ -f "${dest}" && -s "${dest}" ]]; then
-						ok=$((ok + 1))
+						ok_generated=$((ok_generated + 1))
 					else
-						broken=$((broken + 1))
-						printf '  [generated] %s (missing or empty)\n' "${dest}" >&2
+						broken_generated_files+=("${dest}")
+						dotfiles::println '  [generated] %s (missing or empty)' "${dest}" >&2
 					fi
 					;;
 				symlink)
 					if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
-						ok=$((ok + 1))
+						ok_symlink=$((ok_symlink + 1))
 					else
-						broken=$((broken + 1))
-						printf '  %s\n' "${dest}" >&2
+						broken_symlink_files+=("${dest}")
+						dotfiles::println '  [symlink] %s (broken or incorrect target)' "${dest}" >&2
 					fi
 					;;
 				*)
@@ -770,11 +785,45 @@ EOF
 				esac
 			done <"${MANIFEST}"
 
-			if [[ ${broken} -eq 0 ]]; then
-				dotfiles::println '  [verify] OK (%d links valid).' "${ok}" >&2
+			broke_symlink="${#broken_symlink_files[@]}"
+			broke_merged="${#broken_merged_files[@]}"
+			broke_generated="${#broken_generated_files[@]}"
+
+			local total_broken=$((broke_symlink + broke_merged + broke_generated))
+			local total_ok=$((ok_merged + ok_generated + ok_symlink))
+			local total=$((total_broken + total_ok))
+
+			if [[ ${total_broken} -eq 0 ]]; then
+				dotfiles::println '  [verify] OK: All %d files verified successfully.' "${total_ok}"
+				dotfiles::println '           (%d symlinks, %d generated, %d merged)' "${ok_symlink}" "${ok_generated}" "${ok_merged}"
 				return 0
 			else
-				dotfiles::println '  [verify] %d broken, %d ok.' "${broken}" "${ok}" >&2
+				dotfiles::println '  [verify] NOT OK: %d out of %d files are broken.' "${total_broken}" "${total}" >&2
+				dotfiles::println '           Symlinks  : %2d OK, %2d broken' "${ok_symlink}" "${broke_symlink}" >&2
+				dotfiles::println '           Generated : %2d OK, %2d broken' "${ok_generated}" "${broke_generated}" >&2
+				dotfiles::println '           Merged    : %2d OK, %2d broken' "${ok_merged}" "${broke_merged}" >&2
+				dotfiles::println >&2
+				dotfiles::println '  [verify] Broken File Details:' >&2
+				# print exactly which files are broken
+				if [[ "${broke_symlink}" -gt 0 ]]; then
+					for f in "${broken_symlink_files[@]}"; do
+						printf '    - [symlink]   %s (broken or incorrect target)\n' "${f}" >&2
+					done
+				fi
+
+				if [[ "${broke_generated}" -gt 0 ]]; then
+					for f in "${broken_generated_files[@]}"; do
+						printf '    - [generated] %s (missing or empty)\n' "${f}" >&2
+					done
+				fi
+
+				if [[ "${broke_merged}" -gt 0 ]]; then
+					for f in "${broken_merged_files[@]}"; do
+						printf '    - [merged]    %s (missing or broken sentinels)\n' "${f}" >&2
+					done
+				fi
+
+				echo "" >&2
 				return 1
 			fi
 		}
@@ -994,7 +1043,6 @@ EOF
 			local -r source="$1"
 			local -r dest="$2"
 			local -r ftype="${3:-symlink}"
-
 			# ensure parent dir exists
 			mkdir -p "$(dirname "${MANIFEST}")" 2>/dev/null || true
 			# skip if already recorded
@@ -2036,7 +2084,7 @@ EOF
 				dotfiles::print_version
 				exit 0
 				;;
-			-e | --examples)
+			--examples)
 				dotfiles::print_examples
 				exit 0
 				;;

@@ -246,9 +246,6 @@ dotfiles::file_perm() {
 			printf '%s' "${HOME}/.zstyles"
 			;;
 		# bash
-		modules/bash/bash_profile)
-			printf '%s' "${HOME}/.bash_profile"
-			;;
 		modules/bash/bashrc)
 			printf '%s' "${HOME}/.bashrc"
 			;;
@@ -296,6 +293,18 @@ dotfiles::file_perm() {
 			;;
 		modules/claude/plugin.json)
 			printf '%s' "${HOME}/.claude/plugin.json"
+			;;
+		# fastfetch
+		modules/fastfetch/config.jsonc.*)
+			printf '%s' "${HOME}/.config/fastfetch/config.jsonc"
+			;;
+		# topgrade
+		modules/topgrade/topgrade.toml)
+			if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
+				printf "${APPDATA:-${HOME}/.config}/topgrade.toml"
+			else
+				printf "${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
+			fi
 			;;
 		# iterm2
 		# modules/iterm2/Profiles.json)
