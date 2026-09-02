@@ -27,10 +27,6 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
-# ssh
-alias ssh-keygen-init='ssh-keygen -t ed25519 -C'
-alias ssh-git='ssh -T git@github.com'
-
 # clang-tools-extra
 alias fmt='clang-format -i *.cpp *.hpp *.h'
 alias tidy='clang-tidy -i *.cpp *.hpp *.h'
