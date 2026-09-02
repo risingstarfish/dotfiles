@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# .aliases
+# aliases
 ################
 if [[ -n "${__ALIASES_INCLUDED__:-}" ]]; then
 	return 0
@@ -45,8 +45,12 @@ fi
 # eza package
 if command -v eza &>/dev/null; then
 	export EZA_COLORS="${EZA_COLORS:-da=1;34:gm=1;34:Su=1;34}"
-	# base
-	alias ls='eza --icons --group-directories-first --time-style long-iso'
+
+	alias ls='eza \
+	--icons=always \
+	--hyperlink=always \
+	--group-directories-first \
+	--time-style long-iso'
 
 	if eza --git /dev/null &>/dev/null; then
 		alias ll='ls -l --git' # Long format, git status
@@ -54,14 +58,16 @@ if command -v eza &>/dev/null; then
 		alias ll='ls -l' # Long format
 	fi
 
-	alias l='ll -a'  # Long format, all files
-	alias lr='ll -T' # Long format, tree view
-	alias ld='ll -d' # Long format, directories only
+	alias l='ll -a'     # Long format, all files
+	alias lr='l -T'     # Long format, tree view
+	alias ld='ll -d'    # Long format, directories only
+	alias lh='ll -d .*' # Long format, hidden files and directories only
 	# sorting
-	alias lx='ll --sort=extension' # Sort by extension
-	alias lk='ll --sort=size'      # Sort by size (largest last)
-	alias lt='ll --sort=modified'  # Sort by modified time (newest last)
-	alias lc='ll --sort=changed'   # Sort by changed time (newest last)
+	alias lx='l --sort=extension' # Sort by extension
+	alias lk='l --sort=size'      # Sort by size (largest last)
+	alias lt='l --sort=modified'  # Sort by modified time (newest last)
+	alias lc='l --sort=changed'   # Sort by changed time (newest last)
+	alias lt='l --sort=type'      # Sort by type (symlink last)
 fi
 
 # vscode
