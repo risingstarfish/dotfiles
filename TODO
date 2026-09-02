@@ -1,1 +1,37 @@
 enable/disable by default modules
+
+AVAILABLE MODULES
+
+  zsh:
+    (✓) zshrc
+    (✓) zsh_options
+    (✓) zstyles
+    (✓) zimrc
+    (✓) p10k.zsh
+    (✓) exports
+    (✓) paths
+    (✓) aliases
+    (✓) functions
+    (✓) zshrc.toggles
+  bash:
+    (✓) bashrc
+    (✓) bash_profile
+  git:
+    (✓) gitconfig
+    (✓) gitconfig.local.mac
+    (✓) gitignore
+    (✓) gitattributes
+  ssh:
+    (✓) config
+    (✓) allowed_signers
+  tmux:
+    (✓) tmux.conf.mac
+  curl:
+    (✓) curlrc
+  wget:
+    (✓) wgetrc
+  shellcheck:
+    (✓) shellcheckrc
+  claude:
+    (✓) settings.json
+    (✓) plugin.json

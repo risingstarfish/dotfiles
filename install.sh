@@ -65,6 +65,51 @@
 			*) return 1 ;;
 			esac
 		}
+
+		# Check if provided paths exist.
+		# If any paths are missing, outputs a summary at the end.
+		# Usage: check_exists <path> [path...]
+		#
+		# Arguments:
+		#   $@ (args) : Paths to verify.
+		#
+		# Returns:
+		#   0 if all paths exist
+		#   1 if any paths do not exist
+		dotfiles::check_exists() {
+			local -r -a paths=("$@")
+			local -a missing_paths=()
+			local -r prefix="${SRC_PATH}/"
+
+			for path in "${paths[@]}"; do
+				local target_path="$path"
+
+				# If path is relative (does not start with '/' or '~')
+				if [[ "$path" != /* ]] && [[ "$path" != ~* ]]; then
+					# Resolve relative paths against SRC_PATH
+					target_path="${prefix}${path}"
+				fi
+
+				# Check existence of the resolved path
+				if [[ ! -e "$target_path" ]]; then
+					# Strip the SRC_PATH prefix for clean output.
+					# Absolute paths outside SRC_PATH remain unmodified.
+					missing_paths+=("${target_path#"$prefix"}")
+				fi
+			done
+
+			if [[ ${#missing_paths[@]} -gt 0 ]]; then
+				printf "Missing %d path(s):\n" "${#missing_paths[@]}" >&2
+
+				for missing in "${missing_paths[@]}"; do
+					printf "✗ %s\n" "${missing}" >&2
+				done
+
+				return 1
+			fi
+
+			return 0
+		}
 	}
 	####################
 	# functions to set global vars
@@ -92,17 +137,7 @@
 			done
 
 			SRC_PATH="$(cd -P "$(dirname "$source_path")" >/dev/null 2>&1 && pwd)"
-			readonly SRC_PATH
-		}
-
-		dotfiles::set_shell_dir() {
-			[[ -n "${SHELL_DIR:-}" ]] && return 0
-			readonly SHELL_DIR="${SRC_PATH}/shells"
-		}
-
-		dotfiles::set_module_dir() {
-			[[ -n "${MODULE_DIR:-}" ]] && return 0
-			readonly MODULE_DIR="${SRC_PATH}/modules"
+			declare -r SRC_PATH
 		}
 
 		# Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
@@ -213,7 +248,7 @@
 		}
 
 		# Replaces '*' with TARGET_OS, but only keeps the module if the resulting path exists
-		replace_os_wildcards() {
+		dotfiles::replace_os_wildcards() {
 			local updated_modules=()
 			local os_mod
 			local runtime_mod # fallback
@@ -243,38 +278,41 @@
 			# order matters for help message
 			# * == TARGET_OS
 			AVAILABLE_MODULES=(
-				"shells/zsh/zshrc"
-				"shells/zsh/zsh_options"
-				"shells/zsh/zstyles"
-				"shells/zsh/zimrc"
-				"shells/zsh/p10k.zsh"
-				"shells/zsh/exports"
-				"shells/zsh/paths"
-				"shells/zsh/aliases"
-				"shells/zsh/functions"
-				"shells/zsh/zshrc.toggles"
+				"zsh/zshrc"
+				"zsh/zsh_options"
+				"zsh/zstyles"
+				"zsh/zimrc"
+				"zsh/p10k.zsh"
+				"zsh/exports"
+				"zsh/paths"
+				"zsh/aliases"
+				"zsh/functions"
+				"zsh/zshrc.toggles"
 
-				"shells/bash/bashrc"
-				"shells/bash/bash_profile"
+				"bash/bashrc"
+				"bash/bash_profile"
 
-				"modules/git/gitconfig"
-				"modules/git/gitconfig.local.*"
-				"modules/git/gitignore"
-				"modules/git/gitattributes"
+				"git/gitconfig"
+				"git/gitconfig.local.*"
+				"git/gitignore"
+				"git/gitattributes"
 
-				"modules/ssh/config"
-				"modules/ssh/allowed_signers.gen" # print_modules removes .gen
+				"ssh/config"
+				"ssh/allowed_signers.gen"
 
-				"modules/tmux/tmux.conf.*"
-				"modules/curl/curlrc"
-				"modules/wget/wgetrc"
-				"modules/shellcheck/shellcheckrc"
+				"tmux/tmux.conf.*"
 
-				"modules/claude/settings.json"
-				"modules/claude/plugin.json"
+				"curl/curlrc"
+
+				"wget/wgetrc"
+
+				"shellcheck/shellcheckrc"
+
+				"claude/settings.json"
+				"claude/plugin.json"
 			)
 
-			replace_os_wildcards
+			dotfiles::replace_os_wildcards
 			# dotfiles::remove_module()
 			declare -r AVAILABLE_MODULES
 		}
@@ -524,36 +562,37 @@ EOF
 				done <"${MANIFEST}"
 			fi
 
+			dotfiles::println
 			dotfiles::println 'AVAILABLE MODULES'
 			dotfiles::println
 
 			local current_category=""
-			local current_module_dir=""
+			#local current_module_dir=""
 			local category
-			local module_dir
+			#local module_dir
 			local src_file
 			local filename
 
 			for item in "${AVAILABLE_MODULES[@]}"; do
 				category="${item%%/*}"
-				module_dir="${item%/*}"
-				src_file="${SRC_PATH}/${item}"
+				#module_dir="${item%/*}"
+				src_file="${MODULE_DIR}/${item}"
 				filename="${item##*/}"
 				filename="${filename%.gen}" # remove .gen
 
 				# category header
 				if [[ "$category" != "$current_category" ]]; then
-					[[ -n "$current_category" ]] && dotfiles::println
+					#[[ -n "$current_category" ]] && dotfiles::println
 					dotfiles::println "${category}"
 					current_category="${category}"
-					current_module_dir=""
+					#current_module_dir=""
 				fi
 
-				# sub-directory header (once per group)
-				if [[ "$module_dir" != "$current_module_dir" ]]; then
-					printf '  %s:\n' "${module_dir#*/}"
-					current_module_dir="${module_dir}"
-				fi
+				# # sub-directory header (once per group)
+				# if [[ "$module_dir" != "$current_module_dir" ]]; then
+				# 	printf '  %s:\n' "${module_dir#*/}"
+				# 	current_module_dir="${module_dir}"
+				# fi
 
 				local status="✗"
 				local i
@@ -616,7 +655,9 @@ EOF
 					fi
 				fi
 
-				printf '    (%s) %s\n' "$status" "$filename"
+				#printf '    (%s) %s\n' "$status" "$filename"
+				printf '  (%s) %s\n' "$status" "$filename"
+
 			done
 			dotfiles::println
 		}
@@ -941,40 +982,6 @@ EOF
 			return 0
 		}
 
-	}
-
-	# Check if provided paths exist.
-	# If any paths are missing, outputs a summary at the end.
-	# Usage: check_exists <path> [path...]
-	#
-	# Arguments:
-	#   $@ (args) : Paths to verify.
-	#
-	# Returns:
-	#   0 if all paths exist
-	#   1 if any paths do not exist
-	dotfiles::check_exists() {
-		local -r -a paths=("$@")
-		local -a missing_paths=()
-		local -r prefix="${SRC_PATH}/"
-
-		for path in "${paths[@]}"; do
-			if [[ ! -e "$path" ]]; then
-				missing_paths+=("${path#"$prefix"}")
-			fi
-		done
-
-		if [[ ${#missing_paths[@]} -gt 0 ]]; then
-			printf "Missing %d path(s):\n" "${#missing_paths[@]}" >&2
-
-			for missing in "${missing_paths[@]}"; do
-				printf "✗ %s\n" "${missing}" >&2
-			done
-
-			return 1
-		fi
-
-		return 0
 	}
 
 	#######################################
@@ -2123,7 +2130,7 @@ EOF
 				shift
 				;;
 
-				# modules
+			# modules
 			-i | --include)
 				if [[ -z "${2:-}" || "$2" == -* ]]; then
 					dotfiles::println 'Error: Missing argument for %s.' "$1" >&2
@@ -2441,7 +2448,7 @@ EOF
 				((excluded)) && continue
 			fi
 
-			FILES_TO_CHECK+=("${SRC_PATH}/${mod}")
+			FILES_TO_CHECK+=("${MODULE_DIR}/${mod}")
 		done
 
 		declare -r FILES_TO_CHECK
@@ -2489,12 +2496,7 @@ EOF
 			dotfiles::install_from_git "$@" || exit 1
 		fi
 
-		dotfiles::set_shell_dir  # SHELL_DIR
-		dotfiles::set_module_dir # MODULE_DIR
-		if [[ ! -d "${SHELL_DIR}" ]]; then
-			dotfiles::println "Error: unable to locate shells/."
-			exit 1
-		fi
+		declare -r MODULE_DIR="${SRC_PATH}/modules"
 		if [[ ! -d "${MODULE_DIR}" ]]; then
 			dotfiles::println "Error: unable to locate modules/."
 			exit 1

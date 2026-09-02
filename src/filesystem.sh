@@ -215,41 +215,41 @@ dotfiles::file_perm() {
 
 		case "${relative}" in
 		# zsh
-		shells/zsh/aliases)
+		modules/zsh/aliases)
 			printf '%s' "${HOME}/.aliases"
 			;;
-		shells/zsh/exports)
+		modules/zsh/exports)
 			printf '%s' "${HOME}/.exports"
 			;;
-		shells/zsh/functions)
+		modules/zsh/functions)
 			printf '%s' "${HOME}/.functions"
 			;;
-		shells/zsh/p10k.zsh)
+		modules/zsh/p10k.zsh)
 			printf '%s' "${HOME}/.p10k.zsh"
 			;;
-		shells/zsh/paths)
+		modules/zsh/paths)
 			printf '%s' "${HOME}/.paths"
 			;;
-		shells/zsh/zimrc)
+		modules/zsh/zimrc)
 			printf '%s' "${HOME}/.zimrc"
 			;;
-		shells/zsh/zsh_options)
+		modules/zsh/zsh_options)
 			printf '%s' "${HOME}/.zsh_options"
 			;;
-		shells/zsh/zshrc)
+		modules/zsh/zshrc)
 			printf '%s' "${HOME}/.zshrc"
 			;;
-		shells/zsh/zshrc.toggles)
+		modules/zsh/zshrc.toggles)
 			printf '%s' "${HOME}/.zshrc.toggles"
 			;;
-		shells/zsh/zstyles)
+		modules/zsh/zstyles)
 			printf '%s' "${HOME}/.zstyles"
 			;;
 		# bash
-		shells/bash/bash_profile)
+		modules/bash/bash_profile)
 			printf '%s' "${HOME}/.bash_profile"
 			;;
-		shells/bash/bashrc)
+		modules/bash/bashrc)
 			printf '%s' "${HOME}/.bashrc"
 			;;
 
