@@ -60,19 +60,20 @@ if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
         $f = $g.Group[0]
         if ($g.Count -gt 1) {
             Write-Host "  [$idx] $($f.Name)  (split: $($g.Count) parts)" -ForegroundColor White
-        } else {
+        }
+        else {
             Write-Host "  [$idx] $($f.Name)" -ForegroundColor White
         }
         $idx++
     }
     Write-Host "  [p] Paste a custom path" -ForegroundColor DarkGray
-    Write-Host "  [Enter] Use default: Qwen3.8-27B-UD-Q8_K_XL.gguf" -ForegroundColor DarkGray
+    Write-Host "  [Enter] Use default: $defaultModel" -ForegroundColor DarkGray
     Write-Host ""
 
     $modelChoice = Read-Host "Select a model (number, path, or 'p')"
 
     if ([string]::IsNullOrWhiteSpace($modelChoice)) {
-        $ModelFilePath = Join-Path $env:AI_MODELS "Qwen3.8-27B-UD-Q8_K_XL.gguf"
+        $ModelFilePath = Join-Path $env:AI_MODELS $defaultModel
     }
     elseif ($modelChoice -eq 'p') {
         $ModelFilePath = Read-Host "Enter model file path"
@@ -114,6 +115,20 @@ if ([string]::IsNullOrWhiteSpace($llamaBinary)) {
         exit 1
     }
 }
+elseif (-not [System.IO.Path]::IsPathRooted($llamaBinary)) {
+    # bare name / relative-ish input like "ik-llama-server.exe": try PATH resolution
+    $resolved = Get-Command $llamaBinary -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+    if ($resolved) {
+        $llamaBinary = $resolved.Source
+    }
+}
+
+if (-not (Test-Path $llamaBinary)) {
+    Write-Host "Error: Binary not found: $llamaBinary" -ForegroundColor Red
+    exit 1
+}
+
 
 if (-not (Test-Path $llamaBinary)) {
     Write-Host "Error: Binary not found: $llamaBinary" -ForegroundColor Red
@@ -210,8 +225,7 @@ $serverArgs = @(
     "--flash-attn", "on",
     "--cont-batching",
     "--metrics",
-    "--jinja",
-    "--load-mode", "dio" # if dio fails use "none" | "mmap"
+    "--jinja"
 )
 
 # chat template only for non-Flash-Next models
@@ -230,11 +244,14 @@ if ($isMtp) {
     }
 }
 
-# CORS + prompt caching are unrelated to MTP — keep them always (non-ik builds)
 if (-not $isIkLlama) {
     $serverArgs += "--cors-origins", "http://localhost"
     $serverArgs += "--cors-credentials"
     $serverArgs += "--cache-prompt"
+    $serverArgs += "--load-mode", "dio" # if dio fails use "none" | "mmap"
+}
+else {
+    $serverArgs += "--no-mmap"
 }
 
 
