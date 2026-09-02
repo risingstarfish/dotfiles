@@ -1,4 +1,0 @@
-[credential]
-    helper = osxkeychain
-[gpg "ssh"]
-    program = /usr/bin/ssh-keygen

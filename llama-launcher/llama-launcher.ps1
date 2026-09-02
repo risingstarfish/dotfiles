@@ -151,7 +151,8 @@ $serverArgs = @(
     "--flash-attn", "on",
     "--cont-batching",
     "--metrics",
-    "--jinja"
+    "--jinja",
+    "--load-mode", "dio" # if dio fails use "none" | "mmap"
 )
 
 if ($isIkLlama) {

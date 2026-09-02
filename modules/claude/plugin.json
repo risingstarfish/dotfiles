@@ -1,0 +1,19 @@
+{
+  "lspServers": {
+    "clangd": {
+      "command": "clangd",
+      "extensionToLanguage": {
+        ".C": "cpp",
+        ".H": "cpp",
+        ".c": "c",
+        ".h": "c",
+        ".cc": "cpp",
+        ".cpp": "cpp",
+        ".cxx": "cpp",
+        ".hpp": "cpp",
+        ".hxx": "cpp"
+      },
+      "args": ["--background-index"]
+    }
+  }
+}

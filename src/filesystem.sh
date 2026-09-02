@@ -290,6 +290,13 @@ dotfiles::file_perm() {
 		modules/shellcheck/shellcheckrc)
 			printf '%s' "${HOME}/.shellcheckrc"
 			;;
+		# claude
+		modules/claude/settings.json)
+			printf '%s' "${HOME}/.claude/settings.json"
+			;;
+		modules/claude/plugin.json)
+			printf '%s' "${HOME}/.claude/plugin.json"
+			;;
 		# iterm2
 		# modules/iterm2/Profiles.json)
 		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/Profiles.json"

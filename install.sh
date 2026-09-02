@@ -100,9 +100,9 @@
 			readonly SHELL_DIR="${SRC_PATH}/shells"
 		}
 
-		dotfiles::set_app_dir() {
-			[[ -n "${APP_DIR:-}" ]] && return 0
-			readonly APP_DIR="${SRC_PATH}/apps"
+		dotfiles::set_module_dir() {
+			[[ -n "${MODULE_DIR:-}" ]] && return 0
+			readonly MODULE_DIR="${SRC_PATH}/modules"
 		}
 
 		# Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
@@ -257,18 +257,21 @@
 				"shells/bash/bashrc"
 				"shells/bash/bash_profile"
 
-				"apps/git/gitconfig"
-				"apps/git/gitconfig.local.*"
-				"apps/git/gitignore"
-				"apps/git/gitattributes"
+				"modules/git/gitconfig"
+				"modules/git/gitconfig.local.*"
+				"modules/git/gitignore"
+				"modules/git/gitattributes"
 
-				"apps/ssh/config"
-				"apps/ssh/allowed_signers.gen" # print_modules removes .gen
+				"modules/ssh/config"
+				"modules/ssh/allowed_signers.gen" # print_modules removes .gen
 
-				"apps/tmux/tmux.conf.*"
-				"apps/curl/curlrc"
-				"apps/wget/wgetrc"
-				"apps/shellcheck/shellcheckrc"
+				"modules/tmux/tmux.conf.*"
+				"modules/curl/curlrc"
+				"modules/wget/wgetrc"
+				"modules/shellcheck/shellcheckrc"
+
+				"modules/claude/settings.json"
+				"modules/claude/plugin.json"
 			)
 
 			replace_os_wildcards
@@ -2486,14 +2489,14 @@ EOF
 			dotfiles::install_from_git "$@" || exit 1
 		fi
 
-		dotfiles::set_shell_dir # SHELL_DIR
-		dotfiles::set_app_dir   # APP_DIR
+		dotfiles::set_shell_dir  # SHELL_DIR
+		dotfiles::set_module_dir # MODULE_DIR
 		if [[ ! -d "${SHELL_DIR}" ]]; then
 			dotfiles::println "Error: unable to locate shells/."
 			exit 1
 		fi
-		if [[ ! -d "${APP_DIR}" ]]; then
-			dotfiles::println "Error: unable to locate apps/."
+		if [[ ! -d "${MODULE_DIR}" ]]; then
+			dotfiles::println "Error: unable to locate modules/."
 			exit 1
 		fi
 

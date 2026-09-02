@@ -1,6 +1,0 @@
-[credential]
-    helper = libsecret
-[gpg "ssh"]
-    program = /mnt/C/Windows/System32/OpenSSH/ssh-keygen.exe
-[core]
-    sshCommand = /mnt/C/Windows/System32/OpenSSH/ssh.exe
