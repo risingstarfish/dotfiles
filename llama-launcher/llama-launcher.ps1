@@ -39,12 +39,53 @@ if ($MissingEnv) {
     exit 1
 }
 
-# defaults from env
+# defaults from env / prompt for model
 if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
-    $ModelFilePath = Join-Path $env:AI_MODELS "Qwen3.8-27B-UD-Q8_K_XL.gguf"
+
+    Write-Host ""
+    Write-Host "Available models in $($env:AI_MODELS):" -ForegroundColor Cyan
+    $models = @(Get-ChildItem -Path $env:AI_MODELS -Filter "*.gguf" -ErrorAction SilentlyContinue | Sort-Object Name)
+    if ($models.Count -eq 0) {
+        Write-Host "  (no .gguf files found)" -ForegroundColor DarkGray
+    }
+    $idx = 1
+    foreach ($m in $models) {
+        Write-Host "  [$idx] $($m.Name)" -ForegroundColor White
+        $idx++
+    }
+    Write-Host "  [p] Paste a custom path" -ForegroundColor DarkGray
+    Write-Host "  [Enter] Use default: Qwen3.8-27B-UD-Q8_K_XL.gguf" -ForegroundColor DarkGray
+    Write-Host ""
+
+    $modelChoice = Read-Host "Select a model (number, path, or 'p')"
+
+    if ([string]::IsNullOrWhiteSpace($modelChoice)) {
+        $ModelFilePath = Join-Path $env:AI_MODELS "Qwen3.8-27B-UD-Q8_K_XL.gguf"
+    }
+    elseif ($modelChoice -eq 'p') {
+        $ModelFilePath = Read-Host "Enter model file path"
+    }
+    elseif ($modelChoice -match '^\d+$' -and [int]$modelChoice -ge 1 -and [int]$modelChoice -le $models.Count) {
+        $ModelFilePath = $models[[int]$modelChoice - 1].FullName
+    }
+    else {
+        # treat the input as a path
+        $ModelFilePath = $modelChoice
+    }
 }
-if ([string]::IsNullOrWhiteSpace($ChatTemplate)) {
-    $ChatTemplate = Join-Path $env:AI_MODELS "Qwen3.5_chat_template.jinja"
+
+# chat template: only for Qwen3.8, skip for Flash-Next
+$modelFileName = [System.IO.Path]::GetFileName($ModelFilePath)
+$isFlashNext = $modelFileName -match '(?i)flash[-_]?next'
+
+if (-not $isFlashNext) {
+    if ([string]::IsNullOrWhiteSpace($ChatTemplate)) {
+        $ChatTemplate = Join-Path $env:AI_MODELS "Qwen3.5_chat_template.jinja"
+    }
+}
+else {
+    Write-Host "Flash-Next model detected — chat template will be skipped." -ForegroundColor DarkGray
+    $ChatTemplate = ""
 }
 
 # binary detection
@@ -72,7 +113,7 @@ if (-not (Test-Path $ModelFilePath)) {
     Write-Host "Error: Model file not found: $ModelFilePath" -ForegroundColor Red
     exit 1
 }
-if (-not (Test-Path $ChatTemplate)) {
+if (-not $isFlashNext -and -not (Test-Path $ChatTemplate)) {
     Write-Host "Error: Chat template not found: $ChatTemplate" -ForegroundColor Red
     exit 1
 }
@@ -98,6 +139,9 @@ Write-Host "                 llama-launcher                  " -ForegroundColor 
 Write-Host "=================================================" -ForegroundColor Cyan
 Write-Host "  Binary : $llamaBinary" -ForegroundColor Cyan
 Write-Host "  Model  : $ModelFilePath" -ForegroundColor Cyan
+if (-not $isFlashNext) {
+    Write-Host "  ChatTmpl: $ChatTemplate" -ForegroundColor Cyan
+}
 Write-Host "  Host   : $HostIP : $Port" -ForegroundColor Cyan
 Write-Host ""
 
@@ -144,7 +188,6 @@ $serverArgs = @(
     "--host", $HostIP,
     "--port", $Port,
     "--parallel", "1",
-    "--chat-template-file", $ChatTemplate,
     "--cache-type-k", "q8_0",
     "--cache-type-v", "q8_0",
     "--alias", "kvstorm1",
@@ -154,6 +197,11 @@ $serverArgs = @(
     "--jinja",
     "--load-mode", "dio" # if dio fails use "none" | "mmap"
 )
+
+# chat template only for non-Flash-Next models
+if (-not $isFlashNext) {
+    $serverArgs += "--chat-template-file", $ChatTemplate
+}
 
 if ($isIkLlama) {
     $serverArgs += "--spec-type", "mtp:n_max=3,p_min=0.75"
@@ -174,6 +222,9 @@ Write-Host "  [ Model  ] $ModelFilePath" -ForegroundColor Green
 Write-Host "  [ Ctx    ] $CtxSize" -ForegroundColor Green
 Write-Host "  [ GPU-L  ] $NgL" -ForegroundColor Green
 Write-Host "  [ Mode   ] $Mode" -ForegroundColor Green
+if (-not $isFlashNext) {
+    Write-Host "  [ ChatT  ] $ChatTemplate" -ForegroundColor Green
+}
 Write-Host ""
 
 # log setup
