@@ -2508,12 +2508,12 @@ EOF
 		dotfiles::set_elevated          # IS_ELEVATED
 		dotfiles::set_available_modules # AVAILABLE_MODULES
 
-		local -r lib_dir="${SRC_PATH}/lib"
-		local -r -a lib_files=(
-			"${lib_dir}/filesystem.sh"
+		local -r src_dir="${SRC_PATH}/src"
+		local -r -a src_files=(
+			"${src_dir}/filesystem.sh"
 		)
-		dotfiles::check_exists "${lib_files[@]}" || exit 1
-		dotfiles::source_file "${lib_dir}/filesystem.sh" || exit 1
+		dotfiles::check_exists "${src_files[@]}" || exit 1
+		dotfiles::source_file "${src_dir}/filesystem.sh" || exit 1
 
 		dotfiles::argparse "$@"
 		if dotfiles::is_true "${DOTFILES_LOG}"; then
