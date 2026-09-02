@@ -20,7 +20,7 @@ dotfiles::file_perm() {
 	local relative="${source#"${SRC_PATH}"/}"
 
 	case "${relative}" in
-	apps/ssh/config)
+	modules/ssh/config)
 		printf '%s' "600"
 		;;
 	*)
@@ -254,47 +254,47 @@ dotfiles::file_perm() {
 			;;
 
 		# git
-		apps/git/gitconfig)
+		modules/git/gitconfig)
 			printf '%s' "${HOME}/.gitconfig"
 			;;
-		apps/git/gitconfig.local.*)
+		modules/git/gitconfig.local.*)
 			printf '%s' "${HOME}/.gitconfig.local"
 			;;
-		apps/git/gitignore)
+		modules/git/gitignore)
 			printf '%s' "${HOME}/.gitignore"
 			;;
-		apps/git/gitattributes)
+		modules/git/gitattributes)
 			printf '%s' "${HOME}/.gitattributes"
 			;;
 		# ssh
-		apps/ssh/config)
+		modules/ssh/config)
 			printf '%s' "${HOME}/.ssh/config"
 			;;
-		apps/ssh/allowed_signers.gen)
+		modules/ssh/allowed_signers.gen)
 			printf '%s' "${HOME}/.ssh/allowed_signers"
 			;;
 		# tmux
-		apps/tmux/tmux.conf.*)
+		modules/tmux/tmux.conf.*)
 			printf '%s' "${HOME}/.tmux.conf"
 			;;
 
 		# curl
-		apps/curl/curlrc)
+		modules/curl/curlrc)
 			printf '%s' "${HOME}/.curlrc"
 			;;
 		# wget
-		apps/wget/wgetrc)
+		modules/wget/wgetrc)
 			printf '%s' "${HOME}/.wgetrc"
 			;;
 		# .shellcheck
-		apps/shellcheck/shellcheckrc)
+		modules/shellcheck/shellcheckrc)
 			printf '%s' "${HOME}/.shellcheckrc"
 			;;
 		# iterm2
-		# apps/iterm2/Profiles.json)
+		# modules/iterm2/Profiles.json)
 		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/Profiles.json"
 		# 	;;
-		# apps/iterm2/schemas/*)
+		# modules/iterm2/schemas/*)
 		# 	local filename="${relative##*/}"
 		# 	printf '%s' "${HOME}/Library/Application Support/iTerm2/schemas/${filename}"
 		# 	;;

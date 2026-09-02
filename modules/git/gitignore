@@ -1,0 +1,120 @@
+### General gitignore ###
+*.env
+
+# Visual Studio & VSCode
+.vs/
+.vscode/
+
+
+# Project
+out*/
+build*/
+install*/
+bin/
+lib/
+*/_deps/
+
+# Other
+build/*
+out/*
+
+
+
+### CMake gitignore ###
+CMakeUserPresets.json
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+_CPack_Packages/
+
+
+### clangd gitignore ###
+compile_commands.json
+.clangd
+.clangd-ignore
+.cache/
+
+
+### Platform-specific gitignore ###
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+__MACOSX/
+
+# Windows
+Thumbs.db
+Desktop.ini
+ehthumbs.Debug
+$RECYCLE.BIN/
+
+# WSL
+*~
+\#*\#
+*.swp
+*.bak
+
+
+### C++ gitignore ###
+# Prerequisites
+*.d
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Object Files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Compiled Dynamic Libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static Libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables 
+*.exe
+*.out
+*.app
+
+# Debug //todo update
+*.pdb
+
+
+### Dependency Management ###
+# vcpkg 
+#vcpkg.json
+#vcpkg-configuration.json
+vcpkg_installed/
+
+
+### Conan gitignore ###
+conanbuildinfo.txt
+conanbuildinfo.cmake
+conaninfo.txt
+conan_package/
+
+
+### Bazel gitignore ###
+/bazel-*
+/test/bazel-*
+.eclipse/
+
+#python
+.mypy_cache

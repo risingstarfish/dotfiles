@@ -1,0 +1,4 @@
+[credential]
+    helper = libsecret
+[gpg "ssh"]
+    program = /usr/bin/ssh-keygen
