@@ -12,14 +12,6 @@ if [ -t 0 ]; then
 	export GPG_TTY=$(tty)
 fi
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-	# Avoid issues with `gpg` as installed via Homebrew.
-	# https://stackoverflow.com/a/42265848/96656
-	# export GPG_TTY=$(tty)
-	# Hide the “default interactive shell is now zsh” warning on macOS.
-	export BASH_SILENCE_DEPRECATION_WARNING=1
-fi
-
 # llama and claude stuff
 export ANTHROPIC_BASE_URL="http://192.168.0.245:9931"
 #export ANTHROPIC_MODEL="kvstorm1"
@@ -28,3 +20,56 @@ export DISABLE_TELEMETRY=0
 
 # git
 export GITHUB_PUBLIC_EMAIL="169690632+risingstarfish@users.noreply.github.com"
+
+# OS specific
+if [[ "$OSTYPE" == "darwin"* ]]; then
+	# Hide the “default interactive shell is now zsh” warning on macOS.
+	export BASH_SILENCE_DEPRECATION_WARNING=1
+# Windows MSVC / SDK
+elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "win32"* ]]; then
+	set_msvc_env() {
+		local -r VS_ROOT="C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools"
+		local -r SDK_ROOT="C:\Program Files (x86)\Windows Kits\10"
+
+		if [[ ! -d "${VS_ROOT}" || ! -d "${SDK_ROOT}" ]]; then
+			printf '[MSVC] Visual Studio BuildTools or Windows SDK not found.\n' >&2
+			return 1
+		fi
+
+		local sdk_ver
+		sdk_ver="$(find "${SDK_ROOT}/Include" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -rV | head -n 1 | sed 's|.*/||')"
+		if [[ -z "${sdk_ver}" ]]; then
+			printf '[MSVC] No Windows SDK found.\n' >&2
+			return 1
+		fi
+
+		local msvc_dir msvc_ver
+		msvc_dir="$(find "${VS_ROOT}/VC/Tools/MSVC" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -rV | head -n 1)"
+		if [[ -z "${msvc_dir}" ]]; then
+			printf '[MSVC] No MSVC toolset found.\n' >&2
+			return 1
+		fi
+		msvc_ver="$(basename "${msvc_dir}")"
+
+		local msvc_bin="${VS_ROOT}/VC/Tools/MSVC/${msvc_ver}/bin/hostx64/x64"
+		local sdk_bin="${SDK_ROOT}/Bin/${sdk_ver}/x64"
+		local sdk_inc="${SDK_ROOT}/Include/${sdk_ver}"
+		local sdk_lib="${SDK_ROOT}/Lib/${sdk_ver}"
+		local msvc_inc="${VS_ROOT}/VC/Tools/MSVC/${msvc_ver}/include"
+		local msvc_lib="${VS_ROOT}/VC/Tools/MSVC/${msvc_ver}/lib/x64"
+
+		if [[ "${PATH}" != *"${msvc_bin}"* && "${PATH}" != *"${sdk_bin}"* ]]; then
+			export PATH="${msvc_bin};${sdk_bin};${PATH}"
+		fi
+
+		export INCLUDE="${msvc_inc};${sdk_inc}/um;${sdk_inc}/ucrt;${sdk_inc}/shared;${INCLUDE}"
+		export LIB="${msvc_lib};${sdk_lib}/um/x64;${sdk_lib}/ucrt/x64;${LIB}"
+		export WindowsSdkDir="${SDK_ROOT}"
+		export WindowsSdkVersion="${sdk_ver}"
+		export VCToolsVersion="${msvc_ver}"
+		export VCToolsInstallDir="${VS_ROOT}/VC/Tools/MSVC/${msvc_ver}"
+		export UniversalCRTSdkDir="${SDK_ROOT}"
+		export UniversalCRTSdkVersion="${sdk_ver}"
+	}
+	set_msvc_env
+fi
