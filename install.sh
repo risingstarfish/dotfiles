@@ -241,6 +241,7 @@
 		dotfiles::set_available_modules() {
 			[[ -n "${AVAILABLE_MODULES:-}" ]] && return 0
 			# order matters for help message
+			# * == TARGET_OS
 			AVAILABLE_MODULES=(
 				"shells/zsh/zshrc"
 				"shells/zsh/zsh_options"
@@ -262,6 +263,7 @@
 				"apps/git/gitattributes"
 
 				"apps/ssh/config"
+				"apps/ssh/allowed_signers.gen" # print_modules removes .gen
 
 				"apps/tmux/tmux.conf.*"
 				"apps/curl/curlrc"
@@ -392,8 +394,9 @@ USAGE: bash $(basename "$0") [options]
 
 ACTIONS
   -u, --update               Update from Git and copy/link.
-  -r, --repair               Remove orphaned symlinks, then copy/link.
-      --reset                Remove all symlinks managed by this tool.
+  -r, --repair               Remove orphaned symlinks and generated files, then re-link/generate.
+      --reset                Remove all symlinks and generated files managed by this tool.
+                             (note: copied/merged files will remain)
   -b, --backup [file...]     Copy current managed file(s) to the backup directory. Without 
                              arguments, backs up all managed files.
       --clean-backups [N]    Remove backups older than <N> days. (default: 7, 0 = all)
@@ -504,11 +507,16 @@ EOF
 
 			local -a manifest_sources=()
 			local -a manifest_dests=()
+			local -a manifest_ftypes=()
 			if [[ -f "${MANIFEST}" ]]; then
-				while IFS=$'\t' read -r src dest ftype; do
-					[[ -n "${src}" ]] && {
-						manifest_sources+=("${src}")
-						manifest_dests+=("${dest}")
+				local _src
+				local _dest
+				local _ftype
+				while IFS=$'\t' read -r _src _dest _ftype; do
+					[[ -n "${_src}" ]] && {
+						manifest_sources+=("${_src}")
+						manifest_dests+=("${_dest}")
+						manifest_ftypes+=("${_ftype}")
 					}
 				done <"${MANIFEST}"
 			fi
@@ -518,12 +526,17 @@ EOF
 
 			local current_category=""
 			local current_module_dir=""
+			local category
+			local module_dir
+			local src_file
+			local filename
 
 			for item in "${AVAILABLE_MODULES[@]}"; do
-				local category="${item%%/*}"
-				local module_dir="${item%/*}"
-				local filename="${item##*/}"
-				local src_file="${SRC_PATH}/${item}"
+				category="${item%%/*}"
+				module_dir="${item%/*}"
+				src_file="${SRC_PATH}/${item}"
+				filename="${item##*/}"
+				filename="${filename%.gen}" # remove .gen
 
 				# category header
 				if [[ "$category" != "$current_category" ]]; then
@@ -544,11 +557,35 @@ EOF
 				for i in "${!manifest_sources[@]}"; do
 					if [[ "${manifest_sources[$i]}" == "$src_file" ]]; then
 						local dest="${manifest_dests[$i]}"
-						if [[ -L "$dest" && -e "$dest" ]]; then
-							status="✓"
-						elif [[ -L "$dest" ]]; then
-							status="!"
-						fi
+						local ftype="${manifest_ftypes[$i]}"
+
+						case "${ftype}" in
+						merged)
+							if [[ -f "$dest" ]]; then
+								status="✓"
+							else
+								status="!"
+							fi
+							;;
+						generated)
+							if [[ -f "$dest" && -s "$dest" ]]; then
+								status="✓"
+							elif [[ -f "$dest" ]]; then
+								status="!"
+							fi
+							;;
+						symlink)
+							if [[ -L "$dest" && -e "$dest" ]]; then
+								status="✓"
+							elif [[ -L "$dest" ]]; then
+								status="!"
+							fi
+							;;
+						*)
+							dotfiles::println 'Error: invalid type %s' "${ftype}"
+							exit 1
+							;;
+						esac
 						break
 					fi
 				done
@@ -557,7 +594,14 @@ EOF
 				if [[ "${status}" == "✗" ]]; then
 					local resolved_dest
 					if resolved_dest="$(dotfiles::resolve_dest "${src_file}")"; then
-						if [[ -L "${resolved_dest}" ]]; then
+						if [[ "${src_file}" == *.gen ]]; then
+							# generated: healthy if output exists and is non-empty
+							if [[ -f "${resolved_dest}" && -s "${resolved_dest}" ]]; then
+								status="✓"
+							elif [[ -f "${resolved_dest}" ]]; then
+								status="!"
+							fi
+						elif [[ -L "${resolved_dest}" ]]; then
 							if [[ -e "${resolved_dest}" ]]; then
 								status="✓"
 							else
@@ -659,13 +703,25 @@ EOF
 						printf '  [merged] %s\n' "${dest}" >&2
 					fi
 					;;
-				*)
+				generated)
+					if [[ -f "${dest}" && -s "${dest}" ]]; then
+						ok=$((ok + 1))
+					else
+						broken=$((broken + 1))
+						printf '  [generated] %s (missing or empty)\n' "${dest}" >&2
+					fi
+					;;
+				symlink)
 					if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
 						ok=$((ok + 1))
 					else
 						broken=$((broken + 1))
 						printf '  %s\n' "${dest}" >&2
 					fi
+					;;
+				*)
+					dotfiles::println 'Error: invalid type detected: %s' "${ftype}" >&2
+					exit 1
 					;;
 				esac
 			done <"${MANIFEST}"
@@ -692,10 +748,8 @@ bash ${program}
 EOF
 		}
 
-		# pictures
-		{
-			dotfiles::print_banner() {
-				cat <<'EOF'
+		dotfiles::print_banner() {
+			cat <<'EOF'
 
   ____        _    __ _ _           
  |  _ \  ___ | |_ / _(_) | ___  ___ 
@@ -707,10 +761,10 @@ EOF
  -----------------------------------
 
 EOF
-			}
+		}
 
-			dotfiles::print_start() {
-				cat <<'EOF'
+		dotfiles::print_start() {
+			cat <<'EOF'
 
 ╭───────────────────────────────────────────╮
 │                                           │
@@ -719,10 +773,10 @@ EOF
 ╰───────────────────────────────────────────╯
 
 EOF
-			}
-			dotfiles::print_end() {
-				if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
-					cat <<'EOF'
+		}
+		dotfiles::print_end() {
+			if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
+				cat <<'EOF'
 
 ╭───────────────────────────────────────────╮
 │                                           │
@@ -732,8 +786,8 @@ EOF
 ╰───────────────────────────────────────────╯
 
 EOF
-				else
-					cat <<'EOF'
+			else
+				cat <<'EOF'
 
 ╭───────────────────────────────────────────╮
 │                                           │
@@ -743,8 +797,7 @@ EOF
 ╰───────────────────────────────────────────╯
 
 EOF
-				fi
-			}
+			fi
 		}
 	}
 
@@ -1044,7 +1097,7 @@ EOF
 			"${PWSH_CMD}" "${ps_args[@]}" || rc=$?
 
 			echo
-			read -n 1 -saw -r -p "Press any key to exit..."
+			read -rn 1 -p "Press any key to exit..."
 			exit "${rc}"
 		}
 
@@ -1121,6 +1174,7 @@ EOF
 		#   1 if one or more removals failed
 		dotfiles::clean_symlinks() {
 			local -a managed=()
+			local -a managed_generated=()
 			local -a orphans=()
 			local src
 			local dest
@@ -1129,27 +1183,31 @@ EOF
 			if [[ -f "${MANIFEST}" ]]; then
 				while IFS=$'\t' read -r src dest ftype; do
 					[[ -z "${dest}" ]] && continue
-					# only track symlinks; merged files are handled separately
+					# merged files always stay
 					[[ "${ftype:-symlink}" == "merged" ]] && continue
-					managed+=("${dest}")
+					case "${ftype:-symlink}" in
+					generated)
+						managed_generated+=("${dest}")
+						;;
+					*)
+						managed+=("${dest}")
+						;;
+					esac
 				done <"${MANIFEST}"
 			fi
 
-			# safety net
+			# safety net: orphaned symlinks pointing into $SRC_PATH
 			local -a scan_dirs=("$HOME" "$HOME/.ssh")
 			if [[ "${TARGET_OS:-}" == "${OS_MAC}" ]]; then
 				scan_dirs+=("$HOME/Library/Application Support/iTerm2")
 			fi
 
-			local dir
-			local link
-			local target
+			local dir link target
 			for dir in "${scan_dirs[@]}"; do
 				[[ -d "$dir" ]] || continue
 				while IFS= read -r -d '' link; do
 					target="$(readlink "$link" 2>/dev/null)" || continue
 					[[ "$target" == "${SRC_PATH}/"* ]] || continue
-					# skip if already in managed list
 					local in_manifest=0
 					for d in "${managed[@]}"; do
 						[[ "$d" == "$link" ]] && in_manifest=1 && break
@@ -1158,20 +1216,22 @@ EOF
 				done < <(find "$dir" -maxdepth 2 -type l -print0 2>/dev/null)
 			done
 
-			local total=$((${#managed[@]} + ${#orphans[@]}))
+			local total_symlinks=$((${#managed[@]} + ${#orphans[@]}))
+			local total=$((total_symlinks + ${#managed_generated[@]}))
 			if [[ ${total} -eq 0 ]]; then
-				dotfiles::println '  [clean-symlinks] No managed symlinks found.'
+				dotfiles::println '  [clean] No managed files found.'
 				return 0
 			fi
 
-			dotfiles::println '  [clean-symlinks] Found %d managed, %d orphaned symlink(s).' \
-				"${#managed[@]}" "${#orphans[@]}"
+			dotfiles::println '  [clean] Found %d symlink(s), %d generated file(s).' \
+				"${total_symlinks}" "${#managed_generated[@]}"
 
-			local -a all_links=("${managed[@]}" "${orphans[@]}")
 			local removed=0
 			local failed=0
 			local already_gone=0
 
+			# remove symlinks (managed + orphans)
+			local -a all_links=("${managed[@]}" "${orphans[@]}")
 			for link in "${all_links[@]}"; do
 				if [[ ! -L "$link" ]]; then
 					already_gone=$((already_gone + 1))
@@ -1209,13 +1269,44 @@ EOF
 				fi
 			done
 
-			if [[ ${failed} -eq 0 ]]; then
-				if ! ((DRY_RUN)); then
-					dotfiles::manifest_clear
+			# remove generated files (real files, not symlinks)
+			for dest in "${managed_generated[@]}"; do
+				if [[ ! -f "$dest" ]]; then
+					already_gone=$((already_gone + 1))
+					continue
 				fi
-			fi
+				printf '    %s (generated)\n' "$dest"
 
-			dotfiles::println '  [clean-symlinks] Removed %d, skipped %d (already gone), failed %d.' \
+				if ((DRY_RUN)); then
+					dotfiles::println '    [dry-run] rm %s' "$dest"
+					removed=$((removed + 1))
+					continue
+				fi
+
+				if ((INTERACTIVE)); then
+					local choice
+					if ! read -r -p '    Remove? [Y/n]: ' choice; then
+						dotfiles::println '    [skip] no input available.'
+						continue
+					fi
+					case "$choice" in
+					[nN])
+						dotfiles::println '    [skip] %s (user declined)' "$dest"
+						continue
+						;;
+					esac
+				fi
+
+				if rm -f "$dest" 2>/dev/null; then
+					dotfiles::manifest_remove "$dest"
+					removed=$((removed + 1))
+				else
+					dotfiles::println 'Error: cannot remove %s' "$dest" >&2
+					failed=$((failed + 1))
+				fi
+			done
+
+			dotfiles::println '  [clean] Removed %d, skipped %d (already gone), failed %d.' \
 				"${removed}" "${already_gone}" "${failed}"
 			if ((failed > 0)); then
 				return 1
@@ -1328,13 +1419,12 @@ EOF
 			local src
 			local dest
 
-			# pass 1
-			# find orphaned managed symlinks
+			# pass 1: find broken symlinks (link exists, target gone)
 			if [[ -f "${MANIFEST}" ]]; then
 				while IFS=$'\t' read -r src dest ftype; do
 					[[ -z "${dest}" ]] && continue
 					[[ "${ftype:-symlink}" == "merged" ]] && continue
-					# orphan: symlink exists but target is gone
+					[[ "${ftype:-symlink}" == "generated" ]] && continue
 					if [[ -L "${dest}" && ! -e "${dest}" ]]; then
 						orphans+=("${dest}")
 					fi
@@ -1358,15 +1448,37 @@ EOF
 				dotfiles::println '  [repair] Removed %d orphan(s).' "$removed"
 			fi
 
-			# pass 2
+			# pass 2: check all files, dispatch by type
 			local -a to_relink=()
+			local -a to_regen=()
+			local -a to_remerge=()
+			local base
 
 			for source in "${FILES_TO_CHECK[@]}"; do
+				base="${source##*/}"
+
 				if ! dest="$(dotfiles::resolve_dest "${source}")"; then
 					continue
 				fi
 
-				# Already healthy: symlink exists, target exists, points to us
+				# generated: re-run if output missing or empty
+				if [[ "${base}" == *.gen ]]; then
+					if [[ ! -f "${dest}" || ! -s "${dest}" ]]; then
+						to_regen+=("${source}")
+					fi
+					continue
+				fi
+
+				# merged: re-merge if file missing or sentinels absent
+				if [[ "${base}" == *.local || "${base}" == *.local.* ]]; then
+					if [[ ! -f "${dest}" ]] ||
+						! grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" 2>/dev/null; then
+						to_remerge+=("${source}")
+					fi
+					continue
+				fi
+
+				# symlink: existing healthy check
 				if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${source}" ]]; then
 					if ! ((DRY_RUN)); then
 						dotfiles::manifest_add "${source}" "${dest}" "symlink"
@@ -1374,14 +1486,13 @@ EOF
 					continue
 				fi
 
-				# User placed a real file here — do NOT touch it
+				# real file at a symlink dest — user file, not managed
 				if [[ -f "${dest}" && ! -L "${dest}" ]]; then
 					dotfiles::println '  [skip] %s (user file, not managed)' "${dest}"
 					continue
 				fi
 
-				# FIX 2: was an unguarded rm -f. Now gated by DRY_RUN.
-				# Broken symlink (not ours) — safe to remove and re-link
+				# broken symlink (not ours) — safe to remove and re-link
 				if [[ -L "${dest}" && ! -e "${dest}" ]]; then
 					if ((DRY_RUN)); then
 						dotfiles::println '    [dry-run] rm broken symlink %s' "${dest}"
@@ -1390,28 +1501,64 @@ EOF
 					fi
 				fi
 
-				# Doesn't exist or was just cleaned — needs linking
 				to_relink+=("${source}")
 			done
 
-			if [[ ${#to_relink[@]} -eq 0 ]]; then
-				dotfiles::println '  [repair] All managed symlinks are healthy.'
-				return 0
+			# pass 3: relink
+			local ok=0
+			local failed=0
+
+			if [[ ${#to_relink[@]} -gt 0 ]]; then
+				dotfiles::println '  [repair] Relinking %d file(s)…' "${#to_relink[@]}"
+				for source in "${to_relink[@]}"; do
+					dest="$(dotfiles::resolve_dest "${source}")" || continue
+					if dotfiles::symlink_file "${source}" "${dest}"; then
+						ok=$((ok + 1))
+					else
+						failed=$((failed + 1))
+					fi
+				done
+				dotfiles::println '  [repair] Symlinks: %d ok, %d failed.' "${ok}" "${failed}"
 			fi
 
-			dotfiles::println '  [repair] Relinking %d file(s) …' "${#to_relink[@]}"
+			# pass 4: regenerate
+			if [[ ${#to_regen[@]} -gt 0 ]]; then
+				dotfiles::println '  [repair] Regenerating %d file(s)…' "${#to_regen[@]}"
+				local regen_ok=0
+				local regen_failed=0
+				for source in "${to_regen[@]}"; do
+					dest="$(dotfiles::resolve_dest "${source}")" || continue
+					if dotfiles::generate_file "${source}" "${dest}"; then
+						regen_ok=$((regen_ok + 1))
+					else
+						regen_failed=$((regen_failed + 1))
+					fi
+				done
+				dotfiles::println '  [repair] Generated: %d ok, %d failed.' "${regen_ok}" "${regen_failed}"
+				failed=$((failed + regen_failed))
+			fi
 
-			local ok=0 failed=0
-			for source in "${to_relink[@]}"; do
-				dest="$(dotfiles::resolve_dest "${source}")" || continue
-				if dotfiles::symlink_file "${source}" "${dest}"; then
-					ok=$((ok + 1))
-				else
-					failed=$((failed + 1))
-				fi
-			done
+			# pass 5: re-merge
+			if [[ ${#to_remerge[@]} -gt 0 ]]; then
+				dotfiles::println '  [repair] Re-merging %d file(s)…' "${#to_remerge[@]}"
+				local merge_ok=0
+				local merge_failed=0
+				for source in "${to_remerge[@]}"; do
+					dest="$(dotfiles::resolve_dest "${source}")" || continue
+					if dotfiles::copy_file "${source}" "${dest}"; then
+						merge_ok=$((merge_ok + 1))
+					else
+						merge_failed=$((merge_failed + 1))
+					fi
+				done
+				dotfiles::println '  [repair] Merged: %d ok, %d failed.' "${merge_ok}" "${merge_failed}"
+				failed=$((failed + merge_failed))
+			fi
 
-			dotfiles::println '  [repair] Done: %d ok, %d failed.' "${ok}" "${failed}"
+			# summary
+			if [[ ${#to_relink[@]} -eq 0 && ${#to_regen[@]} -eq 0 && ${#to_remerge[@]} -eq 0 ]]; then
+				dotfiles::println '  [repair] All managed files are healthy.'
+			fi
 
 			if ((failed > 0)); then
 				return 1
@@ -1448,8 +1595,10 @@ EOF
 
 			# Determine destination from manifest, fall back to $HOME/<name>
 			local dest="${HOME}/${name}"
+			local src=""
 			if [[ -f "${MANIFEST}" ]]; then
-				local _src _dest _ftype
+				local _dest
+				local _ftype
 				while IFS=$'\t' read -r _src _dest _ftype; do
 					if [[ "${_dest##*/}" == "${name}" ]]; then
 						dest="${_dest}"
@@ -1495,10 +1644,10 @@ EOF
 
 			# copy backup into place
 			if ((DRY_RUN)); then
-				dotfiles::println '    [dry-run] cp %s %s' "${src}" "${dest}"
+				dotfiles::println '    [dry-run] cp %s %s' "${backup_src}" "${dest}"
 			else
-				if ! cp "${src}" "${dest}"; then
-					dotfiles::println 'Error: cannot restore %s to %s.' "${src}" "${dest}" >&2
+				if ! cp "${backup_src}" "${dest}"; then
+					dotfiles::println 'Error: cannot restore %s to %s.' "${backup_src}" "${dest}" >&2
 					return 1
 				fi
 			fi
@@ -1675,48 +1824,47 @@ EOF
 	#
 	# Returns: always 0 (informational only)
 	dotfiles::detect_local_files() {
-		local -a remaining_locals=()
+		local -a remaining=()
 		local src
 		local dest
 
+		# in-memory: COPY_FILES
 		if [[ ${#COPY_FILES[@]} -gt 0 ]]; then
 			for src in "${COPY_FILES[@]}"; do
 				if dest="$(dotfiles::resolve_dest "${src}")"; then
-					[[ -f "${dest}" ]] && remaining_locals+=("${dest}")
+					[[ -f "${dest}" ]] && remaining+=("${dest}")
 				fi
 			done
 		fi
 
-		# manifest "merged" entries
+		# manifest: merged entries (fallback)
 		if [[ -f "${MANIFEST}" ]]; then
 			local _src _dest _ftype
 			while IFS=$'\t' read -r _src _dest _ftype; do
 				if [[ "${_ftype:-}" == "merged" && -f "${_dest}" ]]; then
-					remaining_locals+=("${_dest}")
+					remaining+=("${_dest}")
 				fi
 			done <"${MANIFEST}"
 		fi
 
 		# de-duplicate
-		local -a unique_locals=()
-		local _f _u
-		local dup
-		for _f in "${remaining_locals[@]}"; do
+		local -a unique=()
+		local _f _u dup
+		for _f in "${remaining[@]}"; do
 			dup=0
-			for _u in "${unique_locals[@]}"; do
+			for _u in "${unique[@]}"; do
 				[[ "${_u}" == "${_f}" ]] && dup=1 && break
 			done
-			((dup)) || unique_locals+=("${_f}")
+			((dup)) || unique+=("${_f}")
 		done
 
-		if [[ ${#unique_locals[@]} -gt 0 ]]; then
+		if [[ ${#unique[@]} -gt 0 ]]; then
 			dotfiles::println ''
-			dotfiles::println '  Note: local configuration file(s) still exist:'
-			for _f in "${unique_locals[@]}"; do
+			dotfiles::println '  Note: merged file(s) with user data remain on disk:'
+			for _f in "${unique[@]}"; do
 				dotfiles::println '    %s' "${_f}"
 			done
-			dotfiles::println '  They may contain personal credentials.'
-			dotfiles::println '  Remove them manually if you no longer need them.'
+			dotfiles::println '  These may contain personal credentials. Remove them manually if no longer needed.'
 		fi
 
 		return 0
@@ -1728,21 +1876,32 @@ EOF
 	}
 
 	dotfiles::install() {
-		dotfiles::println "=> Beginning install!"
-		dotfiles::symlink_all
-		dotfiles::println '=> Install complete!' # TODO: no clue if this prints
-		dotfiles::copy_all
+		dotfiles::println "=== Beginning install ==="
+		local rc=0
+
+		dotfiles::symlink_all || rc=1
+		dotfiles::copy_all || rc=1
+		dotfiles::generate_all || rc=1
+
+		if ((rc)); then
+			dotfiles::println '=> Install finished with errors!' >&2
+			return 1
+		fi
+		dotfiles::println '=== Install complete ==='
 	}
 
 	dotfiles::uninstall() {
-		dotfiles::println "=> Beginning uninstall!"
+		dotfiles::println "=== Beginning uninstall ==="
+		local rc=0
+
 		if ((NOCONFIRM)); then
 			: # -y / --noconfirm: skip prompt
 		elif ((DRY_RUN)); then
 			: # dry-run: nothing will be modified, no prompt needed
 		else
 			local choice
-			dotfiles::println 'This will remove all managed symlinks, the manifest, and the dotfiles clone.' >&2
+			dotfiles::println 'This will remove all managed files (symlinks, generated files),' \
+				'backups, logs, the manifest, and the dotfiles clone.' >&2
 			while true; do
 				if ! read -r -p 'Do you really want to uninstall? [y/N]: ' choice; then
 					dotfiles::println 'Error: No input available for prompt.' >&2
@@ -1763,21 +1922,62 @@ EOF
 			done
 		fi
 
-		dotfiles::clean_installs || return 1
+		# remove symlinks (and warn about merged/generated files that remain)
+		dotfiles::clean_symlinks || rc=1
+
+		# remove generated files (tool-owned, no personal data)
+		if [[ ${#GENERATE_FILES[@]} -gt 0 ]]; then
+			local src dest
+			for src in "${GENERATE_FILES[@]}"; do
+				if ! dest="$(dotfiles::resolve_dest "${src}")"; then
+					continue
+				fi
+				if [[ -f "${dest}" ]]; then
+					dotfiles::println '  [uninstall] removing generated: %s' "${dest}"
+					if ((DRY_RUN)); then
+						: # dry-run: nothing to do
+					else
+						rm -f "${dest}" 2>/dev/null || {
+							dotfiles::println 'Warning: could not remove %s' "${dest}" >&2
+						}
+						dotfiles::manifest_remove "${dest}"
+					fi
+				fi
+			done
+		fi
+
+		# warn about merged files (contain user data, NOT removed)
+		dotfiles::detect_local_files
 
 		if ((DRY_RUN)); then
 			dotfiles::println '  [dry-run] rm -rf %s' "${SRC_PATH}"
 		else
 			dotfiles::manifest_clear
 			dotfiles::println '=> Removing clone at %s' "${SRC_PATH}"
+			if ((rc)); then
+				dotfiles::prompt_continue '=> Errors occurred before reaching final uninstall'
+			fi
 			if ! rm -rf "${SRC_PATH}"; then
 				dotfiles::println 'Error: cannot remove %s' "${SRC_PATH}" >&2
-				return 1
+				rc=1
+			fi
+			# remove cache (backups, manifest) and logs
+			if [[ -d "${DOTFILES_CACHE_DIR}" ]]; then
+				dotfiles::println '=> Removing cache at %s' "${DOTFILES_CACHE_DIR}"
+				rm -rf "${DOTFILES_CACHE_DIR}" 2>/dev/null || true
+			fi
+			if [[ -d "${DOTFILES_LOG_DIR}" ]]; then
+				dotfiles::println '=> Removing logs at %s' "${DOTFILES_LOG_DIR}"
+				rm -rf "${DOTFILES_LOG_DIR}" 2>/dev/null || true
 			fi
 		fi
 
-		dotfiles::println 'Uninstall complete!' # TODO: no clue if this prints
-		return 0
+		if ((rc)); then
+			dotfiles::println '=> Uninstall finished with errors!' >&2
+			return 1
+		fi
+
+		dotfiles::println '=== Uninstall complete ==='
 	}
 
 	dotfiles::argparse() {
@@ -2244,20 +2444,22 @@ EOF
 		declare -r FILES_TO_CHECK
 	}
 
-	# Classifies FILES_TO_CHECK into SYMLINK_FILES and COPY_FILES.
+	# Classifies FILES_TO_CHECK into SYMLINK_FILES, COPY_FILES, or GENERATE_FILES.
 	# Rule: basename ending in ".local" → copy/merge; everything else → symlink.
 	#
 	# Precondition:
 	#   FILES_TO_CHECK is populated (readonly).
 	#
 	# Postcondition:
-	#   SYMLINK_FILES = readonly array of absolute paths (for symlink_all)
-	#   COPY_FILES    = readonly array of absolute paths (for apply_merged_files)
+	#   SYMLINK_FILES  = readonly array of absolute paths (for symlink_all)
+	#   COPY_FILES     = readonly array of absolute paths (for copy_all)
+	#   GENERATE_FILES = readonly array of absolute paths (for generate_all)
 	dotfiles::set_file_types() {
-		[[ -n "${SYMLINK_FILES:-}" || -n "${COPY_FILES:-}" ]] && return 0
+		[[ -n "${SYMLINK_FILES:-}" || -n "${COPY_FILES:-}" || -n "${GENERATE_FILES:-}" ]] && return 0
 
 		SYMLINK_FILES=()
 		COPY_FILES=()
+		GENERATE_FILES=()
 
 		local file
 		local base
@@ -2265,6 +2467,8 @@ EOF
 			base="${file##*/}"
 			if [[ "${base}" == *.local || "${base}" == *.local.* ]]; then
 				COPY_FILES+=("${file}")
+			elif [[ "${base}" == *.gen ]]; then
+				GENERATE_FILES+=("${file}")
 			else
 				SYMLINK_FILES+=("${file}")
 			fi
@@ -2304,7 +2508,7 @@ EOF
 		dotfiles::set_elevated          # IS_ELEVATED
 		dotfiles::set_available_modules # AVAILABLE_MODULES
 
-		lib_dir="${SRC_PATH}/lib"
+		local -r lib_dir="${SRC_PATH}/lib"
 		local -r -a lib_files=(
 			"${lib_dir}/filesystem.sh"
 		)
@@ -2404,154 +2608,4 @@ EOF
 	}
 	main "$@" || exit 1
 	####################
-
-	# # logging
-	# {
-	# 	readonly LOG_LEVEL_DEBUG=0
-	# 	readonly LOG_LEVEL_INFO=1
-	# 	readonly LOG_LEVEL_SUCCESS=2
-	# 	readonly LOG_LEVEL_WARNING=3
-	# 	readonly LOG_LEVEL_ERROR=4
-	# 	readonly LOG_LEVEL_FATAL=5
-
-	# 	log::detail::format() {
-	# 		if [[ $# -gt 1 ]]; then
-	# 			# shellcheck disable=SC2059
-	# 			printf "$1" "${@:2}"
-	# 		else
-	# 			printf '%s' "${1:-}"
-	# 		fi
-	# 	}
-
-	# 	# handles colors for terminal, plain text for file.
-	# 	log::detail::emit() {
-	# 		local level_name="$1"
-	# 		local stream="$2"
-	# 		local msg="$3"
-
-	# 		local color_code=""
-	# 		local reset_code=""
-	# 		if [[ "${COLOUR_DEPTH}" != "none" ]]; then
-	# 			# colour if the *actual* stream is a terminal
-	# 			if [[ "$stream" -eq 2 ]] && [[ -t 2 ]]; then
-	# 				: # stderr is a TTY
-	# 			elif [[ "$stream" -eq 1 ]] && [[ -t 1 ]]; then
-	# 				: # stdout is a TTY
-	# 			else
-	# 				return_after_file=1 # skip colour, still write to file
-	# 			fi
-	# 		fi
-
-	# 		if [[ -z "$return_after_file" ]]; then
-	# 			case "$level_name" in
-	# 			DEBUG) color_code="${COLOUR[BOLD_GREY]}" ;;
-	# 			INFO) color_code="${COLOUR[BOLD_BLUE]}" ;;
-	# 			SUCCESS) color_code="${COLOUR[BOLD_GREEN]}" ;;
-	# 			WARNING) color_code="${COLOUR[BOLD_YELLOW]}" ;;
-	# 			ERROR | FATAL | DEVELOPER) color_code="${COLOUR[BOLD_RED]}" ;;
-	# 			esac
-	# 			reset_code="${COLOUR[RESET]}"
-	# 		fi
-	# 		# terminal output
-	# 		if [[ "$stream" -eq 2 ]]; then
-	# 			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}" >&2
-	# 		else
-	# 			printf "%s[ %s ]%b %s\n" "${color_code}" "${level_name}" "${reset_code}" "${msg}"
-	# 		fi
-
-	# 		# file
-	# 		if [[ -n "${INSTALL_LOG_FILE:-}" ]]; then
-	# 			local ts
-	# 			ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-	# 			printf "[%s] [ %s ] %s\n" "$ts" "$level_name" "$msg" >>"$INSTALL_LOG_FILE"
-	# 		fi
-	# 	}
-
-	# 	log::info() {
-	# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_INFO)) && return 0
-	# 		local msg
-	# 		msg="$(log::detail::format "$@")"
-	# 		log::detail::emit "INFO" 1 "$msg"
-	# 	}
-
-	# 	log::success() {
-	# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_SUCCESS)) && return 0
-	# 		local msg
-	# 		msg="$(log::detail::format "$@")"
-	# 		log::detail::emit "SUCCESS" 1 "$msg"
-	# 	}
-
-	# 	log::warning() {
-	# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_WARNING)) && return 0
-	# 		local msg
-	# 		msg="$(log::detail::format "$@")"
-	# 		log::detail::emit "WARNING" 2 "$msg"
-	# 	}
-
-	# 	log::error() {
-	# 		((ACTIVE_LOG_LEVEL > LOG_LEVEL_ERROR)) && return 0
-	# 		local msg
-	# 		msg="$(log::detail::format "$@")"
-	# 		log::detail::emit "ERROR" 2 "$msg"
-	# 	}
-
-	# 	log::fatal() {
-	# 		local msg
-	# 		msg="$(log::detail::format "$@")"
-	# 		log::detail::emit "FATAL" 2 "$msg"
-	# 		exit 1
-	# 	}
-
-	# 	# Output detailed error message in COLOUR["BOLD_RED"]
-	# 	# Usage: log::dev_fatal <message_or_format> [args...]
-	# 	#
-	# 	# Arguments:
-	# 	#   $1 (format) : The error message, or a printf-style format string.
-	# 	#   $@ (args)   : (Optional) Arguments to populate the format string.
-	# 	#
-	# 	# Returns:
-	# 	#   Outputs the formatted error string to stderr and exists.
-	# 	#
-	# 	# Examples:
-	# 	#   [ DEV_ERROR ] file: main.sh(25) `main`: Uh oh! An unspecified developer error occurred.
-	# 	log::dev_fatal() {
-	# 		# set stack level (immediate caller)
-	# 		local -i level=1
-	# 		local -i line_level=$((level - 1))
-
-	# 		local -r caller_file="${BASH_SOURCE[$level]:-Unknown}"
-	# 		local -r caller_line="${BASH_LINENO[$line_level]:-Unknown}"
-	# 		local -r caller_func="${FUNCNAME[$level]:-main}"
-	# 		local -r base_file="${caller_file##*/}"
-
-	# 		local msg
-	# 		msg="$(log::detail::format "$@")"
-	# 		msg="${msg:-Uh oh! An unspecified developer error occurred.}"
-
-	# 		local -r trace_msg="file: ${base_file}(${caller_line}) \`${caller_func}()\`: ${msg}"
-	# 		log::detail::emit "DEVELOPER" 2 "$trace_msg"
-
-	# 		exit 1
-	# 	}
-	# }
-
-	# filesystem::install_symlink "$HOME" "${BARE_FILES[@]}" "$GIT_DIR"/* "$ZSH_DIR"/*
-
-	# log::step "Setting up local configuration templates"
-
-	# # FIXME: platform specific
-	# declare -r LOCAL_ZSH="$HOME/.zshrc.local"
-	# declare -r ZSH_TEMPLATE="$TEMPLATE_DIR/.zshrc.template"
-
-	# declare -r LOCAL_GITCONFIG="$HOME/.gitconfig.local"
-
-	# template::install "$LOCAL_ZSH" "$ZSH_TEMPLATE" || missing_deps=1
-	# template::validate "$LOCAL_ZSH" "${INVALID_TOKEN}" || missing_deps=1
-
-	# if [[ "$os_suffix" != "unknown" ]]; then
-	# 	gitconfig_src="$TEMPLATE_DIR/.gitconfig.${RUNTIME_SUFFIX}"
-
-	# 	filesystem::install_local "$gitconfig_src" "$LOCAL_GITCONFIG" || missing_deps=1
-	# 	#TODO: zsh
-	# fi
 }
