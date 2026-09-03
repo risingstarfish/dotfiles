@@ -2561,6 +2561,8 @@ EOF
 		dotfiles::set_elevated          # IS_ELEVATED
 		dotfiles::set_available_modules # AVAILABLE_MODULES
 
+#FIXME: ^^^^^^init^^^^^^
+
 		local -r src_dir="${SRC_PATH}/src"
 		local -r -a src_files=(
 			"${src_dir}/filesystem.sh"
