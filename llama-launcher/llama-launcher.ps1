@@ -10,10 +10,10 @@ param (
     [int]$NgL = 999,
     
     [ValidateRange(4096, 262144)]
-    [int]$CtxSize = 131072,
+    [int]$CtxSize = 32768, #131072
 
     [ValidateSet("xhigh", "medium", "low")]
-    [string]$Reasoning = "xhigh",
+    [string]$Reasoning = "medium",
 
     [ValidateSet("thinking", "instruct")]
     [string]$Mode = "",
@@ -219,8 +219,8 @@ $serverArgs = @(
     "--host", $HostIP,
     "--port", $Port,
     "--parallel", "1",
-    "--cache-type-k", "q8_0",
-    "--cache-type-v", "q8_0",
+    "--cache-type-k", "q4_0",
+    "--cache-type-v", "q4_0",
     "--alias", "kvstorm1",
     "--flash-attn", "on",
     "--cont-batching",
