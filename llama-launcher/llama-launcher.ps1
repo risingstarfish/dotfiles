@@ -13,7 +13,7 @@ param (
     [int]$CtxSize = 131072,
 
     [ValidateSet("xhigh", "medium", "low")]
-    [string]$Reasoning = "medium",
+    [string]$Reasoning = "xhigh",
 
     [ValidateSet("thinking", "instruct")]
     [string]$Mode = "",
