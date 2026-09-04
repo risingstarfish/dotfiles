@@ -252,7 +252,7 @@ function fs() {
 	function _compdef_gac() {
 		_arguments -s : \
 			'1:msg:' \
-			'2:paths:*:_files -/'
+			'*:paths:_files -/'
 	}
 	compdef _compdef_gac gac
 	compdef _compdef_gac gacp
@@ -260,7 +260,7 @@ function fs() {
 	function _compdef_gaac() {
 		_arguments -s : '1:msg:'
 	}
-	#compdef _compdefd_gaac gaac
+	compdef _compdef_gaac gaac
 	compdef _compdef_gaac gaacp
 }
 
