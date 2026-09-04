@@ -32,22 +32,22 @@
     // Default endpoint used when an instance does not specify network_slot.
     "default": {
       "host": "127.0.0.1",
-      "port": 8080,
+      "port": 9931,
     },
     // Named endpoints.
     // Each slot is one complete host + port pair.
     "slots": {
       "x": {
         "host": "0.0.0.0",
-        "port": 8080,
+        "port": 9932,
       },
       "y": {
         "host": "127.0.0.1",
-        "port": 8081,
+        "port": 9933,
       },
       "z": {
         "host": "127.0.0.1",
-        "port": 8082,
+        "port": 9934,
       },
     },
   },
