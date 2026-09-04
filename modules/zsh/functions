@@ -11,96 +11,98 @@
 	function _err() {
 		printf "Error: %s\n" "${1:-}" >&2
 	}
+}
 
-	function _cd() {
+# directory navigation
+{
+	function _rs_cd() {
 		command cd -- "${1}" 2>/dev/null
 	}
 
-	function _mkdir() {
+	function _rs_mkdir() {
 		command mkdir "${@}" 2>/dev/null
 	}
-}
 
-# Create a new directory and enter it
-function mkcd() {
-	local -a opts=()
-	local -r msg="USAGE: mkcd [-pv] [-m mode] directory_name..."
-	local target_dir=""
+	# Create a new directory and enter it
+	function mkcd() {
+		local -a opts=()
+		local -r msg="USAGE: mkcd [-pv] [-m mode] directory_name..."
+		local target_dir=""
 
-	function mkcd::fail() {
-		_func_err "${1}" "${funcstack[2]}"
-		printf '%s\n' "${msg:-}" >&2
-		return 1
-	}
-
-	while [[ $# -gt 0 ]]; do
-		case "$1" in
-		-p)
-			opts+=(-p)
-			shift
-			;;
-		-v)
-			opts+=(-v)
-			shift
-			;;
-		-m)
-			(($# < 2)) && {
-				mkcd::fail "option ${1} requires an argument (e.g. 755)"
-				return 1
-			}
-			opts+=(-m "${2}")
-			shift 2
-			;;
-		-h | --help)
-			printf '%s\n' "${msg}"
-			return 0
-			;;
-		-?*)
-			mkcd::fail "illegal option ${1}"
+		function mkcd::fail() {
+			_func_err "${1}" "${funcstack[2]}"
+			printf '%s\n' "${msg:-}" >&2
 			return 1
-			;;
-		*)
-			if [[ -n "${target_dir}" ]]; then
-				mkcd::fail 'expected only one directory name'
+		}
+
+		while [[ $# -gt 0 ]]; do
+			case "$1" in
+			-p)
+				opts+=(-p)
+				shift
+				;;
+			-v)
+				opts+=(-v)
+				shift
+				;;
+			-m)
+				(($# < 2)) && {
+					mkcd::fail "option ${1} requires an argument (e.g. 755)"
+					return 1
+				}
+				opts+=(-m "${2}")
+				shift 2
+				;;
+			-h | --help)
+				printf '%s\n' "${msg}"
+				return 0
+				;;
+			-?*)
+				mkcd::fail "illegal option ${1}"
+				return 1
+				;;
+			*)
+				if [[ -n "${target_dir}" ]]; then
+					mkcd::fail 'expected only one directory name'
+					return 1
+				fi
+				target_dir="$1"
+				shift
+				;;
+			esac
+		done
+
+		# validate
+		if [[ -z "${target_dir}" ]]; then
+			_func_err 'no directory name provided'
+			printf '%s\n' "${msg}" >&2
+			return 1
+		fi
+
+		# check if directory exists
+		if [[ -d "${target_dir}" ]]; then
+			if _rs_cd "${target_dir}"; then
+				return 0
+			else
+				_err "could not change to directory ${target_dir}"
 				return 1
 			fi
-			target_dir="$1"
-			shift
-			;;
-		esac
-	done
+		fi
 
-	# validate
-	if [[ -z "${target_dir}" ]]; then
-		_func_err 'no directory name provided'
-		printf '%s\n' "${msg}" >&2
-		return 1
-	fi
-
-	# check if directory exists
-	if [[ -d "${target_dir}" ]]; then
-		if _cd "${target_dir}"; then
-			return 0
-		else
+		# create
+		if ! _rs_mkdir "${opts[@]}" -- "${target_dir}"; then
+			_err "could not create directory ${target_dir}"
+			return 1
+		fi
+		# enter
+		if ! _rs_cd "${target_dir}"; then
 			_err "could not change to directory ${target_dir}"
 			return 1
 		fi
-	fi
 
-	# create
-	if ! _mkdir "${opts[@]}" -- "${target_dir}"; then
-		_err "could not create directory ${target_dir}"
-		return 1
-	fi
-	# enter
-	if ! _cd "${target_dir}"; then
-		_err "could not change to directory ${target_dir}"
-		return 1
-	fi
-
-	return 0
+		return 0
+	}
 }
-
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/cp
 # cp function that uses rsync
 # The enabled options for rsync are:
@@ -249,20 +251,20 @@ function fs() {
 		_git_flow 1 "$1"
 	}
 
-}
-# compdef
-{
-	function _compdef_ga() {
-		_arguments -s : \
-			'1:msg:' \
-			'*:paths:_files -/'
-	}
-	compdef _compdef_ga gac
-	compdef _compdef_ga gacp
+	# compdef
+	{
+		function _compdef_ga() {
+			_arguments -s : \
+				'1:msg:' \
+				'*:paths:_files -/'
+		}
+		compdef _compdef_ga gac
+		compdef _compdef_ga gacp
 
-	function _compdef_gaa() {
-		_arguments -s : '1:msg:'
+		function _compdef_gaa() {
+			_arguments -s : '1:msg:'
+		}
+		compdef _compdef_gaa gaac
+		compdef _compdef_gaa gaacp
 	}
-	compdef _compdef_gaa gaac
-	compdef _compdef_gaa gaacp
 }

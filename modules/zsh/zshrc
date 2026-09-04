@@ -109,29 +109,43 @@ else
 	exit 0
 fi
 
-print_header "User gitconfig"
-GIT_CONFIG="$HOME/.gitconfig"
-if [[ ! -f "$GIT_CONFIG" ]]; then
-	log_message ERROR "Unable to find $HOME/.gitconfig.\nEnsure you have run \033[36m'bash install.sh'\033[0m."
+# Powerlevel10k configuration
+print_header "Powerlevel10k"
 
-	LOCAL_GIT="$HOME/.gitconfig.local"
-	if [[ -f "$LOCAL_GIT" ]]; then
-		log_message INFO "Found $LOCAL_GIT!"
+P10K_DIR="$HOME/powerlevel10k"
+P10K_THEME="$P10K_DIR/powerlevel10k.zsh-theme"
+P10K_CONFIG="$HOME/.p10k.zsh"
+
+# Enable Powerlevel10k instant prompt
+# check for p10k
+if [[ ! -d $P10K_DIR/.git || ! -f "$P10K_THEME" ]]; then
+	log_message WARNING "Powerlevel10k not found at $P10K_DIR. Cloning repository..."
+	if git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"; then
+		log_message SUCCESS "Successfully cloned Powerlevel10k."
 	else
-		log_message INFO "Could not find $LOCAL_GIT! Creating empty file..."
-		touch "$LOCAL_GIT"
+		log_message ERROR "Failed to clone Powerlevel10k."
 	fi
 else
-	log_message SUCCESS "~/.gitconfig already exists."
+	log_message SUCCESS "Powerlevel10k detected. Sourcing..."
 fi
 
-# NOTE: keep here
-print_header "Exports"
-if [[ -f "$HOME/.exports" ]]; then
-	source "$HOME/.exports"
-	log_message SUCCESS "Sourced $HOME/.exports"
+if [[ -d "$P10K_DIR/.git" && -f "$P10K_THEME" ]]; then
+
+	source "$P10K_THEME"
+	log_message SUCCESS "Powerlevel10k theme loaded from manual git directory."
+
+	if [[ -f "$P10K_CONFIG" ]]; then
+		log_message SUCCESS "Powerlevel10k configuration file found. Sourcing."
+		source "$P10K_CONFIG"
+	else
+		log_message WARNING "Powerlevel10k config ($HOME/.p10k.zsh) not found. Run 'p10k configure'."
+	fi
+
 else
-	log_message ERROR "Unable to find $HOME/.exports.\nSome functionality may not work properly."
+	# Fallback if the git clone failed
+	PROMPT="%{%F{green}%}%n@%{%F{blue}%}%m %{%F{yellow}%}%~%{%F{white}%} %# %{%F{reset}%}"
+	RPROMPT=""
+	log_message WARNING "Powerlevel10k not loaded, using a basic prompt."
 fi
 
 # Zim configuration
@@ -174,6 +188,31 @@ if [[ -d "$HOME/.zim" ]]; then
 else
 	log_message ERROR "Failed to create directory: $HOME/.zim"
 	log_message ERROR "Manually create it then rerun this script."
+fi
+
+print_header "User gitconfig"
+GIT_CONFIG="$HOME/.gitconfig"
+if [[ ! -f "$GIT_CONFIG" ]]; then
+	log_message ERROR "Unable to find $HOME/.gitconfig.\nEnsure you have run \033[36m'bash install.sh'\033[0m."
+
+	LOCAL_GIT="$HOME/.gitconfig.local"
+	if [[ -f "$LOCAL_GIT" ]]; then
+		log_message INFO "Found $LOCAL_GIT!"
+	else
+		log_message INFO "Could not find $LOCAL_GIT! Creating empty file..."
+		touch "$LOCAL_GIT"
+	fi
+else
+	log_message SUCCESS "~/.gitconfig already exists."
+fi
+
+# NOTE: keep here
+print_header "Exports"
+if [[ -f "$HOME/.exports" ]]; then
+	source "$HOME/.exports"
+	log_message SUCCESS "Sourced $HOME/.exports"
+else
+	log_message ERROR "Unable to find $HOME/.exports.\nSome functionality may not work properly."
 fi
 
 print_header "Default paths"
@@ -268,45 +307,6 @@ else
 		fastfetch
 		echo "\n\n"
 	fi
-fi
-
-# Powerlevel10k configuration
-print_header "Powerlevel10k"
-
-P10K_DIR="$HOME/powerlevel10k"
-P10K_THEME="$P10K_DIR/powerlevel10k.zsh-theme"
-P10K_CONFIG="$HOME/.p10k.zsh"
-
-# Enable Powerlevel10k instant prompt
-# check for p10k
-if [[ ! -d $P10K_DIR/.git || ! -f "$P10K_THEME" ]]; then
-	log_message WARNING "Powerlevel10k not found at $P10K_DIR. Cloning repository..."
-	if git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$P10K_DIR"; then
-		log_message SUCCESS "Successfully cloned Powerlevel10k."
-	else
-		log_message ERROR "Failed to clone Powerlevel10k."
-	fi
-else
-	log_message SUCCESS "Powerlevel10k detected. Sourcing..."
-fi
-
-if [[ -d "$P10K_DIR/.git" && -f "$P10K_THEME" ]]; then
-
-	source "$P10K_THEME"
-	log_message SUCCESS "Powerlevel10k theme loaded from manual git directory."
-
-	if [[ -f "$P10K_CONFIG" ]]; then
-		log_message SUCCESS "Powerlevel10k configuration file found. Sourcing."
-		source "$P10K_CONFIG"
-	else
-		log_message WARNING "Powerlevel10k config ($HOME/.p10k.zsh) not found. Run 'p10k configure'."
-	fi
-
-else
-	# Fallback if the git clone failed
-	PROMPT="%{%F{green}%}%n@%{%F{blue}%}%m %{%F{yellow}%}%~%{%F{white}%} %# %{%F{reset}%}"
-	RPROMPT=""
-	log_message WARNING "Powerlevel10k not loaded, using a basic prompt."
 fi
 
 # ruby
