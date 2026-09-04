@@ -176,6 +176,7 @@ function fs() {
 		fi
 	}
 
+
 	_git_commit() {
 		if ! command git commit -S -m "${1}" 2>/dev/null; then
 			func_err 'failed to commit changes' "${funcstack[3]}"
