@@ -25,7 +25,7 @@ param (
 )
 
 Set-StrictMode -Version Latest
-$defaultModel = "Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf"
+$defaultModel = "Qwen3.8-27B-UD-IQ3_S.mtp.gguf"
 
 # env check
 $RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
@@ -45,7 +45,7 @@ if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
 
     Write-Host ""
     Write-Host "Available models in $($env:AI_MODELS):" -ForegroundColor Cyan
-    $modelFiles = @(Get-ChildItem -Path $env:AI_MODELS -Filter "*.gguf" -ErrorAction SilentlyContinue | Sort-Object Name)
+    $modelFiles = @(Get-ChildItem -Path $env:AI_MODELS -Filter "*.gguf" -ErrorAction SilentlyContinue)
     if ($modelFiles.Count -eq 0) {
         Write-Host "  (no .gguf files found)" -ForegroundColor DarkGray
     }
@@ -53,26 +53,53 @@ if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
     # collapse split shards (name-00001-of-00003.gguf) into one entry per model
     $shardPattern = '-\d{5}-of-\d{5}$'
     $groups = @($modelFiles | Group-Object -Property { $_.BaseName -replace $shardPattern, '' })
-    $models = @($groups | ForEach-Object { $_.Group[0] })
+
+    # build sortable list: [name, totalSize, firstShardFile]
+    $groups = @($groups | ForEach-Object {
+            $totalSize = ($_.Group | Measure-Object Length -Sum).Sum
+            $firstShard = $_.Group | Where-Object { $_.Name -match '-00001-of-' } | Select-Object -First 1
+            [PSCustomObject]@{
+                Name       = $_.Name
+                TotalSize  = $totalSize
+                FirstShard = if ($firstShard) { $firstShard } else { $_.Group | Sort-Object Name | Select-Object -First 1 }
+                Count      = $_.Count
+            }
+        } | Sort-Object TotalSize -Descending)
+
+    # separate the default model out of the numbered list
+    $defaultBase = [System.IO.Path]::GetFileNameWithoutExtension($defaultModel) -replace $shardPattern, ''
+    $defaultEntry = $groups | Where-Object { $_.Name -eq $defaultBase } | Select-Object -First 1
+    $otherEntries = @($groups | Where-Object { $_.Name -ne $defaultBase })
+    $models = @($otherEntries | ForEach-Object { $_.FirstShard })
+
+    # --- size formatter ---
+    function Format-Size([long]$bytes) {
+        if ($bytes -ge 1TB) { "{0:N1} TB" -f ($bytes / 1TB) }
+        elseif ($bytes -ge 1GB) { "{0:N1} GB" -f ($bytes / 1GB) }
+        elseif ($bytes -ge 1MB) { "{0:N1} MB" -f ($bytes / 1MB) }
+        else { "{0:N1} KB" -f ($bytes / 1KB) }
+    }
+
+
+    # --- display ---
+    if ($defaultEntry) {
+        $sz = Format-Size $defaultEntry.TotalSize
+        Write-Host "  [*] $($defaultEntry.FirstShard.Name)  ($sz)" -ForegroundColor Yellow
+    }
 
     $idx = 1
-    foreach ($g in $groups) {
-        $f = $g.Group[0]
-        if ($g.Count -gt 1) {
-            Write-Host "  [$idx] $($f.Name)  (split: $($g.Count) parts)" -ForegroundColor White
-        }
-        else {
-            Write-Host "  [$idx] $($f.Name)" -ForegroundColor White
-        }
+    foreach ($e in $otherEntries) {
+        $sz = Format-Size $e.TotalSize
+        Write-Host "  [$idx] $($e.FirstShard.Name)  ($sz)" -ForegroundColor White
         $idx++
     }
     Write-Host "  [p] Paste a custom path" -ForegroundColor DarkGray
-    Write-Host "  [Enter] Use default: $defaultModel" -ForegroundColor DarkGray
+    Write-Host "  [Enter / *] Use default: $defaultModel" -ForegroundColor DarkGray
     Write-Host ""
 
     $modelChoice = Read-Host "Select a model (number, path, or 'p')"
 
-    if ([string]::IsNullOrWhiteSpace($modelChoice)) {
+    if ([string]::IsNullOrWhiteSpace($modelChoice) -or $modelChoice -eq '*') {
         $ModelFilePath = Join-Path $env:AI_MODELS $defaultModel
     }
     elseif ($modelChoice -eq 'p') {
@@ -82,10 +109,11 @@ if ([string]::IsNullOrWhiteSpace($ModelFilePath)) {
         $ModelFilePath = $models[[int]$modelChoice - 1].FullName
     }
     else {
-        # treat the input as a path
         $ModelFilePath = $modelChoice
     }
 }
+
+
 
 
 # chat template: only for Qwen3.8, skip for Flash-Next
@@ -240,7 +268,7 @@ if ($isMtp) {
     }
     else {
         $serverArgs += "--spec-type", "draft-mtp"
-        $serverArgs += "--spec-draft-n-max", "3"
+        $serverArgs += "--spec-draft-n-max", "2"
     }
 }
 
@@ -267,7 +295,10 @@ if (-not $isFlashNext) {
     Write-Host "  [ ChatT  ] $ChatTemplate" -ForegroundColor Green
 }
 if ($isMtp) {
-    Write-Host "  [ MTP    ] on" -ForegroundColor Green
+    Write-Host "  [ MTP    ] Enabled" -ForegroundColor Green
+}
+else {
+    Write-Host "  [ MTP    ] Disabled" -ForegroundColor Green
 }
 
 Write-Host ""
