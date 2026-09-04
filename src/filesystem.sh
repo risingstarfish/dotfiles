@@ -317,9 +317,9 @@ dotfiles::file_perm() {
 		# topgrade
 		modules/topgrade/topgrade.toml)
 			if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
-				printf "${APPDATA:-${HOME}/.config}/topgrade.toml"
+				printf '%s' "${APPDATA:-${HOME}/.config}/topgrade.toml"
 			else
-				printf "${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
+				printf '%s' "${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
 			fi
 			;;
 		# iterm2
@@ -475,7 +475,7 @@ dotfiles::file_perm() {
 		local source
 		local dest
 
-		dotfiles::println '=> Symlinking %d file(s)…' "${total}"
+		dotfiles::println '=> Symlinking %d file(s)...' "${total}"
 
 		for source in "${SYMLINK_FILES[@]}"; do
 			if ! dest="$(dotfiles::resolve_dest "${source}")"; then
@@ -644,7 +644,7 @@ dotfiles::file_perm() {
 		local failed=0
 		local source dest
 
-		dotfiles::println '=> Merging %d local file(s)…' "${total}"
+		dotfiles::println '=> Merging %d local file(s)...' "${total}"
 
 		for source in "${COPY_FILES[@]}"; do
 			if ! dest="$(dotfiles::resolve_dest "${source}")"; then
@@ -735,7 +735,6 @@ dotfiles::file_perm() {
 			dotfiles::println 'Warning: generator ran but %s was not created.' "${dest}" >&2
 		fi
 
-		dotfiles::println '  [generated] %s' "${dest}"
 		dotfiles::manifest_add "${source}" "${dest}" "generated"
 
 		return 0
@@ -760,7 +759,7 @@ dotfiles::file_perm() {
 		local failed=0
 		local source dest
 
-		dotfiles::println '=> Generating %d file(s)…' "${total}"
+		dotfiles::println '=> Generating %d file(s)...' "${total}"
 
 		for source in "${GENERATE_FILES[@]}"; do
 			if ! dest="$(dotfiles::resolve_dest "${source}")"; then

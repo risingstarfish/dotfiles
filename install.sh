@@ -323,7 +323,9 @@
 			)
 
 			dotfiles::replace_os_wildcards
-			# dotfiles::remove_module()
+			if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
+				dotfiles::remove_module 'topgrade/topgrade.toml'
+			fi
 			declare -r AVAILABLE_MODULES
 		}
 	}
@@ -881,7 +883,7 @@ EOF
 │                                           │
 │          INSTALLATION COMPLETE!           │
 │                                           │
-│  Restarting shell…                        │
+│  Restarting shell...                        │
 ╰───────────────────────────────────────────╯
 
 EOF
@@ -1469,7 +1471,7 @@ EOF
 				removed=$((removed + 1))
 			done
 
-			# FIX (style): was a fragile $([[ ]] && printf …) inline substitution.
+			# FIX (style): was a fragile $([[ ]] && printf ...) inline substitution.
 			local suffix=""
 			if [[ "${days}" != "0" ]]; then
 				suffix=" older than ${days} day(s)"
@@ -1479,6 +1481,7 @@ EOF
 		}
 
 		dotfiles::repair_symlink() {
+			# TODO: check manifest -> compare to installed/symlink modules
 			local -a orphans=()
 			local src
 			local dest
@@ -1573,7 +1576,7 @@ EOF
 			local failed=0
 
 			if [[ ${#to_relink[@]} -gt 0 ]]; then
-				dotfiles::println '  [repair] Relinking %d file(s)…' "${#to_relink[@]}"
+				dotfiles::println '  [repair] Relinking %d file(s)...' "${#to_relink[@]}"
 				for source in "${to_relink[@]}"; do
 					dest="$(dotfiles::resolve_dest "${source}")" || continue
 					if dotfiles::symlink_file "${source}" "${dest}"; then
@@ -1587,7 +1590,7 @@ EOF
 
 			# pass 4: regenerate
 			if [[ ${#to_regen[@]} -gt 0 ]]; then
-				dotfiles::println '  [repair] Regenerating %d file(s)…' "${#to_regen[@]}"
+				dotfiles::println '  [repair] Regenerating %d file(s)...' "${#to_regen[@]}"
 				local regen_ok=0
 				local regen_failed=0
 				for source in "${to_regen[@]}"; do
@@ -1604,7 +1607,7 @@ EOF
 
 			# pass 5: re-merge
 			if [[ ${#to_remerge[@]} -gt 0 ]]; then
-				dotfiles::println '  [repair] Re-merging %d file(s)…' "${#to_remerge[@]}"
+				dotfiles::println '  [repair] Re-merging %d file(s)...' "${#to_remerge[@]}"
 				local merge_ok=0
 				local merge_failed=0
 				for source in "${to_remerge[@]}"; do
