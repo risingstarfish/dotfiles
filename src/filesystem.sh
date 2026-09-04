@@ -270,6 +270,22 @@ dotfiles::file_perm() {
 		modules/ssh/allowed_signers.gen)
 			printf '%s' "${HOME}/.ssh/allowed_signers"
 			;;
+			# dev
+		modules/dev/CMakeUserPresets.json)
+			printf '%s' "${HOME}/dev/CMakeUserPresets.json"
+			;;
+		modules/dev/internal-flags.cmake)
+			printf '%s' "${HOME}/dev/internal-flags.cmake"
+			;;
+		modules/dev/cmake-format.py)
+			printf '%s' "${HOME}/dev/.cmake-format.py"
+			;;
+		modules/dev/clang-format)
+			printf '%s' "${HOME}/dev/.clang-format"
+			;;
+		modules/dev/clang-tidy)
+			printf '%s' "${HOME}/dev/.clang-tidy"
+			;;
 		# tmux
 		modules/tmux/tmux.conf.*)
 			printf '%s' "${HOME}/.tmux.conf"

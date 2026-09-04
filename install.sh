@@ -300,6 +300,12 @@
 				"ssh/config"
 				"ssh/allowed_signers.gen"
 
+				"dev/CMakeUserPresets.json"
+				"dev/internal-flags.cmake"
+				"dev/cmake-format.py"
+				"dev/clang-format"
+				"dev/clang-tidy"
+
 				"topgrade/topgrade.toml"
 
 				"fastfetch/config.jsonc.*"
@@ -2561,7 +2567,7 @@ EOF
 		dotfiles::set_elevated          # IS_ELEVATED
 		dotfiles::set_available_modules # AVAILABLE_MODULES
 
-#FIXME: ^^^^^^init^^^^^^
+		#FIXME: ^^^^^^init^^^^^^
 
 		local -r src_dir="${SRC_PATH}/src"
 		local -r -a src_files=(
