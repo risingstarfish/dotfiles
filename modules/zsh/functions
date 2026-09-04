@@ -249,20 +249,20 @@ function fs() {
 		_git_flow 1 "$1"
 	}
 
-	function _compdef_gac() {
+}
+# compdef
+{
+	function _compdef_ga() {
 		_arguments -s : \
 			'1:msg:' \
 			'*:paths:_files -/'
 	}
-	compdef _compdef_gac gac
-	compdef _compdef_gac gacp
+	compdef _compdef_ga gac
+	compdef _compdef_ga gacp
 
-	function _compdef_gaac() {
+	function _compdef_gaa() {
 		_arguments -s : '1:msg:'
 	}
-	compdef _compdef_gaac gaac
-	compdef _compdef_gaac gaacp
+	compdef _compdef_gaa gaac
+	compdef _compdef_gaa gaacp
 }
-
-
-#compdef _files gaac gac gacp gaacp
