@@ -187,7 +187,7 @@ function fs() {
 	_git_current_branch() {
 		command git symbolic-ref --short -q HEAD
 	}
-
+ 
 	_git_flow() {
 		local -r do_push="${1:-0}"
 		local -r commit_msg="${2:-}"
