@@ -177,7 +177,7 @@ function fs() {
 	}
 
 	_git_commit() {
-		if ! command git commit -S -m -- "${1}" 2>/dev/null; then
+		if ! command git commit -S -m "${1}" 2>/dev/null; then
 			func_err 'failed to commit changes' "${funcstack[3]}"
 			return 1
 		fi
@@ -223,8 +223,7 @@ function fs() {
 			printf 'Usage: gac <commit_msg> <paths...>\n' >&2
 			return 1
 		}
-		shift
-		_git_flow 0 "${1}" "${@}"
+		_git_flow 0 "${1}" "${@:2}"
 	}
 
 	# git add <paths>, commit, push
