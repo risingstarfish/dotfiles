@@ -1,70 +1,107 @@
 #!/usr/bin/env zsh
 
+# util
+{
+	# NOTE: zsh index start at 1 !!!???
+	func_err() {
+		local stack="${2:-${funcstack[2]}}"
+		printf "%s: %s\n" "${stack}" "${1:-}" >&2
+	}
+
+	err() {
+		printf "Error: %s\n" "${1:-}" >&2
+	}
+
+	_cd() {
+		command cd -- "${1}" 2>/dev/null 2>&1
+	}
+
+	_mkdir() {
+		command mkdir "${@}" 2>/dev/null 2>&1
+	}
+
+}
 # Create a new directory and enter it
 function mkcd() {
-	local -r target_dir="$1"
-	local -r msg="Usage: mkcd <directory_name>"
+	local -a opts=()
+	local -r msg="USAGE: mkcd [-pv] [-m mode] directory_name..."
+	local target_dir=""
 
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+		-p)
+			opts+=(-p)
+			shift
+			;;
+		-v)
+			opts+=(-v)
+			shift
+			;;
+		-m)
+			if [[ $# -lt 2 ]]; then
+				func_err "option requires an argument ${1}"
+				printf '%s\n' "${msg}" >&2
+				return 1
+			fi
+			opts+=(-m "${2}")
+			shift 2
+			;;
+		-h | --help)
+			printf '%s\n' "${msg}"
+			return 0
+			;;
+		-?*)
+			func_err "illegal option $1"
+			printf '%s\n' "${msg}" >&2
+			return 1
+			;;
+		*)
+			if [[ -n "${target_dir}" ]]; then
+				func_err 'expected only one directory name'
+				printf '%s\n' "${msg}" >&2
+				return 1
+			fi
+			target_dir="$1"
+			shift
+			;;
+		esac
+	done
+
+	# validate
 	if [[ -z "${target_dir}" ]]; then
+		func_err 'no directory name provided'
 		printf '%s\n' "${msg}" >&2
-		printf 'Error: No directory name provided.\n' >&2
 		return 1
 	fi
 
 	if [[ "${target_dir}" -gt 1 ]]; then
+		func_err 'too many arguments'
 		printf '%s\n' "${msg}" >&2
-		printf 'Error: Too many arguments. Please provide only one directory name.\n' >&2
 		return 1
 	fi
 
-	# Check if the directory already exists
+	# check if directory exists
 	if [[ -d "${target_dir}" ]]; then
-		printf 'Directory %s already exists. Changing into it.\n' "${target_dir}"
-		if cd "${target_dir}"; then
-			printf 'Successfully changed to: %s\n' "$(pwd)"
+		if _cd "${target_dir}"; then
 			return 0
 		else
-			printf 'Error: Could not change to directory %s\n' "${target_dir}" >&2
+			err "could not change to directory ${target_dir}"
 			return 1
 		fi
 	fi
 
-	# Attempt to create the directory and then change into it
-	if ! command mkdir -p "${target_dir}" 2>/dev/null; then
-		printf 'Error: Could not create directory %s.\n' "${target_dir}" >&2
+	# create
+	if ! _mkdir "${opts[@]}" -- "${target_dir}"; then
+		err "could not create directory ${target_dir}"
 		return 1
 	fi
-	if ! command cd "${target_dir}" 2>/dev/null; then
-		printf 'Error: Could not change to directory %s.\n' "${target_dir}" >&2
+	# enter
+	if ! _cd "${target_dir}"; then
+		err "could not change to directory ${target_dir}"
 		return 1
 	fi
-	printf 'Successfully created and changed to: %s\n' "$(pwd)"
+
 	return 0
-}
-
-# Internal helper function to prompt for email and generate the key
-_generate_github_ssh_key() {
-	local key_type="$1"
-	local email="${GITHUB_PUBLIC_EMAIL:-}"
-
-	if [[ -z "$email" ]]; then
-		printf '$GITHUB_PUBLIC_EMAIL is unset. Enter GitHub email: '
-		read -r email
-	else
-		printf 'Using $GITHUB_PUBLIC_EMAIL: %s\n' "${GITHUB_PUBLIC_EMAIL}"
-	fi
-
-	ssh-keygen -t "$key_type" -C "\"$email\""
-}
-
-# Create a standard ed25519 SSH key for GitHub
-github_ssh_key() {
-	_generate_github_ssh_key "ed25519"
-}
-
-# Create an ed25519-sk hardware security key for GitHub
-github_ssh_sk() {
-	_generate_github_ssh_key "ed25519-sk"
 }
 
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/cp
@@ -98,30 +135,124 @@ function fs() {
 	fi
 }
 
-# git add, commit
-function gac() {
-	local message="$1"
+# github
+{
+	# Internal helper function to prompt for email and generate the key
+	_generate_github_ssh_key() {
+		local key_type="$1"
+		local email="${GITHUB_PUBLIC_EMAIL:-}"
 
-	if [[ -n "$message" ]]; then
-		git add .
-		git commit -S -m "$message"
-	else
-		echo "Error: Commit message is not provided"
-		echo "Usage: gac \"Your commit message here\""
-	fi
-}
+		if [[ -z "$email" ]]; then
+			printf '$GITHUB_PUBLIC_EMAIL is unset. Enter GitHub email: '
+			read -r email
+		else
+			printf 'Using $GITHUB_PUBLIC_EMAIL: %s\n' "${GITHUB_PUBLIC_EMAIL}"
+		fi
 
-# git add, commit, push
-function gacp() {
-	local message="$1"
-	local currBranch=$(git symbolic-ref --short -q HEAD)
+		ssh-keygen -t "$key_type" -C "\"$email\""
+	}
 
-	if [[ -n "$message" ]]; then
-		git add -A
-		git commit -S -m "$message"
-		git push origin "$currBranch"
-	else
-		echo "Error: Commit message is not provided"
-		echo "Usage: gacp \"Your commit message here\""
-	fi
+	# Create a standard ed25519 SSH key for GitHub
+	github_ssh_key() {
+		_generate_github_ssh_key "ed25519"
+	}
+
+	# Create an ed25519-sk hardware security key for GitHub
+	github_ssh_sk() {
+		_generate_github_ssh_key "ed25519-sk"
+	}
+
+	_git_add() {
+		if [[ $# -eq 0 ]]; then
+			if ! command git add -A 2>/dev/null; then
+				func_err 'failed to stage changes' "${funcstack[3]}"
+				return 1
+			fi
+		else
+			if ! command git add -- "$@" 2>/dev/null; then
+				func_err 'failed to stage paths' "${funcstack[3]}"
+				return 1
+			fi
+		fi
+	}
+
+	_git_commit() {
+		if ! command git commit -S -m -- "${1}" 2>/dev/null; then
+			func_err 'failed to commit changes' "${funcstack[3]}"
+			return 1
+		fi
+	}
+
+	_git_push() {
+		if ! command git push origin "${1}" 2>/dev/null; then
+			func_err "failed to push to origin/${1}." "${funcstack[3]}"
+			return 1
+		fi
+	}
+
+	_git_current_branch() {
+		command git symbolic-ref --short -q HEAD
+	}
+
+	_git_flow() {
+		local -r do_push="${1:-0}"
+		local -r commit_msg="${2:-}"
+		shift 2
+
+		_git_add "${@}" || return 1
+		_git_commit "${commit_msg}" || return 1
+
+		# return if not pushing
+		[[ "${do_push}" -eq 1 ]] || return 0
+
+		local branch
+		branch="$(_git_current_branch)"
+		if [[ -z "${branch}" ]]; then
+			printf '%s: not on a branch (detached HEAD or not a repo)\n' \
+				"${funcstack[1]}" >&2
+			return 1
+		fi
+
+		_git_push "${branch}" || return 1
+
+	}
+
+	# git add <paths>, commit
+	function gac() {
+		[[ $# -ge 2 && -n "${1}" ]] || {
+			printf 'Usage: gac <commit_msg> <paths...>\n' >&2
+			return 1
+		}
+		shift
+		_git_flow 0 "${1}" "${@}"
+	}
+
+	# git add <paths>, commit, push
+	function gacp() {
+		[[ $# -ge 2 && -n "${1}" ]] || {
+			printf 'Usage: gacp <commit_msg> <paths...>\n' >&2
+			return 1
+		}
+		shift
+		_git_flow 1 "${1}" "${@}"
+
+	}
+
+	# git add -A, commit
+	function gaac() {
+		[[ $# -eq 1 && -n "$1" ]] || {
+			printf 'Usage: gaac <commit_msg>\n' >&2
+			return 1
+		}
+		_git_flow 0 "$1"
+	}
+
+	# git add -A, commit, push
+	function gaacp() {
+		[[ $# -eq 1 && -n "$1" ]] || {
+			printf 'Usage: gaacp <commit_msg>\n' >&2
+			return 1
+		}
+		_git_flow 1 "$1"
+	}
 }
