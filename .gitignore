@@ -4,4 +4,4 @@ configs/user.config.json
 
 tmp/
 
-!modules/cpp/CMakeUserPresets.json
+!CMakeUserPresets.json
