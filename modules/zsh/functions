@@ -13,11 +13,11 @@
 	}
 
 	_cd() {
-		command cd -- "${1}" 2>/dev/null 2>&1
+		command cd -- "${1}" 2>/dev/null
 	}
 
 	_mkdir() {
-		command mkdir "${@}" 2>/dev/null 2>&1
+		command mkdir "${@}" 2>/dev/null
 	}
 
 }
@@ -39,7 +39,7 @@ function mkcd() {
 			;;
 		-m)
 			if [[ $# -lt 2 ]]; then
-				func_err "option requires an argument ${1}"
+				func_err "option ${1} requires an argument (e.g. 755)"
 				printf '%s\n' "${msg}" >&2
 				return 1
 			fi
@@ -70,12 +70,6 @@ function mkcd() {
 	# validate
 	if [[ -z "${target_dir}" ]]; then
 		func_err 'no directory name provided'
-		printf '%s\n' "${msg}" >&2
-		return 1
-	fi
-
-	if [[ "${target_dir}" -gt 1 ]]; then
-		func_err 'too many arguments'
 		printf '%s\n' "${msg}" >&2
 		return 1
 	fi
@@ -176,7 +170,6 @@ function fs() {
 		fi
 	}
 
-
 	_git_commit() {
 		if ! command git commit -S -m "${1}" 2>/dev/null; then
 			func_err 'failed to commit changes' "${funcstack[3]}"
@@ -209,8 +202,7 @@ function fs() {
 		local branch
 		branch="$(_git_current_branch)"
 		if [[ -z "${branch}" ]]; then
-			printf '%s: not on a branch (detached HEAD or not a repo)\n' \
-				"${funcstack[1]}" >&2
+			func_err 'not on a branch (detached HEAD or not a repo)'
 			return 1
 		fi
 
@@ -234,7 +226,6 @@ function fs() {
 			return 1
 		}
 		_git_flow 1 "${1}" "${@:2}"
-
 	}
 
 	# git add -A, commit
