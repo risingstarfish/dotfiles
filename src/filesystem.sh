@@ -262,7 +262,7 @@ dotfiles::file_perm() {
 			;;
 		modules/git/gitattributes)
 			printf '%s' "${HOME}/.gitattributes"
-						;;
+			;;
 		modules/git/diff-so-fancy)
 			printf '%s' "${HOME}/.local/bin/diff-so-fancy"
 			;;
@@ -288,6 +288,9 @@ dotfiles::file_perm() {
 			;;
 		modules/dev/clang-tidy)
 			printf '%s' "${HOME}/dev/.clang-tidy"
+			;;
+		modules/dev/editorconfig)
+			printf '%s' "${HOME}/dev/.editorconfig"
 			;;
 		# tmux
 		modules/tmux/tmux.conf.*)

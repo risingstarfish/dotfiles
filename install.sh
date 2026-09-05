@@ -13,7 +13,7 @@
 	# constants
 	{
 		if [[ -z "${HOME:-}" || ! -d "$HOME" ]]; then
-			printf 'Error: unable to resolve $HOME'
+			printf 'Error: unable to resolve %s' "${HOME}"
 			exit 1
 		fi
 
@@ -308,6 +308,7 @@
 				"dev/cmake-format.py"
 				"dev/clang-format"
 				"dev/clang-tidy"
+				"dev/editorconfig"
 
 				"topgrade/topgrade.toml"
 
@@ -878,6 +879,7 @@ EOF
 
 EOF
 		}
+
 		dotfiles::print_end() {
 			if dotfiles::is_true "${DOTFILES_AUTORESTART}"; then
 				cat <<'EOF'
@@ -2674,6 +2676,6 @@ EOF
 
 		exit 0
 	}
-	main "$@" || exit 1
+	main "$@"
 	####################
 }
