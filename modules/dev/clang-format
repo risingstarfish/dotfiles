@@ -6,7 +6,7 @@ Standard: Auto
 # Indentation and spacing
 IndentWidth: 4
 TabWidth: 4
-UseTab: ForContinuationAndIndentation
+UseTab: Never
 ContinuationIndentWidth: 2
 AccessModifierOffset: -4
 
