@@ -5,3 +5,4 @@ configs/user.config.json
 tmp/
 
 !CMakeUserPresets.json
+!bin/

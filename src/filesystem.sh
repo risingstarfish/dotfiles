@@ -262,6 +262,9 @@ dotfiles::file_perm() {
 			;;
 		modules/git/gitattributes)
 			printf '%s' "${HOME}/.gitattributes"
+						;;
+		modules/git/diff-so-fancy)
+			printf '%s' "${HOME}/.local/bin/diff-so-fancy"
 			;;
 		# ssh
 		modules/ssh/config)

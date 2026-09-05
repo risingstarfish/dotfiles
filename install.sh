@@ -278,6 +278,8 @@
 			[[ -n "${AVAILABLE_MODULES:-}" ]] && return 0
 			# order matters for help message
 			# * == TARGET_OS
+			# FIXME: declare -A
+
 			AVAILABLE_MODULES=(
 				"zsh/zshrc"
 				"zsh/zsh_options"
@@ -296,6 +298,7 @@
 				"git/gitconfig.local.*"
 				"git/gitignore"
 				"git/gitattributes"
+				"git/diff-so-fancy"
 
 				"ssh/config"
 				"ssh/allowed_signers.gen"
@@ -1481,6 +1484,7 @@ EOF
 		}
 
 		dotfiles::repair_symlink() {
+			printf "\n\nFIXME: broken\n\n"
 			# TODO: check manifest -> compare to installed/symlink modules
 			local -a orphans=()
 			local src
