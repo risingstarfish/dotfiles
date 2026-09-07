@@ -420,7 +420,8 @@
 
 			local choice
 			while true; do
-				if ! read -r -p '\nDo you want to continue anyway? [y/N]: ' choice; then
+				echo
+				if ! read -r -p 'Do you want to continue anyway? [y/N]: ' choice; then
 					dotfiles::println 'Error: No input available for prompt.' >&2
 					return 1
 				fi
