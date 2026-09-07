@@ -16,11 +16,11 @@
 # directory navigation
 {
 	function _rs_cd() {
-		command cd -- "${1}" 2>/dev/null
+		cd -- "${1}" 2>/dev/null
 	}
 
 	function _rs_mkdir() {
-		command mkdir "${@}" 2>/dev/null
+		mkdir "${@}" 2>/dev/null
 	}
 
 	# Create a new directory and enter it
@@ -251,20 +251,4 @@ function fs() {
 		_git_flow 1 "$1"
 	}
 
-	# compdef
-	{
-		function _compdef_ga() {
-			_arguments -s : \
-				'1:msg:' \
-				'*:paths:_files -/'
-		}
-		compdef _compdef_ga gac
-		compdef _compdef_ga gacp
-
-		function _compdef_gaa() {
-			_arguments -s : '1:msg:'
-		}
-		compdef _compdef_gaa gaac
-		compdef _compdef_gaa gaacp
-	}
 }
