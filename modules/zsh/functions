@@ -83,10 +83,10 @@
 		if [[ -d "${target_dir}" ]]; then
 			if _rs_cd "${target_dir}"; then
 				return 0
-			else
-				_err "could not change to directory ${target_dir}"
-				return 1
 			fi
+			
+			_err "could not change to directory ${target_dir}"
+			return 1
 		fi
 
 		# create
