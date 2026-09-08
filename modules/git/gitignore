@@ -118,3 +118,4 @@ conan_package/
 
 #python
 .mypy_cache
+**/.claude/settings.local.json

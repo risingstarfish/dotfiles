@@ -1,0 +1,8 @@
+The FATCAT project has three binaries, FATCAT (main program), FATCATQue.pl, and FATCATSearch.pl. The main binary in FATCAT.c builds an AFPCHAIN object (AFPchain.C) from two .pdb files and creates two PROT structures via PROT::AssignPDB() in Prot.C. It then runs AFPCHAIN::ExtractAfp()/SortAfp() from AFPchain.C, the chaining DP in AFPCHAIN::doChainAfp()/TraceBack, per-block realignment using SALNOPT::Optimize() in SAlnOpt.C, significance via SIGEVA::calSigAll in SigEva.C, and finally cli flag-gated output in FATCAT.C via AFPchain.C AFPCHAIN::Display(), Report(), and ShtReport(). The modules/files to touch are PROT::AssignPdb in Prot.C, AFPCHAIN constructor(s) (ctor) in AFPchain.C, and main in FATCAT.C
+
+A good solution would reuse the ARRAY/STASIS namespace templates in tempkit.h and the sized-buffer idiom, AFPchain.C, and the install script 'Install'.
+
+Callers of the functions: PROT::AssignPdb, AFPChain ctor,, POSTALIGN::ReadPdb ReadFastaAln, ReadClustalAln.
+Consumers of output: The report, extalign, extprob functions in FATCATDBSearch.C, fatcatcatparser.pl, fatcatparser_t.pl, FATCATQue.pl, and FATCATSearch.pl. 
+
+There are no tests in this project.

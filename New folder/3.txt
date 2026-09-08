@@ -1,0 +1,1 @@
+FATCAT is a legacy repo because there are zero tests or CI. Much of modern programming is attempting to modernize these legacy programs. A postdoc or lab engineer who had an alignment fail 30 minutes in would want to know what failed and why instead of simply exiting with no understanding. This could potentially be considered maintenance, not necessarily a feature.
