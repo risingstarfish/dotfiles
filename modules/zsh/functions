@@ -251,4 +251,98 @@ function fs() {
 		_git_flow 1 "$1"
 	}
 
+	# compdef
+	function _compdef_ga() {
+		_arguments -s : \
+			'1:msg:' \
+			'*:paths:_files -/'
+	}
+	compdef _compdef_ga gac
+	compdef _compdef_ga gacp
+
+	function _compdef_gaa() {
+		_arguments -s : '1:msg:'
+	}
+	compdef _compdef_gaa gaac
+	compdef _compdef_gaa gaacp
+
+	# initialise git repo (default)
+	# should be used in base repo directory
+	function git_init() {
+		if ! command git init 2>/dev/null; then
+			_func_err 'failed to initialise repository' "${funcstack[1]}"
+			return 1
+		fi
+
+		# TODO: if file already exists, warn at end and state --force to overwrite
+		local -r -a all_files=("LICENSE"
+			"README.md"
+			"CMakeLists.txt"
+			"CMakeUserPresets.json"
+			".clang-format"
+			".clang-tidy"
+			".cmake-format.py"
+			".editorconfig"
+			".gitignore"
+		)
+		local -r -a all_dirs=(
+			"test"
+			"src/"
+			"include/${project_name}"
+			"doc"
+			"cmake"
+			"example"
+			"module"
+		)
+		local -r -a all_modules=() # all_files + all_dirs
+
+		local -a include_modules=()
+		local -a exclude_modules=()
+		local do_force=0
+
+		while [[ $# -gt 0 ]]; do
+			case "${1}" in
+			-h | --help)
+				_init_help_msg
+				return 0
+				;;
+			-i | --include)
+				if [[ -z "${2:-}" || "$2" == -* ]]; then
+					printf 'Error: Missing argument for %s.\n' "$1" >&2
+					exit 1
+				fi
+				include_modules+=("${2}")
+				shift 2
+				;;
+			-i=* | --include=*)
+				include_modules+=("${1#*=}")
+				shift
+				;;
+			-x | --exclude)
+				if [[ -z "${2:-}" || "$2" == -* ]]; then
+					printf 'Error: Missing argument for %s.\n' "$1" >&2
+					exit 1
+				fi
+				exclude_modules+=("${2}")
+				shift 2
+				;;
+			-x=* | --exclude=*)
+				exclude_modules+=("${1#*=}")
+				shift
+				;;
+			-l | --list)
+				# TODO: list options
+				return 0
+				;;
+			-f | --force)
+				do_force=1
+				;;
+			*)
+				printf 'Error: Invalid parameter "%s"\n' "{$1}" >&2
+				printf "Run \`%s %s --help\` for valid options.\n" "${funcstack[1]}" "$(basename "$0")" >&2
+				return 1
+				;;
+			esac
+		done
+	}
 }

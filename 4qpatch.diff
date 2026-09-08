@@ -1,0 +1,962 @@
+diff --git a/FATCATMain/AFP.h b/FATCATMain/AFP.h
+index 8182419..5f236ce 100644
+--- a/FATCATMain/AFP.h
++++ b/FATCATMain/AFP.h
+@@ -100,7 +100,11 @@ class AFP
+ 		}
+ 
+ 		//assign a given afp to this
+-		void	operator = (AFP &afp) 
++		//NOTE: parameter changed from "AFP &afp" to "const AFP &afp" so that
++		//std::vector<AFP>'s internal move/copy paths (which bind to rvalues,
++		//i.e. via std::move) can call this operator under modern (C++11+)
++		//libstdc++; behavior is unchanged since the body never modifies afp.
++		void	operator = (const AFP &afp)
+ 		{
+ 			i = afp.i;
+ 			j = afp.j;
+diff --git a/FATCATMain/AFPchain.C b/FATCATMain/AFPchain.C
+index 7120388..bf41476 100644
+--- a/FATCATMain/AFPchain.C
++++ b/FATCATMain/AFPchain.C
+@@ -8,6 +8,8 @@
+ 
+ #include <cstring>
+ #include <cstdlib>
++#include <cstdio>
++#include <cstdarg>
+ 
+ #include "AFPchain.h"
+ #include "SAlnOpt.h"
+@@ -62,16 +64,24 @@ AFPCHAIN::AFPCHAIN(char *file1, int s1, int l1, char *file2, int s2, int l2, int
+ 	strcpy(pro2Name, file2 + p2);
+ 
+ 	pro1 = new PROT(file1, s1, l1);
++	if(pro1->GetErr() != PDB_OK)	{
++		SetErr(pro1->GetErr(), pro1->GetErrLine(), "%s: %s", file1, pro1->GetErrDetail());
++		return; //bail out before touching pro1's (partially invalid) data
++	}
+ 	pro1Len = pro1->length;
+ 	if(debug)	printf("protein 1 %s len %d\n", pro1Name, pro1Len);
+ 
+ 	pro2 = new PROT(file2, s2, l2);
++	if(pro2->GetErr() != PDB_OK)	{
++		SetErr(pro2->GetErr(), pro2->GetErrLine(), "%s: %s", file2, pro2->GetErrDetail());
++		return; //bail out before touching pro2's (partially invalid) data
++	}
+ 	pro2Len = pro2->length;
+ 	if(debug)	printf("protein 2 %s len %d\n", pro2Name, pro2Len);
+ 
+ 	if(pro1Len <= 0 || pro2Len <= 0)	{
+-		printf("Wrong pdb read %d %d\n", pro1Len, pro2Len);
+-		exit(1);
++		SetErr(PDB_TRUNCATED, 0, "parsed pdb produced a zero-length protein (len1 %d, len2 %d)", pro1Len, pro2Len);
++		return;
+ 	}
+ 
+ 	if(pro1Len < pro2Len)	minLen = pro1Len;
+@@ -146,6 +156,42 @@ void AFPCHAIN::Initial(void)
+ 	showtime = 0;
+ 
+ 	disTable1 = disTable2 = NULL;
++
++	err = PDB_OK;
++	errLine = 0;
++	errDetail[0] = '\0';
++}
++
++//------------------------------------------------------------------
++//record a parse error propagated from pro1/pro2 (or detected locally)
++//------------------------------------------------------------------
++PdbErr AFPCHAIN::SetErr(PdbErr code, int line, const char *fmt, ...)
++{
++	err = code;
++	errLine = line;
++	va_list ap;
++	va_start(ap, fmt);
++	vsnprintf(errDetail, sizeof(errDetail), fmt, ap);
++	va_end(ap);
++	return err;
++}
++
++//------------------------------------------------------------------
++PdbErr AFPCHAIN::GetErr(void) const
++{
++	return err;
++}
++
++//------------------------------------------------------------------
++int AFPCHAIN::GetErrLine(void) const
++{
++	return errLine;
++}
++
++//------------------------------------------------------------------
++const char* AFPCHAIN::GetErrDetail(void) const
++{
++	return errDetail;
+ }
+ 
+ //------------------------------------------------------------------
+diff --git a/FATCATMain/AFPchain.h b/FATCATMain/AFPchain.h
+index 01b68a6..36c3949 100644
+--- a/FATCATMain/AFPchain.h
++++ b/FATCATMain/AFPchain.h
+@@ -126,7 +126,13 @@ class AFPCHAIN	{
+ 		int	showtime;
+ 		time_t	bgtime;		//the starting time for this job 
+ 
++		//parse-error state, propagated from pro1/pro2 (see PROT::GetErr)
++		PdbErr	err;
++		int	errLine;
++		char	errDetail[512];
++
+ 		void	Initial(void);	//initial the class
++		PdbErr	SetErr(PdbErr code, int line, const char *fmt, ...); //record a parse error
+ 		void	SetParameters(void);	//setup the parameters
+ 		void	Calloc(void);	//calloc the variants
+ 		void	ExtractAfp(void); 	//assign AFPs simply based on equal length fragments
+@@ -165,6 +171,9 @@ class AFPCHAIN	{
+ 		AFPCHAIN(char *file1, char *file2, int sps, char *output);
+ 		AFPCHAIN(char *file1, int s1, int l1, char *file2, int s2, int l2, int sps, char *output);
+ 		~AFPCHAIN();
++		PdbErr	GetErr(void) const;        //PDB_OK unless pdb parsing failed for pro1/pro2
++		int	GetErrLine(void) const;     //the 1-based input line where parsing failed, or 0 if n/a
++		const char*	GetErrDetail(void) const;   //human readable detail message
+ 		void	ShowAfp(int ifcolor); //show AFP in ps format
+ 		void 	ChainAfp(void);	 //chain the AFPs
+ 		void 	RChainAfp(void); //chain the AFPs without flexibility(rigid structural alignment)
+diff --git a/FATCATMain/Align0.C b/FATCATMain/Align0.C
+index 554dd4f..0ddd0f3 100644
+--- a/FATCATMain/Align0.C
++++ b/FATCATMain/Align0.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "Align0.h"
+ #include "Amino.h"
+ 
+diff --git a/FATCATMain/Amino.C b/FATCATMain/Amino.C
+index 98ed334..de9237c 100644
+--- a/FATCATMain/Amino.C
++++ b/FATCATMain/Amino.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "Amino.h"
+ 
+ char AMINO::AA3[AANUM][5] = {"GLY", "ALA", "PRO", "CYS", "THR", "SER",
+diff --git a/FATCATMain/FATCAT b/FATCATMain/FATCAT
+index d496f73..7220c23 100755
+Binary files a/FATCATMain/FATCAT and b/FATCATMain/FATCAT differ
+diff --git a/FATCATMain/FATCAT.C b/FATCATMain/FATCAT.C
+index 7ce8fd5..a4f7447 100644
+--- a/FATCATMain/FATCAT.C
++++ b/FATCATMain/FATCAT.C
+@@ -1,5 +1,6 @@
+ #include <cstring> 
+ #include <cstdlib> 
++#include <cstdio>
+ 
+ #include "AFPchain.h"
+ 
+@@ -83,6 +84,17 @@ int main(int argc, char *argv[])
+ 	sprintf(pdb2f, "%s/%s", dir2, pdb2);
+ 	AFPCHAIN	*afpc = new AFPCHAIN(pdb1f, s1, l1, pdb2f, s2, l2, sparse, file0);
+ 
++	if(afpc->GetErr() != PDB_OK)	{
++		if(afpc->GetErrLine() > 0)
++			fprintf(stderr, "FATCAT: error: %s (line %d): %s\n",
++				PdbErrStr(afpc->GetErr()), afpc->GetErrLine(), afpc->GetErrDetail());
++		else
++			fprintf(stderr, "FATCAT: error: %s: %s\n",
++				PdbErrStr(afpc->GetErr()), afpc->GetErrDetail());
++		delete afpc;
++		exit(1);
++	}
++
+ 	if(showt)	afpc->ShowTimeSet();
+ 
+ 	if(ft)	{
+diff --git a/FATCATMain/FATCAT2Tree b/FATCATMain/FATCAT2Tree
+index 7d44421..1a9bf08 100755
+Binary files a/FATCATMain/FATCAT2Tree and b/FATCATMain/FATCAT2Tree differ
+diff --git a/FATCATMain/FATCAT2Tree.C b/FATCATMain/FATCAT2Tree.C
+index a81478e..9361337 100644
+--- a/FATCATMain/FATCAT2Tree.C
++++ b/FATCATMain/FATCAT2Tree.C
+@@ -1,5 +1,7 @@
+ //this program is for output the distance matrix based on
+ //twists and scores, respectively in one file
++#include <cstring>
++#include <cstdio>
+ #include "AFPchain.h"
+ #include "hiCluster.h"
+ #include "tempkit.h"
+@@ -110,6 +112,17 @@ int main(int argc, char *argv[])
+ 
+ 				AFPCHAIN        *afpc = new AFPCHAIN(pdb1f, s1, l1, pdb2f, s2, l2, 0, file0);
+ 
++				if(afpc->GetErr() != PDB_OK)	{
++					if(afpc->GetErrLine() > 0)
++						fprintf(stderr, "FATCAT2Tree: error: %s (line %d): %s\n",
++							PdbErrStr(afpc->GetErr()), afpc->GetErrLine(), afpc->GetErrDetail());
++					else
++						fprintf(stderr, "FATCAT2Tree: error: %s: %s\n",
++							PdbErrStr(afpc->GetErr()), afpc->GetErrDetail());
++					delete afpc;
++					exit(1);
++				}
++
+ 				if(rgd) afpc->RChainAfp();
+ 				else    afpc->ChainAfp();
+ 
+diff --git a/FATCATMain/FATCATDB b/FATCATMain/FATCATDB
+index 4b93ece..07e8f05 100755
+Binary files a/FATCATMain/FATCATDB and b/FATCATMain/FATCATDB differ
+diff --git a/FATCATMain/FATCATDB.C b/FATCATMain/FATCATDB.C
+index d91e386..2f05232 100644
+--- a/FATCATMain/FATCATDB.C
++++ b/FATCATMain/FATCATDB.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "FATCATDB.h"
+ #include "HtmlReport.h"
+ #include "SigEva.h"
+diff --git a/FATCATMain/FATCATDBSearch.C b/FATCATMain/FATCATDBSearch.C
+index bb5973b..a64488c 100644
+--- a/FATCATMain/FATCATDBSearch.C
++++ b/FATCATMain/FATCATDBSearch.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "FATCATDB.h"
+ 
+ /*
+diff --git a/FATCATMain/FATPAT b/FATCATMain/FATPAT
+index 698ed78..f12df94 100755
+Binary files a/FATCATMain/FATPAT and b/FATCATMain/FATPAT differ
+diff --git a/FATCATMain/FatDom.C b/FATCATMain/FatDom.C
+index e374f6c..a42ae77 100644
+--- a/FATCATMain/FatDom.C
++++ b/FATCATMain/FatDom.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "FatDom.h"
+ 
+ using namespace ARRAY;
+diff --git a/FATCATMain/FatPatMain.C b/FATCATMain/FatPatMain.C
+index e225000..6f56b35 100644
+--- a/FATCATMain/FatPatMain.C
++++ b/FATCATMain/FatPatMain.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ #include "FatDom.h"
+ 
+ int main(int argc, char *argv[])
+diff --git a/FATCATMain/PostAlign.C b/FATCATMain/PostAlign.C
+index 761e722..80fa9d2 100644
+--- a/FATCATMain/PostAlign.C
++++ b/FATCATMain/PostAlign.C
+@@ -4,6 +4,9 @@
+ //construct the complex structure according to the alignment file
+ //------------------------------------------------------------------
+ 
++#include <cstring>
++#include <cstdio>
++#include <cstdarg>
+ #include "tempkit.h"
+ #include "geometry.h"
+ #include "PostAlign.h"
+@@ -39,6 +42,7 @@ void POSTALIGN::GetInput(char *file1, char *file2, char *name1, char *name2, cha
+ 	strcpy(pro2Name, name2);
+ 
+ 	ReadPdb(file1, file2);
++	if(err != PDB_OK)	return; //ReadPdb already recorded the error, do not touch invalid state
+ 
+ 	Calloc();
+ 
+@@ -52,18 +56,26 @@ void POSTALIGN::GetInput(char *file1, char *file2, char *name1, char *name2, cha
+ void POSTALIGN::ReadPdb(char *file1, char *file2)
+ {
+ 	pro1 = new PROT(file1);
++	if(pro1->GetErr() != PDB_OK)	{
++		SetErr(pro1->GetErr(), pro1->GetErrLine(), "%s: %s", file1, pro1->GetErrDetail());
++		return; //bail out before touching pro1's (partially invalid) data
++	}
+ 	pro1Len = pro1->GetLength();
+ 	proseq1 = new char[pro1Len + 1];
+ 	pro1->GetSAA(proseq1);
+ 
+ 	pro2 = new PROT(file2);
++	if(pro2->GetErr() != PDB_OK)	{
++		SetErr(pro2->GetErr(), pro2->GetErrLine(), "%s: %s", file2, pro2->GetErrDetail());
++		return; //bail out before touching pro2's (partially invalid) data
++	}
+ 	pro2Len = pro2->GetLength();
+ 	proseq2 = new char[pro2Len + 1];
+ 	pro2->GetSAA(proseq2);
+ 
+ 	if(pro1Len <= 0 || pro2Len <= 0)	{
+-		printf("Wrong pdb read %d %d\n", pro1Len, pro2Len);
+-		exit(1);
++		SetErr(PDB_TRUNCATED, 0, "parsed pdb produced a zero-length protein (len1 %d, len2 %d)", pro1Len, pro2Len);
++		return;
+ 	}
+ 
+ 	if(pro1Len < pro2Len)	minLen = pro1Len;
+@@ -102,6 +114,42 @@ void POSTALIGN::Initial(void)
+ 	rotateIdx = 0;
+ 	chain1 = 'A';
+ 	chain2 = 'B';
++
++	err = PDB_OK;
++	errLine = 0;
++	errDetail[0] = '\0';
++}
++
++//------------------------------------------------------------------
++//record a parse error propagated from pro1/pro2 or the alignment file
++//------------------------------------------------------------------
++PdbErr POSTALIGN::SetErr(PdbErr code, int line, const char *fmt, ...)
++{
++	err = code;
++	errLine = line;
++	va_list ap;
++	va_start(ap, fmt);
++	vsnprintf(errDetail, sizeof(errDetail), fmt, ap);
++	va_end(ap);
++	return err;
++}
++
++//------------------------------------------------------------------
++PdbErr POSTALIGN::GetErr(void) const
++{
++	return err;
++}
++
++//------------------------------------------------------------------
++int POSTALIGN::GetErrLine(void) const
++{
++	return errLine;
++}
++
++//------------------------------------------------------------------
++const char* POSTALIGN::GetErrDetail(void) const
++{
++	return errDetail;
+ }
+ 
+ //------------------------------------------------------------------
+@@ -668,12 +716,25 @@ void POSTALIGN::ReadFastaAln(char *file, char *name1, char *name2)
+ {
+ 	//read alignment file in fasta format
+ 	ifstream in(file);
+-	if(!in)	{ printf("open %s error\n", file); exit(1); }
++	if(!in)	{
++		SetErr(PDB_NOFILE, 0, "cannot open alignment file %s", file);
++		return;
++	}
+ 	int	lab = 0;
+ 	alnseq1[0] = alnseq2[0] = 0;
+-	char	str[1001], tmp[1000];
++	char	str[MAXLEN], tmp[MAXLEN];
++	int	lineNo = 0;
++	int	cap = pro1Len + pro2Len; //the capacity Calloc() reserved for alnseq1/alnseq2
+ 	while(!in.eof())	{
+-		in.getline(str, 1000);
++		str[0] = '\0';
++		in.getline(str, MAXLEN);
++		lineNo ++;
++		if(in.fail() && !in.eof())	{
++			in.close();
++			SetErr(PDB_TOO_LONG, lineNo,
++				"line exceeds the %d character limit (MAXLEN) in alignment file %s", MAXLEN - 1, file);
++			return;
++		}
+ 		if(str[0] == '>')	{ 
+ 			sscanf(str + 1, "%s", tmp);
+ 			if(!strcmp(tmp, name1))	{	
+@@ -686,17 +747,35 @@ void POSTALIGN::ReadFastaAln(char *file, char *name1, char *name2)
+ 		}
+ 		else if(strlen(str) >= 1)	{
+ 			if(lab == 1)	{
++				if((int)(strlen(alnseq1) + strlen(str)) > cap)	{
++					in.close();
++					SetErr(PDB_TOO_LONG, lineNo,
++						"%s sequence in alignment file %s exceeds the expected length (%d)", name1, file, cap);
++					return;
++				}
+ 				strcat(alnseq1, str);
+ 			}
+ 			else if(lab == 2)	{
++				if((int)(strlen(alnseq2) + strlen(str)) > cap)	{
++					in.close();
++					SetErr(PDB_TOO_LONG, lineNo,
++						"%s sequence in alignment file %s exceeds the expected length (%d)", name2, file, cap);
++					return;
++				}
+ 				strcat(alnseq2, str);
+ 			}
+ 		}
+ 	}
+ 	in.close();
+ 
+-	if(alnseq1[0] == 0)	{ printf("can not find %s sequence in the alignment file or the format is not correct\n", name1); exit(1); }
+-	if(alnseq2[0] == 0)	{ printf("can not find %s sequence in the alignment file or the format is not correct\n", name2); exit(1); }
++	if(alnseq1[0] == 0)	{
++		SetErr(PDB_MALFORMED, 0, "can not find %s sequence in the alignment file %s or the format is not correct", name1, file);
++		return;
++	}
++	if(alnseq2[0] == 0)	{
++		SetErr(PDB_MALFORMED, 0, "can not find %s sequence in the alignment file %s or the format is not correct", name2, file);
++		return;
++	}
+ 
+ 	int	len = strlen(alnseq1);
+ 	char	*blockseq = new char[len + 1];
+@@ -712,27 +791,58 @@ void POSTALIGN::ReadClustalAln(char *file, char *name1, char *name2)
+ {
+ 	//read alignment file in clustal format
+ 	ifstream in(file);
+-	if(!in)	{ printf("open %s error\n", file); exit(1); }
++	if(!in)	{
++		SetErr(PDB_NOFILE, 0, "cannot open alignment file %s", file);
++		return;
++	}
+ 	alnseq1[0] = alnseq2[0] = 0;
+-	char	str[1001], tmp[1000], tmp2[1000];
++	char	str[MAXLEN], tmp[MAXLEN], tmp2[MAXLEN];
++	int	lineNo = 0;
++	int	cap = pro1Len + pro2Len; //the capacity Calloc() reserved for alnseq1/alnseq2
+ 	while(!in.eof())	{
+-		in.getline(str, 1000);
++		str[0] = '\0';
++		in.getline(str, MAXLEN);
++		lineNo ++;
++		if(in.fail() && !in.eof())	{
++			in.close();
++			SetErr(PDB_TOO_LONG, lineNo,
++				"line exceeds the %d character limit (MAXLEN) in alignment file %s", MAXLEN - 1, file);
++			return;
++		}
+ 		if(strlen(str) > 3)	{
+ 			sscanf(str, "%s", tmp);
+ 			if(!strcmp(tmp, name1))	{	
+ 				sscanf(str, "%*s%s", tmp2);
++				if((int)(strlen(alnseq1) + strlen(tmp2)) > cap)	{
++					in.close();
++					SetErr(PDB_TOO_LONG, lineNo,
++						"%s sequence in alignment file %s exceeds the expected length (%d)", name1, file, cap);
++					return;
++				}
+ 				strcat(alnseq1, tmp2);
+ 			}
+ 			else if(!strcmp(tmp, name2))	{
+ 				sscanf(str, "%*s%s", tmp2);
++				if((int)(strlen(alnseq2) + strlen(tmp2)) > cap)	{
++					in.close();
++					SetErr(PDB_TOO_LONG, lineNo,
++						"%s sequence in alignment file %s exceeds the expected length (%d)", name2, file, cap);
++					return;
++				}
+ 				strcat(alnseq2, tmp2);
+ 			}
+ 		}
+ 	}
+ 	in.close();
+ 
+-	if(alnseq1[0] == 0)	{ printf("can not find %s sequence in the alignment file or the format is not correct\n", name1); exit(1); }
+-	if(alnseq2[0] == 0)	{ printf("can not find %s sequence in the alignment file or the format is not correct\n", name2); exit(1); }
++	if(alnseq1[0] == 0)	{
++		SetErr(PDB_MALFORMED, 0, "can not find %s sequence in the alignment file %s or the format is not correct", name1, file);
++		return;
++	}
++	if(alnseq2[0] == 0)	{
++		SetErr(PDB_MALFORMED, 0, "can not find %s sequence in the alignment file %s or the format is not correct", name2, file);
++		return;
++	}
+ 
+ 	int	len = strlen(alnseq1);
+ 	char	*blockseq = new char[len + 1];
+diff --git a/FATCATMain/PostAlign.h b/FATCATMain/PostAlign.h
+index a7104ff..b50c2bf 100644
+--- a/FATCATMain/PostAlign.h
++++ b/FATCATMain/PostAlign.h
+@@ -54,7 +54,13 @@ class POSTALIGN	{
+ 		double	*translateList;
+ 		double	*rmsdList;
+ 
++		//parse-error state, propagated from pro1/pro2/alignment file parsing
++		PdbErr	err;
++		int	errLine;
++		char	errDetail[512];
++
+ 		void	Initial(void);	//initial the class
++		PdbErr	SetErr(PdbErr code, int line, const char *fmt, ...); //record a parse error
+ 		void	Calloc(void);	//calloc the variants
+ 		void	WriteScript(PROT *p1, PROT *p2, int bk, int ifopt, char *pdbfile, char *scriptfile);
+ 		void	TransPdb(int n, int *res1, int *res2);
+@@ -65,6 +71,9 @@ class POSTALIGN	{
+ 		POSTALIGN(char *file1, char *file2, char *name1, char *name2, char *alnfile);
+ 		POSTALIGN(char *file1, char *file2, char *name1, char *name2, char *alnfile, char *format);
+ 		~POSTALIGN();
++		PdbErr	GetErr(void) const;        //PDB_OK unless pdb/alignment parsing failed
++		int	GetErrLine(void) const;     //the 1-based input line where parsing failed, or 0 if n/a
++		const char*	GetErrDetail(void) const;   //human readable detail message
+ 		void	GetInput(char *file1, char *file2, char *name1, char *name2, char *alnfile, char *format);
+ 		void	ReadPdb(char *file1, char *file2);
+ 		void	ReadAln(char *alnfile, char *name1, char *name2);
+diff --git a/FATCATMain/PostFATCAT b/FATCATMain/PostFATCAT
+index b1af27a..9221d8d 100755
+Binary files a/FATCATMain/PostFATCAT and b/FATCATMain/PostFATCAT differ
+diff --git a/FATCATMain/PostFATCAT.C b/FATCATMain/PostFATCAT.C
+index bb36c05..d0dfe1f 100644
+--- a/FATCATMain/PostFATCAT.C
++++ b/FATCATMain/PostFATCAT.C
+@@ -1,3 +1,5 @@
++#include <cstring>
++#include <cstdio>
+ #include "PostAlign.h"
+ 
+ //this program is relaced by Align2Struct
+@@ -53,6 +55,18 @@ int main(int argc, char *argv[])
+ 	POSTALIGN	*palign;
+ 	if(ref == 1) 	palign = new POSTALIGN(pdb1file, pdb2file, name1, name2, alignfile);
+ 	else 		palign = new POSTALIGN(pdb2file, pdb1file, name2, name1, alignfile);
++
++	if(palign->GetErr() != PDB_OK)	{
++		if(palign->GetErrLine() > 0)
++			fprintf(stderr, "PostFATCAT: error: %s (line %d): %s\n",
++				PdbErrStr(palign->GetErr()), palign->GetErrLine(), palign->GetErrDetail());
++		else
++			fprintf(stderr, "PostFATCAT: error: %s: %s\n",
++				PdbErrStr(palign->GetErr()), palign->GetErrDetail());
++		delete palign;
++		exit(1);
++	}
++
+ 	if(cpdb[0] != 0 && rasmol[0] != 0)	palign -> WriteTwistPdb(cpdb, chain1[0], chain2[0], rasmol);  
+ 	else if(cpdb[0] != 0)	palign -> WriteTwistPdb(cpdb, chain1[0], chain2[0]);
+ 	if(outfile[0] != 0)	{
+diff --git a/FATCATMain/Prot.C b/FATCATMain/Prot.C
+index a7b56ee..79490bd 100644
+--- a/FATCATMain/Prot.C
++++ b/FATCATMain/Prot.C
+@@ -4,6 +4,8 @@
+ //--------------------------------------------------------------
+ #include <cstring>
+ #include <cstdlib>
++#include <cstdio>
++#include <cstdarg>
+ #include "Prot.h"
+ #include "Amino.h"
+ using namespace AMINO;
+@@ -12,7 +14,8 @@ PROT::PROT(char *file)
+ {
+ 	Initial();
+ 	AssignPdb(file, 0, 100000);
+-	SAA();
++	if(err == PDB_OK)	SAA();
++	else	{ saa = NewArray <char> (1); saa[0] = '\0'; } //keep saa non-NULL/safe; caller must check GetErr()
+ }
+ 
+ //--------------------------------------------------------------
+@@ -20,7 +23,8 @@ PROT::PROT(char *file, int begres, int reslen)
+ {
+ 	Initial();
+ 	AssignPdb(file, begres, reslen);
+-	SAA();
++	if(err == PDB_OK)	SAA();
++	else	{ saa = NewArray <char> (1); saa[0] = '\0'; } //keep saa non-NULL/safe; caller must check GetErr()
+ }
+ 
+ //--------------------------------------------------------------
+@@ -106,6 +110,44 @@ void PROT::Initial(void)
+ 	atmName = NULL;
+ 	atm2Res = NULL;
+ 	saa = NULL;
++
++	err = PDB_OK;
++	errLine = 0;
++	errDetail[0] = '\0';
++}
++
++//--------------------------------------------------------------
++//record a parse error: what (code), where (line, 0 if n/a), and a
++//formatted human-readable detail string. Always returns code, so
++//callers can "return SetErr(...);" directly out of AssignPdb.
++//--------------------------------------------------------------
++PdbErr PROT::SetErr(PdbErr code, int line, const char *fmt, ...)
++{
++	err = code;
++	errLine = line;
++	va_list ap;
++	va_start(ap, fmt);
++	vsnprintf(errDetail, sizeof(errDetail), fmt, ap);
++	va_end(ap);
++	return err;
++}
++
++//--------------------------------------------------------------
++PdbErr PROT::GetErr(void) const
++{
++	return err;
++}
++
++//--------------------------------------------------------------
++int PROT::GetErrLine(void) const
++{
++	return errLine;
++}
++
++//--------------------------------------------------------------
++const char* PROT::GetErrDetail(void) const
++{
++	return errDetail;
+ }
+ 
+ //--------------------------------------------------------------
+@@ -159,25 +201,44 @@ void PROT::AssignPdbCa(char *file)
+ 
+ //read original-pdb files with all atoms 
+ //--------------------------------------------------------------
+-void PROT::AssignPdb(char *file, int begres, int reslen)
++PdbErr PROT::AssignPdb(char *file, int begres, int reslen)
+ {
+ //printf("file %s, begres %d, reslen %d\n", file, begres, reslen);
+ 
++	err = PDB_OK;
++	errLine = 0;
++	errDetail[0] = '\0';
++
+ 	int	i, len, atm, ca, k;
+-	char	str[50000], oldline[50000];
++	char	str[MAXLEN], oldline[MAXLEN];
++	int	lineNo;
+ 	ifstream pdb(file);
+ 	if(!pdb) {
+-		printf("open pdb file %s error\n", file);
+-		exit(1);
++		return SetErr(PDB_NOFILE, 0, "cannot open pdb file %s", file);
+ 	}
+ 
+ 	//extract length of residues and atoms first
+ 	len = atm = 0;
++	oldline[0] = '\0';
++	lineNo = 0;
+ 	while(!pdb.eof())	{
+ 		str[0] = '\0';
+-		pdb.getline(str, 5000);
++		pdb.getline(str, MAXLEN);
++		lineNo ++;
++		if(pdb.fail() && !pdb.eof())	{
++			//the physical line is longer than MAXLEN-1 characters: reject the
++			//file instead of silently truncating/misaligning the rest of the parse
++			pdb.close();
++			return SetErr(PDB_TOO_LONG, lineNo,
++				"line exceeds the %d character limit (MAXLEN) in pdb file %s", MAXLEN - 1, file);
++		}
+ 		if(!strncmp(str, "ENDMDL", 6))	break;
+ 		if(!strncmp(str, "ATOM", 4))	{
++			if((int)strlen(str) < 27)	{
++				pdb.close();
++				return SetErr(PDB_MALFORMED, lineNo,
++					"truncated ATOM record (missing residue index columns) in pdb file %s", file);
++			}
+ 			if(strncmp(str + 22, oldline + 22, 5) || len == 0)	len ++;	
+ 			//bug reported by Martin for case d1tlca_
+ 			atm ++;
+@@ -186,6 +247,11 @@ void PROT::AssignPdb(char *file, int begres, int reslen)
+ 	}
+ 	pdb.close();
+ 
++	if(len == 0)	{
++		return SetErr(PDB_TRUNCATED, lineNo,
++			"no ATOM records found in pdb file %s (file may be empty or truncated)", file);
++	}
++
+ 	//calloc the varibles
+ 	Calloc(len);
+ 	CallocAtm(atm);
+@@ -196,12 +262,27 @@ void PROT::AssignPdb(char *file, int begres, int reslen)
+ 	int	add = -1;
+ 	int	len_bf, atm_bf;
+ 	len_bf = atm_bf = 0;
++	oldline[0] = '\0';
+ 	ifstream pdb2(file);
++	lineNo = 0;
+ 	while(!pdb2.eof())	{
+ 		str[0] = '\0';
+-		pdb2.getline(str, 5000);
++		pdb2.getline(str, MAXLEN);
++		lineNo ++;
++		if(pdb2.fail() && !pdb2.eof())	{
++			pdb2.close();
++			DelArray <int> (caread);
++			return SetErr(PDB_TOO_LONG, lineNo,
++				"line exceeds the %d character limit (MAXLEN) in pdb file %s", MAXLEN - 1, file);
++		}
+ 		if(!strncmp(str, "ENDMDL", 6))	break;
+ 		if(!strncmp(str, "ATOM", 4))	{
++			if((int)strlen(str) < 27)	{
++				pdb2.close();
++				DelArray <int> (caread);
++				return SetErr(PDB_MALFORMED, lineNo,
++					"truncated ATOM record (missing residue index columns) in pdb file %s", file);
++			}
+ 			if(add == -1 || strncmp(str + 22, oldline + 22, 5))	{
+ 				add ++;
+ 				if(add < begres)	{
+@@ -211,17 +292,19 @@ void PROT::AssignPdb(char *file, int begres, int reslen)
+ 				if(add >= reslen + begres)	break; 
+ 					//note: only part structure when begres and reslen are used	
+ 				if(len >= length0)	{
+-					printf("length0 %d\nthis line %s\n", length0, str);
+-					printf("wrong residue read\n");
+-					exit(1);
++					pdb2.close();
++					DelArray <int> (caread);
++					return SetErr(PDB_MALFORMED, lineNo,
++						"residue count exceeds the %d residues counted in the first pass of pdb file %s (file changed between reads?)",
++						length0, file);
+ 				}
+ 				if(len >= 1 && caread[len - 1] == 0)	{
+ 					//printf("Warning: pdb %s, the %s residue has no CA atom, removed!\n", file, index[len - 1]);
+ 					len = len_bf;
+ 					atm = atm_bf;
+ 				} //the residues without CA atom is not considered, Y.Y, Dec 8, 03
+-				sscanf(str + 17, "%s", res[len]);
+-				sscanf(str + 22, "%s", index[len]);
++				sscanf(str + 17, "%4s", res[len]);
++				sscanf(str + 22, "%4s", index[len]);
+ 				res2Atm[len] = atm;
+ 				chain[len] = str[21];
+ 				caread[len] = 0;
+@@ -231,11 +314,25 @@ void PROT::AssignPdb(char *file, int begres, int reslen)
+ 			} //a new residue
+ 			if(add < begres)	continue;	
+ 			if(atm >= atm0)	{
+-				printf("wrong atm read\n");
+-				exit(1);
++				pdb2.close();
++				DelArray <int> (caread);
++				return SetErr(PDB_MALFORMED, lineNo,
++					"atom count exceeds the %d atoms counted in the first pass of pdb file %s (file changed between reads?)",
++					atm0, file);
++			}
++			if((int)strlen(str) < 54)	{
++				pdb2.close();
++				DelArray <int> (caread);
++				return SetErr(PDB_MALFORMED, lineNo,
++					"truncated ATOM record (missing coordinate columns) in pdb file %s", file);
++			}
++			sscanf(str + 12, "%5s", atmName[atm]);
++			if(sscanf(str + 30, "%lf%lf%lf", &atmCod[3*atm], &atmCod[3*atm+1], &atmCod[3*atm+2]) != 3)	{
++				pdb2.close();
++				DelArray <int> (caread);
++				return SetErr(PDB_MALFORMED, lineNo,
++					"could not parse x/y/z coordinates in pdb file %s", file);
+ 			}
+-			sscanf(str + 12, "%s", atmName[atm]);
+-			sscanf(str + 30, "%lf%lf%lf", &atmCod[3*atm], &atmCod[3*atm+1], &atmCod[3*atm+2]);
+ 			if(!strcmp(atmName[atm], "CA"))	{
+ 				if(caread[len - 1] == 0)	{
+ 					for(k = 0; k < 3; k ++)	caCod[3*ca+k] = atmCod[3*atm+k];
+@@ -264,17 +361,26 @@ void PROT::AssignPdb(char *file, int begres, int reslen)
+ 	if(ca != len)	{
+ 		for(i = 0; i < len; i ++) {
+ 			if(caread[i] == 0)	{
+-				printf("Warning: pdb %s, the %s residue has no CA atom!\n", file, index[i]); exit(1);
++				DelArray <int> (caread);
++				return SetErr(PDB_MALFORMED, 0,
++					"residue %s in pdb file %s has no CA atom", index[i], file);
+ 			}
+ 			if(caread[i] > 1)	{
+-				printf("Warning: pdb %s, the %s residue has two CA atom!\n", file, index[i]); exit(1);
++				DelArray <int> (caread);
++				return SetErr(PDB_MALFORMED, 0,
++					"residue %s in pdb file %s has more than one CA atom", index[i], file);
+ 			}
+ 		}
+-		//sprintf(str, "read pdb %s error: %d residues have no CA atoms, residue %d, ca %d!\n", file, len - ca, len, ca);
+-		//DelArray <int> (caread);
+ 		//Y.Y, Dec,8,2003, annoyed by so many not-perfect pdb files
+ 	}
+ 	DelArray <int> (caread);
++
++	if(length <= 0)	{
++		return SetErr(PDB_TRUNCATED, 0,
++			"no usable residues (with a single CA atom) found in pdb file %s", file);
++	}
++
++	return PDB_OK;
+ }
+ 
+ //--------------------------------------------------------------
+diff --git a/FATCATMain/Prot.h b/FATCATMain/Prot.h
+index 9ca74b1..1289d51 100644
+--- a/FATCATMain/Prot.h
++++ b/FATCATMain/Prot.h
+@@ -35,18 +35,28 @@ class PROT	{
+ 		int	length0;
+ 		int	atm0;
+ 
++		//parse-error state: what (err), where (errLine, a separate out-param
++		//rather than folded into the enum), and a human-readable detail string
++		PdbErr	err;
++		int	errLine;
++		char	errDetail[512];
++
+ 		void	Initial(void);
+ 		void	Calloc(int len);
+ 		void	CallocAtm(int atm);
+ 		void	AssignPdbCa(char *file);  //read processed pdb file with only CA coords.
++		PdbErr	SetErr(PdbErr code, int line, const char *fmt, ...); //record a parse error
+ 	public:
+ 		PROT(char *filename);
+ 		PROT(char *filename, int begres, int reslen);
+ 		PROT(void);
+ 		~PROT(void);
+ 		void	SAA(void);
+-		void	AssignPdb(char *file, int begres, int reslen); //read original pdb file
++		PdbErr	AssignPdb(char *file, int begres, int reslen); //read original pdb file, returns PDB_OK on success
+ 		void	AssignPdb(PROT *pro); //read original pdb file
++		PdbErr	GetErr(void) const;        //PDB_OK if no parse error occurred
++		int	GetErrLine(void) const;     //the 1-based input line where parsing failed, or 0 if n/a
++		const char*	GetErrDetail(void) const;   //human readable detail message
+ 		double* Cod4Res(int n, int *list); //return the coordinations for a given residue list
+ 		void	PrintPdb(char forcechain, ofstream &stream);
+ 		double	CalCaRmsd(PROT *pro, int resn, int *res1, int *res2);
+diff --git a/FATCATMain/basic.h b/FATCATMain/basic.h
+index b8739a6..95496f1 100644
+--- a/FATCATMain/basic.h
++++ b/FATCATMain/basic.h
+@@ -18,4 +18,37 @@
+ #define SSDIS   -4.0
+ #define PVALUE  0.25
+ using namespace std;
++
++//------------------------------------------------------------------
++//PDB-parsing error contract.
++//Shared by PROT::AssignPdb, the AFPCHAIN constructor (FATCAT/FATCAT2Tree),
++//and POSTALIGN::ReadPdb/ReadFastaAln/ReadClustalAln (PostFATCAT).
++//A PdbErr code carries *what* went wrong; the line number where parsing
++//failed (if any) is carried separately by each class as an int
++//(PROT::GetErrLine / AFPCHAIN::GetErrLine / POSTALIGN::GetErrLine),
++//not encoded into this enum.
++//------------------------------------------------------------------
++enum PdbErr	{
++	PDB_OK = 0,	//no error, parsing succeeded
++	PDB_NOFILE,	//the input file could not be opened
++	PDB_MALFORMED,	//a record could not be parsed as expected (bad/short columns)
++	PDB_TRUNCATED,	//the file ended before any/enough usable data was read
++	PDB_TOO_LONG,	//a line exceeded the MAXLEN cap, or the file is otherwise oversized
++	PDB_ALLOC	//a memory allocation failed while parsing
++};
++
++//map a PdbErr code to a short, fixed, human readable message
++inline const char* PdbErrStr(PdbErr code)
++{
++	switch(code)	{
++		case PDB_OK:		return "ok";
++		case PDB_NOFILE:	return "could not open file";
++		case PDB_MALFORMED:	return "malformed pdb record";
++		case PDB_TRUNCATED:	return "truncated pdb file (unexpected end of file)";
++		case PDB_TOO_LONG:	return "oversized pdb input (line or file exceeds MAXLEN)";
++		case PDB_ALLOC:		return "memory allocation failed";
++		default:		return "unknown pdb error";
++	}
++}
++
+ #endif
+diff --git a/FATCATMain/basic_73.h b/FATCATMain/basic_73.h
+index 19583af..54e0fe8 100644
+--- a/FATCATMain/basic_73.h
++++ b/FATCATMain/basic_73.h
+@@ -16,4 +16,37 @@
+ #define SSSIM   4.0
+ #define SSDIS   -4.0
+ #define PVALUE  0.25
++
++//------------------------------------------------------------------
++//PDB-parsing error contract.
++//Shared by PROT::AssignPdb, the AFPCHAIN constructor (FATCAT/FATCAT2Tree),
++//and POSTALIGN::ReadPdb/ReadFastaAln/ReadClustalAln (PostFATCAT).
++//A PdbErr code carries *what* went wrong; the line number where parsing
++//failed (if any) is carried separately by each class as an int
++//(PROT::GetErrLine / AFPCHAIN::GetErrLine / POSTALIGN::GetErrLine),
++//not encoded into this enum.
++//------------------------------------------------------------------
++enum PdbErr	{
++	PDB_OK = 0,	//no error, parsing succeeded
++	PDB_NOFILE,	//the input file could not be opened
++	PDB_MALFORMED,	//a record could not be parsed as expected (bad/short columns)
++	PDB_TRUNCATED,	//the file ended before any/enough usable data was read
++	PDB_TOO_LONG,	//a line exceeded the MAXLEN cap, or the file is otherwise oversized
++	PDB_ALLOC	//a memory allocation failed while parsing
++};
++
++//map a PdbErr code to a short, fixed, human readable message
++inline const char* PdbErrStr(PdbErr code)
++{
++	switch(code)	{
++		case PDB_OK:		return "ok";
++		case PDB_NOFILE:	return "could not open file";
++		case PDB_MALFORMED:	return "malformed pdb record";
++		case PDB_TRUNCATED:	return "truncated pdb file (unexpected end of file)";
++		case PDB_TOO_LONG:	return "oversized pdb input (line or file exceeds MAXLEN)";
++		case PDB_ALLOC:		return "memory allocation failed";
++		default:		return "unknown pdb error";
++	}
++}
++
+ #endif
+diff --git a/FATCATMain/basic_90.h b/FATCATMain/basic_90.h
+index b8739a6..95496f1 100644
+--- a/FATCATMain/basic_90.h
++++ b/FATCATMain/basic_90.h
+@@ -18,4 +18,37 @@
+ #define SSDIS   -4.0
+ #define PVALUE  0.25
+ using namespace std;
++
++//------------------------------------------------------------------
++//PDB-parsing error contract.
++//Shared by PROT::AssignPdb, the AFPCHAIN constructor (FATCAT/FATCAT2Tree),
++//and POSTALIGN::ReadPdb/ReadFastaAln/ReadClustalAln (PostFATCAT).
++//A PdbErr code carries *what* went wrong; the line number where parsing
++//failed (if any) is carried separately by each class as an int
++//(PROT::GetErrLine / AFPCHAIN::GetErrLine / POSTALIGN::GetErrLine),
++//not encoded into this enum.
++//------------------------------------------------------------------
++enum PdbErr	{
++	PDB_OK = 0,	//no error, parsing succeeded
++	PDB_NOFILE,	//the input file could not be opened
++	PDB_MALFORMED,	//a record could not be parsed as expected (bad/short columns)
++	PDB_TRUNCATED,	//the file ended before any/enough usable data was read
++	PDB_TOO_LONG,	//a line exceeded the MAXLEN cap, or the file is otherwise oversized
++	PDB_ALLOC	//a memory allocation failed while parsing
++};
++
++//map a PdbErr code to a short, fixed, human readable message
++inline const char* PdbErrStr(PdbErr code)
++{
++	switch(code)	{
++		case PDB_OK:		return "ok";
++		case PDB_NOFILE:	return "could not open file";
++		case PDB_MALFORMED:	return "malformed pdb record";
++		case PDB_TRUNCATED:	return "truncated pdb file (unexpected end of file)";
++		case PDB_TOO_LONG:	return "oversized pdb input (line or file exceeds MAXLEN)";
++		case PDB_ALLOC:		return "memory allocation failed";
++		default:		return "unknown pdb error";
++	}
++}
++
+ #endif
+diff --git a/FATCATMain/hiCluster.C b/FATCATMain/hiCluster.C
+index 223b9d4..212fe78 100644
+--- a/FATCATMain/hiCluster.C
++++ b/FATCATMain/hiCluster.C
+@@ -1,3 +1,4 @@
++#include <cstring>
+ //---------------------------------------------------------------------------------
+ //A class for clustering
+ //single-linkage clustering, average-linkage clustering are realized
