@@ -30,7 +30,7 @@
                 "CMAKE_C_STANDARD": "17",
                 "CMAKE_C_STANDARD_REQUIRED": "ON",
                 "CMAKE_CXX_STANDARD": "23",
-                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_STANDARD_REQUIRED": "OFF",
                 "CMAKE_CXX_EXTENSIONS": "OFF",
                 "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/bin",
                 "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/lib",
@@ -46,13 +46,13 @@
                 "ENABLE_CPPCHECK": "OFF",
                 "ENABLE_CLANG_TIDY": "OFF",
                 "USE_LIBCPP": "OFF",
-                "VISUAL_STUDIO_BUILD_WITH_DEBUG_INFO_FOR_PROFILING": "OFF"
+                "VISUAL_STUDIO_BUILD_WITH_DEBUG_INFO_FOR_PROFILING": "OFF",
+                "SAFEMATH_USE_MODULES": "ON"
             }
         },
         {
             "name": "debug",
             "hidden": true,
-            "inherits": ["base"],
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
             }
@@ -60,7 +60,6 @@
         {
             "name": "release",
             "hidden": true,
-            "inherits": ["base"],
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
@@ -129,6 +128,7 @@
         {
             "name": "host-unix",
             "hidden": true,
+            "inherits": ["base"],
             "condition": {
                 "type": "inList",
                 "string": "${hostSystemName}",
@@ -175,6 +175,7 @@
             "name": "host-windows",
             "description": "Windows settings for MSBuild toolchain that apply to msvc and clang",
             "hidden": true,
+            "inherits": ["base"],
             "condition": {
                 "type": "equals",
                 "lhs": "${hostSystemName}",
@@ -211,7 +212,8 @@
             "inherits": ["host-linux"],
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "$env{SYSTEM}/bin/gcc",
-                "CMAKE_CXX_COMPILER": "$env{SYSTEM}/bin/g++"
+                "CMAKE_CXX_COMPILER": "$env{SYSTEM}/bin/g++",
+                "CMAKE_CXX_STANDARD": "26"
             }
         },
         // --- macOS ---
@@ -221,7 +223,9 @@
             "inherits": ["host-mac"],
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "$env{HOMEBREW_GCC}/bin/gcc-16",
-                "CMAKE_CXX_COMPILER": "$env{HOMEBREW_GCC}/bin/g++-16"
+                "CMAKE_CXX_COMPILER": "$env{HOMEBREW_GCC}/bin/g++-16",
+                "CMAKE_CXX_STANDARD": "26",
+                "CMAKE_CXX_STANDARD_REQUIRED": "ON"
             }
         },
         {
@@ -276,7 +280,8 @@
             "hidden": true,
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "$env{GCC_TRUNK}/bin/gcc$env{EXE}",
-                "CMAKE_CXX_COMPILER": "$env{GCC_TRUNK}/bin/g++$env{EXE}"
+                "CMAKE_CXX_COMPILER": "$env{GCC_TRUNK}/bin/g++$env{EXE}",
+                "CMAKE_CXX_STANDARD": "26"
             }
         },
         {
@@ -284,7 +289,8 @@
             "hidden": true,
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "$env{CLANG_TRUNK}/bin/clang$env{EXE}",
-                "CMAKE_CXX_COMPILER": "$env{CLANG_TRUNK}/bin/clang++$env{EXE}"
+                "CMAKE_CXX_COMPILER": "$env{CLANG_TRUNK}/bin/clang++$env{EXE}",
+                "CMAKE_CXX_STANDARD": "26"
             }
         },
         {
