@@ -1,699 +1,729 @@
 {
-  "version": 12,
-  "cmakeMinimumRequired": {
-    "major": 4,
-    "minor": 4,
-    "patch": 0
-  },
-  "configurePresets": [
-    // ====================
-    // Base
-    // ====================
-    {
-      "name": "base",
-      "description": "General settings that apply to all configurations",
-      "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "installDir": "${sourceDir}/install/${presetName}",
-      "architecture": {
-        "value": "x64",
-        "strategy": "external"
-      },
-      "toolset": {
-        "value": "host=x64",
-        "strategy": "external"
-      },
-      "cacheVariables": {
-        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_C_STANDARD": "17",
-        "CMAKE_C_STANDARD_REQUIRED": "ON",
-        "CMAKE_CXX_STANDARD": "23",
-        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
-        "CMAKE_CXX_EXTENSIONS": "OFF",
-        "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/bin",
-        "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/lib",
-        "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/lib",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
-        // Sanitise
-        "SANITIZE_ADDRESS": "OFF",
-        "SANITIZE_UNDEFINED": "OFF",
-        "SANITIZE_MEMORY": "OFF",
-        "SANITIZE_THREADS": "OFF",
-        //
-        "ENABLE_CPPCHECK": "OFF",
-        "ENABLE_CLANG_TIDY": "OFF",
-        "USE_LIBCPP": "OFF",
-        "VISUAL_STUDIO_BUILD_WITH_DEBUG_INFO_FOR_PROFILING": "OFF"
-      }
+    "version": 12,
+    "cmakeMinimumRequired": {
+        "major": 4,
+        "minor": 4,
+        "patch": 0
     },
-    {
-      "name": "debug",
-      "hidden": true,
-      "inherits": ["base"],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "release",
-      "hidden": true,
-      "inherits": ["base"],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
+    "configurePresets": [
+        // ====================
+        // Base
+        // ====================
+        {
+            "name": "base",
+            "description": "General settings that apply to all configurations",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/install/${presetName}",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "toolset": {
+                "value": "host=x64",
+                "strategy": "external"
+            },
+            "cacheVariables": {
+                "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+                "CMAKE_C_STANDARD": "17",
+                "CMAKE_C_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_STANDARD": "23",
+                "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+                "CMAKE_CXX_EXTENSIONS": "OFF",
+                "CMAKE_RUNTIME_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/bin",
+                "CMAKE_LIBRARY_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/lib",
+                "CMAKE_ARCHIVE_OUTPUT_DIRECTORY": "${sourceDir}/build/${presetName}/lib",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "CMAKE_CXX_SCAN_FOR_MODULES": "OFF",
+                // Sanitise
+                "SANITIZE_ADDRESS": "OFF",
+                "SANITIZE_UNDEFINED": "OFF",
+                "SANITIZE_MEMORY": "OFF",
+                "SANITIZE_THREADS": "OFF",
+                //
+                "ENABLE_CPPCHECK": "OFF",
+                "ENABLE_CLANG_TIDY": "OFF",
+                "USE_LIBCPP": "OFF",
+                "VISUAL_STUDIO_BUILD_WITH_DEBUG_INFO_FOR_PROFILING": "OFF"
+            }
+        },
+        {
+            "name": "debug",
+            "hidden": true,
+            "inherits": ["base"],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release",
+            "hidden": true,
+            "inherits": ["base"],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
 
-    // ====================
-    // Sanitizers
-    // ====================
-    {
-      "name": "feature-asan",
-      "description": "Enable address sanitizer",
-      "hidden": true,
-      "cacheVariables": {
-        "SANITIZE_ADDRESS": "ON"
-      }
-    },
-    {
-      "name": "feature-tsan",
-      "description": "Enable thread sanitizer",
-      "hidden": true,
-      "cacheVariables": {
-        "SANITIZE_THREAD": "ON"
-      }
-    },
-    {
-      "name": "feature-msan",
-      "description": "Enable memory sanitizer",
-      "hidden": true,
-      "cacheVariables": {
-        "SANITIZE_MEMORY": "ON"
-      }
-    },
-    {
-      "name": "feature-ubsan",
-      "description": "Enable undefined sanitizer",
-      "hidden": true,
-      "cacheVariables": {
-        "SANITIZE_UNDEFINED": "ON"
-      }
-    },
-    // Combined
-    {
-      "name": "feature-asan-ubsan",
-      "description": "Enable address and undefined sanitizer",
-      "hidden": true,
-      "inherits": ["feature-asan", "feature-ubsan"]
-    },
-    {
-      "name": "feature-tsan-ubsan",
-      "description": "Enable thread and undefined sanitizer",
-      "hidden": true,
-      "inherits": ["feature-tsan", "feature-ubsan"]
-    },
-    {
-      "name": "feature-msan-ubsan",
-      "description": "Enable memory and undefined sanitizer",
-      "hidden": true,
-      "inherits": ["feature-msan", "feature-ubsan"]
-    },
+        // ====================
+        // Sanitizers
+        // ====================
+        {
+            "name": "feature-asan",
+            "description": "Enable address sanitizer",
+            "hidden": true,
+            "cacheVariables": {
+                "SANITIZE_ADDRESS": "ON"
+            }
+        },
+        {
+            "name": "feature-tsan",
+            "description": "Enable thread sanitizer",
+            "hidden": true,
+            "cacheVariables": {
+                "SANITIZE_THREAD": "ON"
+            }
+        },
+        {
+            "name": "feature-msan",
+            "description": "Enable memory sanitizer",
+            "hidden": true,
+            "cacheVariables": {
+                "SANITIZE_MEMORY": "ON"
+            }
+        },
+        {
+            "name": "feature-ubsan",
+            "description": "Enable undefined sanitizer",
+            "hidden": true,
+            "cacheVariables": {
+                "SANITIZE_UNDEFINED": "ON"
+            }
+        },
+        // Combined
+        {
+            "name": "feature-asan-ubsan",
+            "description": "Enable address and undefined sanitizer",
+            "hidden": true,
+            "inherits": ["feature-asan", "feature-ubsan"]
+        },
+        {
+            "name": "feature-tsan-ubsan",
+            "description": "Enable thread and undefined sanitizer",
+            "hidden": true,
+            "inherits": ["feature-tsan", "feature-ubsan"]
+        },
+        {
+            "name": "feature-msan-ubsan",
+            "description": "Enable memory and undefined sanitizer",
+            "hidden": true,
+            "inherits": ["feature-msan", "feature-ubsan"]
+        },
 
-    // ====================
-    // Host Environment
-    // https://cmake.org/cmake/help/latest/variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME
-    // ====================
-    // --- Unix Base ---
-    {
-      "name": "host-unix",
-      "hidden": true,
-      "condition": {
-        "type": "inList",
-        "string": "${hostSystemName}",
-        "list": ["Darwin", "Linux"]
-      },
-      "environment": {
-        "EXE": "",
-        "SYSTEM": "/usr",
-        "GCC_TRUNK": "$env{HOME}/opt/gcc-trunk",
-        "CLANG_TRUNK": "$env{HOME}/opt/clang-trunk",
-        "CLANG_P2996": "$env{HOME}/opt/gcc-p2996"
-      }
-    },
-    // --- Linux ---
-    {
-      "name": "host-linux",
-      "description": "Unix-like OS settings for gcc and clang toolchains",
-      "hidden": true,
-      "inherits": ["host-unix"],
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Linux"
-      }
-    },
-    // --- macOS ---
-    {
-      "name": "host-mac",
-      "description": "macOS settings for gcc and clang toolchains",
-      "hidden": true,
-      "inherits": ["host-unix"],
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Darwin"
-      },
-      "environment": {
-        "HOMEBREW_GCC": "/opt/homebrew/opt/llvm",
-        "HOMEBREW_CLANG": "/opt/homebrew/opt/gcc"
-      }
-    },
-    // --- Windows ---
-    {
-      "name": "host-windows",
-      "description": "Windows settings for MSBuild toolchain that apply to msvc and clang",
-      "hidden": true,
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      },
-      "environment": {
-        "EXE": ".exe",
-        "GCC_TRUNK": "$env{USERPROFILE}/opt/gcc-trunk",
-        "CLANG_TRUNK": "$env{USERPROFILE}/opt/clang-trunk",
-        "CLANG_P2996": "$env{USERPROFILE}/opt/gcc-p2996",
-        "MSVC": "$env{USERPROFILE}/opt/win-msvc",
-        "MSVC_TRUNK": "$env{USERPROFILE}/opt/win-msvc-trunk",
-        "MSVC_LLVM": "$env{USERPROFILE}/opt/win-msvc-llvm",
-        "MINGW64": "$env{USERPROFILE}/opt/mingw64"
-      }
-    },
+        // ====================
+        // Host Environment
+        // https://cmake.org/cmake/help/latest/variable/CMAKE_SYSTEM_NAME.html#variable:CMAKE_SYSTEM_NAME
+        // ====================
+        // --- Unix Base ---
+        {
+            "name": "host-unix",
+            "hidden": true,
+            "condition": {
+                "type": "inList",
+                "string": "${hostSystemName}",
+                "list": ["Darwin", "Linux"]
+            },
+            "environment": {
+                "EXE": "",
+                "SYSTEM": "/usr",
+                "GCC_TRUNK": "$env{HOME}/opt/gcc-trunk",
+                "CLANG_TRUNK": "$env{HOME}/opt/clang-trunk",
+                "CLANG_P2996": "$env{HOME}/opt/gcc-p2996"
+            }
+        },
+        // --- Linux ---
+        {
+            "name": "host-linux",
+            "description": "Unix-like OS settings for gcc and clang toolchains",
+            "hidden": true,
+            "inherits": ["host-unix"],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        // --- macOS ---
+        {
+            "name": "host-mac",
+            "description": "macOS settings for gcc and clang toolchains",
+            "hidden": true,
+            "inherits": ["host-unix"],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "environment": {
+                "HOMEBREW_CLANG": "/opt/homebrew/opt/llvm",
+                "HOMEBREW_GCC": "/opt/homebrew/opt/gcc"
+            }
+        },
+        // --- Windows ---
+        {
+            "name": "host-windows",
+            "description": "Windows settings for MSBuild toolchain that apply to msvc and clang",
+            "hidden": true,
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "environment": {
+                "EXE": ".exe",
+                "GCC_TRUNK": "$env{USERPROFILE}/opt/gcc-trunk",
+                "CLANG_TRUNK": "$env{USERPROFILE}/opt/clang-trunk",
+                "CLANG_P2996": "$env{USERPROFILE}/opt/gcc-p2996",
+                "MSVC": "$env{USERPROFILE}/opt/win-msvc",
+                "MSVC_TRUNK": "$env{USERPROFILE}/opt/win-msvc-trunk",
+                "MSVC_LLVM": "$env{USERPROFILE}/opt/win-msvc-llvm",
+                "MINGW64": "$env{USERPROFILE}/opt/mingw64"
+            }
+        },
 
-    // ====================
-    // Toolchains
-    // ====================
-    // --- Unix/Linux ---
-    {
-      "name": "unix-clang",
-      "hidden": true,
-      "inherits": ["host-unix"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{SYSTEM}/bin/clang",
-        "CMAKE_CXX_COMPILER": "$env{SYSTEM}/bin/clang++"
-      }
-    },
-    {
-      "name": "linux-gcc",
-      "hidden": true,
-      "inherits": ["host-linux"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{SYSTEM}/bin/gcc",
-        "CMAKE_CXX_COMPILER": "$env{SYSTEM}/bin/g++"
-      }
-    },
-    // --- macOS ---
-    {
-      "name": "mac-homebrew-gcc",
-      "hidden": true,
-      "inherits": ["host-mac"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{HOMEBREW_GCC}/bin/gcc-16",
-        "CMAKE_CXX_COMPILER": "$env{HOMEBREW_GCC}/bin/g++-16"
-      }
-    },
-    {
-      "name": "mac-homebrew-clang",
-      "hidden": true,
-      "inherits": ["host-mac"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{HOMEBREW_CLANG}/bin/clang",
-        "CMAKE_CXX_COMPILER": "$env{HOMEBREW_CLANG}/bin/clang++"
-      }
-    },
-    // --- Windows ---
-    {
-      "name": "win-msvc",
-      "hidden": true,
-      "inherits": ["host-windows"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{MSVC}/bin/cl.exe",
-        "CMAKE_CXX_COMPILER": "$env{MSVC}/bin/cl.exe"
-      }
-    },
-    {
-      "name": "win-msvc-trunk",
-      "hidden": true,
-      "inherits": ["host-windows"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{MSVC_TRUNK}/bin/cl.exe",
-        "CMAKE_CXX_COMPILER": "$env{MSVC_TRUNK}/bin/cl.exe"
-      }
-    },
-    {
-      "name": "win-msvc-llvm",
-      "hidden": true,
-      "inherits": ["host-windows"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{MSVC_LLVM}/bin/clang.exe",
-        "CMAKE_CXX_COMPILER": "$env{MSVC_LLVM}/bin/clang++.exe"
-      }
-    },
-    {
-      "name": "win-mingw64",
-      "hidden": true,
-      "inherits": ["host-windows"],
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{MINGW64}/bin/gcc.exe",
-        "CMAKE_CXX_COMPILER": "$env{MINGW64}/bin/g++.exe"
-      }
-    },
-    // --- Trunk / Experimental ---
-    {
-      "name": "gcc-trunk",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{GCC_TRUNK}/bin/gcc$env{EXE}",
-        "CMAKE_CXX_COMPILER": "$env{GCC_TRUNK}/bin/g++$env{EXE}"
-      }
-    },
-    {
-      "name": "clang-trunk",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{CLANG_TRUNK}/bin/clang$env{EXE}",
-        "CMAKE_CXX_COMPILER": "$env{CLANG_TRUNK}/bin/clang++$env{EXE}"
-      }
-    },
-    {
-      "name": "experimental-clang-p2996",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_C_COMPILER": "$env{CLANG_P2996}/bin/clang$env{EXE}",
-        "CMAKE_CXX_COMPILER": "$env{CLANG_P2996}/bin/clang++$env{EXE}",
-        "CMAKE_CXX_STANDARD": "26",
-        "CMAKE_CXX_FLAGS": "-freflection -fexpansion-statements -stdlib=libc++ -std=c++26"
-      }
-    },
+        // ====================
+        // Toolchains
+        // ====================
+        // --- Unix/Linux ---
+        {
+            "name": "unix-clang",
+            "hidden": true,
+            "inherits": ["host-unix"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{SYSTEM}/bin/clang",
+                "CMAKE_CXX_COMPILER": "$env{SYSTEM}/bin/clang++"
+            }
+        },
+        {
+            "name": "linux-gcc",
+            "hidden": true,
+            "inherits": ["host-linux"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{SYSTEM}/bin/gcc",
+                "CMAKE_CXX_COMPILER": "$env{SYSTEM}/bin/g++"
+            }
+        },
+        // --- macOS ---
+        {
+            "name": "mac-homebrew-gcc",
+            "hidden": true,
+            "inherits": ["host-mac"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{HOMEBREW_GCC}/bin/gcc-16",
+                "CMAKE_CXX_COMPILER": "$env{HOMEBREW_GCC}/bin/g++-16"
+            }
+        },
+        {
+            "name": "mac-homebrew-clang",
+            "hidden": true,
+            "inherits": ["host-mac"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{HOMEBREW_CLANG}/bin/clang",
+                "CMAKE_CXX_COMPILER": "$env{HOMEBREW_CLANG}/bin/clang++"
+            }
+        },
+        // --- Windows ---
+        {
+            "name": "win-msvc",
+            "hidden": true,
+            "inherits": ["host-windows"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{MSVC}/bin/cl.exe",
+                "CMAKE_CXX_COMPILER": "$env{MSVC}/bin/cl.exe"
+            }
+        },
+        {
+            "name": "win-msvc-trunk",
+            "hidden": true,
+            "inherits": ["host-windows"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{MSVC_TRUNK}/bin/cl.exe",
+                "CMAKE_CXX_COMPILER": "$env{MSVC_TRUNK}/bin/cl.exe"
+            }
+        },
+        {
+            "name": "win-msvc-llvm",
+            "hidden": true,
+            "inherits": ["host-windows"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{MSVC_LLVM}/bin/clang.exe",
+                "CMAKE_CXX_COMPILER": "$env{MSVC_LLVM}/bin/clang++.exe"
+            }
+        },
+        {
+            "name": "win-mingw64",
+            "hidden": true,
+            "inherits": ["host-windows"],
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{MINGW64}/bin/gcc.exe",
+                "CMAKE_CXX_COMPILER": "$env{MINGW64}/bin/g++.exe"
+            }
+        },
+        // --- Trunk / Experimental ---
+        {
+            "name": "gcc-trunk",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{GCC_TRUNK}/bin/gcc$env{EXE}",
+                "CMAKE_CXX_COMPILER": "$env{GCC_TRUNK}/bin/g++$env{EXE}"
+            }
+        },
+        {
+            "name": "clang-trunk",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{CLANG_TRUNK}/bin/clang$env{EXE}",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_TRUNK}/bin/clang++$env{EXE}"
+            }
+        },
+        {
+            "name": "experimental-clang-p2996",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "$env{CLANG_P2996}/bin/clang$env{EXE}",
+                "CMAKE_CXX_COMPILER": "$env{CLANG_P2996}/bin/clang++$env{EXE}",
+                "CMAKE_CXX_STANDARD": "26",
+                "CMAKE_CXX_FLAGS": "-freflection -fexpansion-statements -stdlib=libc++ -std=c++26"
+            }
+        },
 
-    // ====================
-    // Standard Presets
-    // ====================
-    // --- Unix/Linux ---
-    {
-      "name": "unix-clang-debug",
-      "displayName": "Clang (Unix) [Debug]",
-      "description": "System Clang on Linux/macOS - Debug build",
-      "inherits": ["debug", "unix-clang"]
-    },
-    {
-      "name": "unix-clang-release",
-      "displayName": "Clang (Unix) [Release]",
-      "description": "System Clang on Linux/macOS - Release build",
-      "inherits": ["release", "unix-clang"]
-    },
-    {
-      "name": "linux-gcc-debug",
-      "displayName": "GCC (Linux) [Debug]",
-      "description": "System GCC on Linux - Debug build",
-      "inherits": ["debug", "linux-gcc"]
-    },
-    {
-      "name": "linux-gcc-release",
-      "displayName": "GCC (Linux) [Release]",
-      "description": "System GCC on Linux - Release build",
-      "inherits": ["release", "linux-gcc"]
-    },
+        // ====================
+        // Standard Presets
+        // ====================
+        // --- Unix/Linux ---
+        {
+            "name": "unix-clang-debug",
+            "displayName": "Clang (Unix) [Debug]",
+            "description": "System Clang on Linux/macOS - Debug build",
+            "inherits": ["debug", "unix-clang"]
+        },
+        {
+            "name": "unix-clang-release",
+            "displayName": "Clang (Unix) [Release]",
+            "description": "System Clang on Linux/macOS - Release build",
+            "inherits": ["release", "unix-clang"]
+        },
+        {
+            "name": "linux-gcc-debug",
+            "displayName": "GCC (Linux) [Debug]",
+            "description": "System GCC on Linux - Debug build",
+            "inherits": ["debug", "linux-gcc"]
+        },
+        {
+            "name": "linux-gcc-release",
+            "displayName": "GCC (Linux) [Release]",
+            "description": "System GCC on Linux - Release build",
+            "inherits": ["release", "linux-gcc"]
+        },
 
-    // --- macOS ---
-    {
-      "name": "mac-homebrew-gcc-debug",
-      "displayName": "GCC (macOS Brew) [Debug]",
-      "description": "Homebrew GCC on macOS - Debug build",
-      "inherits": ["debug", "mac-homebrew-gcc"]
-    },
-    {
-      "name": "mac-homebrew-gcc-release",
-      "displayName": "GCC (macOS Brew) [Release]",
-      "description": "Homebrew GCC on macOS - Release build",
-      "inherits": ["release", "mac-homebrew-gcc"]
-    },
-    {
-      "name": "mac-homebrew-clang-debug",
-      "displayName": "Clang (macOS Brew) [Debug]",
-      "description": "Homebrew Clang on macOS - Debug build",
-      "inherits": ["debug", "mac-homebrew-clang"]
-    },
-    {
-      "name": "mac-homebrew-clang-release",
-      "displayName": "Clang (macOS Brew) [Release]",
-      "description": "Homebrew Clang on macOS - Release build",
-      "inherits": ["release", "mac-homebrew-clang"]
-    },
+        // --- macOS ---
+        {
+            "name": "mac-homebrew-gcc-debug",
+            "displayName": "GCC (macOS Brew) [Debug]",
+            "description": "Homebrew GCC on macOS - Debug build",
+            "inherits": ["debug", "mac-homebrew-gcc"]
+        },
+        {
+            "name": "mac-homebrew-gcc-release",
+            "displayName": "GCC (macOS Brew) [Release]",
+            "description": "Homebrew GCC on macOS - Release build",
+            "inherits": ["release", "mac-homebrew-gcc"]
+        },
+        {
+            "name": "mac-homebrew-clang-debug",
+            "displayName": "Clang (macOS Brew) [Debug]",
+            "description": "Homebrew Clang on macOS - Debug build",
+            "inherits": ["debug", "mac-homebrew-clang"]
+        },
+        {
+            "name": "mac-homebrew-clang-release",
+            "displayName": "Clang (macOS Brew) [Release]",
+            "description": "Homebrew Clang on macOS - Release build",
+            "inherits": ["release", "mac-homebrew-clang"]
+        },
 
-    // --- Windows ---
-    {
-      "name": "win-msvc-debug",
-      "displayName": "MSVC (Windows) [Debug]",
-      "description": "Visual Studio Compiler - Debug build",
-      "inherits": ["debug", "win-msvc"]
-    },
-    {
-      "name": "win-msvc-release",
-      "displayName": "MSVC (Windows) [Release]",
-      "description": "Visual Studio Compiler - Release build",
-      "inherits": ["release", "win-msvc"]
-    },
-    {
-      "name": "win-msvc-trunk-debug",
-      "displayName": "MSVC Trunk (Windows) [Debug]",
-      "description": "Visual Studio Preview/Trunk Compiler - Debug build",
-      "inherits": ["debug", "win-msvc-trunk"]
-    },
-    {
-      "name": "win-msvc-trunk-release",
-      "displayName": "MSVC Trunk (Windows) [Release]",
-      "description": "Visual Studio Preview/Trunk Compiler - Release build",
-      "inherits": ["release", "win-msvc-trunk"]
-    },
-    {
-      "name": "win-msvc-llvm-debug",
-      "displayName": "MSVC LLVM (Windows) [Debug]",
-      "description": "Clang-cl / LLVM for Windows - Debug build",
-      "inherits": ["debug", "win-msvc-llvm"]
-    },
-    {
-      "name": "win-msvc-llvm-release",
-      "displayName": "MSVC LLVM (Windows) [Release]",
-      "description": "Clang-cl / LLVM for Windows - Release build",
-      "inherits": ["release", "win-msvc-llvm"]
-    },
-    {
-      "name": "win-mingw64-debug",
-      "displayName": "MinGW64 (Windows) [Debug]",
-      "description": "GCC on Windows via MinGW64 - Debug build",
-      "inherits": ["debug", "win-mingw64"]
-    },
-    {
-      "name": "win-mingw64-release",
-      "displayName": "MinGW64 (Windows) [Release]",
-      "description": "GCC on Windows via MinGW64 - Release build",
-      "inherits": ["release", "win-mingw64"]
-    },
+        // --- Windows ---
+        {
+            "name": "win-msvc-debug",
+            "displayName": "MSVC (Windows) [Debug]",
+            "description": "Visual Studio Compiler - Debug build",
+            "inherits": ["debug", "win-msvc"]
+        },
+        {
+            "name": "win-msvc-release",
+            "displayName": "MSVC (Windows) [Release]",
+            "description": "Visual Studio Compiler - Release build",
+            "inherits": ["release", "win-msvc"]
+        },
+        {
+            "name": "win-msvc-trunk-debug",
+            "displayName": "MSVC Trunk (Windows) [Debug]",
+            "description": "Visual Studio Preview/Trunk Compiler - Debug build",
+            "inherits": ["debug", "win-msvc-trunk"]
+        },
+        {
+            "name": "win-msvc-trunk-release",
+            "displayName": "MSVC Trunk (Windows) [Release]",
+            "description": "Visual Studio Preview/Trunk Compiler - Release build",
+            "inherits": ["release", "win-msvc-trunk"]
+        },
+        {
+            "name": "win-msvc-llvm-debug",
+            "displayName": "MSVC LLVM (Windows) [Debug]",
+            "description": "Clang-cl / LLVM for Windows - Debug build",
+            "inherits": ["debug", "win-msvc-llvm"]
+        },
+        {
+            "name": "win-msvc-llvm-release",
+            "displayName": "MSVC LLVM (Windows) [Release]",
+            "description": "Clang-cl / LLVM for Windows - Release build",
+            "inherits": ["release", "win-msvc-llvm"]
+        },
+        {
+            "name": "win-mingw64-debug",
+            "displayName": "MinGW64 (Windows) [Debug]",
+            "description": "GCC on Windows via MinGW64 - Debug build",
+            "inherits": ["debug", "win-mingw64"]
+        },
+        {
+            "name": "win-mingw64-release",
+            "displayName": "MinGW64 (Windows) [Release]",
+            "description": "GCC on Windows via MinGW64 - Release build",
+            "inherits": ["release", "win-mingw64"]
+        },
 
-    // --- Trunk / Experimental ---
-    {
-      "name": "gcc-trunk-debug",
-      "displayName": "GCC Trunk [Debug]",
-      "description": "Latest GCC development snapshot - Debug build",
-      "inherits": ["debug", "gcc-trunk"]
-    },
-    {
-      "name": "gcc-trunk-release",
-      "displayName": "GCC Trunk [Release]",
-      "description": "Latest GCC development snapshot - Release build",
-      "inherits": ["release", "gcc-trunk"]
-    },
-    {
-      "name": "clang-trunk-debug",
-      "displayName": "Clang Trunk [Debug]",
-      "description": "Latest Clang development snapshot - Debug build",
-      "inherits": ["debug", "clang-trunk"]
-    },
-    {
-      "name": "clang-trunk-release",
-      "displayName": "Clang Trunk [Release]",
-      "description": "Latest Clang development snapshot - Release build",
-      "inherits": ["release", "clang-trunk"]
-    },
-    {
-      "name": "experimental-clang-p2996-debug",
-      "displayName": "Clang P2996 Reflection [Debug]",
-      "description": "Experimental C++26 Reflection build - Debug",
-      "inherits": ["debug", "experimental-clang-p2996"]
-    },
-    {
-      "name": "experimental-clang-p2996-release",
-      "displayName": "Clang P2996 Reflection [Release]",
-      "description": "Experimental C++26 Reflection build - Release",
-      "inherits": ["release", "experimental-clang-p2996"]
-    },
+        // --- Trunk / Experimental ---
+        {
+            "name": "gcc-trunk-debug",
+            "displayName": "GCC Trunk [Debug]",
+            "description": "Latest GCC development snapshot - Debug build",
+            "inherits": ["debug", "gcc-trunk"]
+        },
+        {
+            "name": "gcc-trunk-release",
+            "displayName": "GCC Trunk [Release]",
+            "description": "Latest GCC development snapshot - Release build",
+            "inherits": ["release", "gcc-trunk"]
+        },
+        {
+            "name": "clang-trunk-debug",
+            "displayName": "Clang Trunk [Debug]",
+            "description": "Latest Clang development snapshot - Debug build",
+            "inherits": ["debug", "clang-trunk"]
+        },
+        {
+            "name": "clang-trunk-release",
+            "displayName": "Clang Trunk [Release]",
+            "description": "Latest Clang development snapshot - Release build",
+            "inherits": ["release", "clang-trunk"]
+        },
+        {
+            "name": "experimental-clang-p2996-debug",
+            "displayName": "Clang P2996 Reflection [Debug]",
+            "description": "Experimental C++26 Reflection build - Debug",
+            "inherits": ["debug", "experimental-clang-p2996"]
+        },
+        {
+            "name": "experimental-clang-p2996-release",
+            "displayName": "Clang P2996 Reflection [Release]",
+            "description": "Experimental C++26 Reflection build - Release",
+            "inherits": ["release", "experimental-clang-p2996"]
+        },
 
-    // ====================
-    // Sanitise Presets
-    // ====================
-    // --- Unix Clang ---
-    // Single
-    {
-      "name": "unix-clang-debug-asan",
-      "displayName": "Clang (Unix) [Debug][ASAN]",
-      "description": "System Clang on Linux/macOS with Address sanitiser",
-      "inherits": ["debug", "unix-clang", "feature-asan"]
-    },
-    {
-      "name": "unix-clang-debug-msan",
-      "displayName": "Clang (Unix) [Debug][MSAN]",
-      "description": "System Clang on Linux/macOS with Memory sanitiser",
-      "inherits": ["debug", "unix-clang", "feature-msan"]
-    },
-    {
-      "name": "unix-clang-debug-tsan",
-      "displayName": "Clang (Unix) [Debug][TSAN]",
-      "description": "System Clang on Linux/macOS with Thread sanitiser",
-      "inherits": ["debug", "unix-clang", "feature-tsan"]
-    },
-    {
-      "name": "unix-clang-debug-ubsan",
-      "displayName": "Clang (Unix) [Debug][UBSAN]",
-      "description": "System Clang on Linux/macOS with Undefined sanitiser",
-      "inherits": ["debug", "unix-clang", "feature-ubsan"]
-    },
-    // Combined
-    {
-      "name": "unix-clang-debug-asan-ubsan",
-      "displayName": "Clang (Unix) [Debug][ASAN][UBSAN]",
-      "description": "System Clang on Linux/macOS with Address and Undefined sanitisers",
-      "inherits": ["debug", "unix-clang", "feature-asan", "feature-ubsan"]
-    },
-    {
-      "name": "unix-clang-debug-msan-ubsan",
-      "displayName": "Clang (Unix) [Debug][MSAN][UBSAN]",
-      "description": "System Clang on Linux/macOS with Memory and Undefined sanitisers",
-      "inherits": ["debug", "unix-clang", "feature-msan", "feature-ubsan"]
-    },
-    {
-      "name": "unix-clang-debug-tsan-ubsan",
-      "displayName": "Clang (Unix) [Debug][TSAN][UBSAN]",
-      "description": "System Clang on Linux/macOS with Thread and Undefined sanitisers",
-      "inherits": ["debug", "unix-clang", "feature-tsan", "feature-ubsan"]
-    },
-    // Linux GCC
-    // Single
-    {
-      "name": "linux-gcc-debug-asan",
-      "displayName": "GCC (Linux) [Debug][ASAN]",
-      "description": "System GCC on Linux with Address sanitiser",
-      "inherits": ["debug", "linux-gcc", "feature-asan"]
-    },
-    {
-      "name": "linux-gcc-debug-msan",
-      "displayName": "GCC (Linux) [Debug][MSAN]",
-      "description": "System GCC on Linux with Memory sanitiser",
-      "inherits": ["debug", "linux-gcc", "feature-msan"]
-    },
-    {
-      "name": "linux-gcc-debug-tsan",
-      "displayName": "GCC (Linux) [Debug][TSAN]",
-      "description": "System GCC on Linux with Thread sanitiser",
-      "inherits": ["debug", "linux-gcc", "feature-tsan"]
-    },
-    {
-      "name": "linux-gcc-debug-ubsan",
-      "displayName": "GCC (Linux) [Debug][UBSAN]",
-      "description": "System GCC on Linux with Undefined sanitiser",
-      "inherits": ["debug", "linux-gcc", "feature-ubsan"]
-    },
-    // Combined
-    {
-      "name": "linux-gcc-debug-asan-ubsan",
-      "displayName": "GCC (Linux) [Debug][ASAN][UBSAN]",
-      "description": "System GCC on Linux with Address and Undefined sanitisers",
-      "inherits": ["debug", "linux-gcc", "feature-asan", "feature-ubsan"]
-    },
-    {
-      "name": "linux-gcc-debug-msan-ubsan",
-      "displayName": "GCC (Linux) [Debug][MSAN][UBSAN]",
-      "description": "System GCC on Linux with Memory and Undefined sanitisers",
-      "inherits": ["debug", "linux-gcc", "feature-msan", "feature-ubsan"]
-    },
-    {
-      "name": "linux-gcc-debug-tsan-ubsan",
-      "displayName": "GCC (Linux) [Debug][TSAN][UBSAN]",
-      "description": "System GCC on Linux with Thread and Undefined sanitisers",
-      "inherits": ["debug", "linux-gcc", "feature-tsan", "feature-ubsan"]
-    },
+        // ====================
+        // Sanitise Presets
+        // ====================
+        // --- Unix Clang ---
+        // Single
+        {
+            "name": "unix-clang-debug-asan",
+            "displayName": "Clang (Unix) [Debug][ASAN]",
+            "description": "System Clang on Linux/macOS with Address sanitiser",
+            "inherits": ["debug", "unix-clang", "feature-asan"]
+        },
+        {
+            "name": "unix-clang-debug-msan",
+            "displayName": "Clang (Unix) [Debug][MSAN]",
+            "description": "System Clang on Linux/macOS with Memory sanitiser",
+            "inherits": ["debug", "unix-clang", "feature-msan"]
+        },
+        {
+            "name": "unix-clang-debug-tsan",
+            "displayName": "Clang (Unix) [Debug][TSAN]",
+            "description": "System Clang on Linux/macOS with Thread sanitiser",
+            "inherits": ["debug", "unix-clang", "feature-tsan"]
+        },
+        {
+            "name": "unix-clang-debug-ubsan",
+            "displayName": "Clang (Unix) [Debug][UBSAN]",
+            "description": "System Clang on Linux/macOS with Undefined sanitiser",
+            "inherits": ["debug", "unix-clang", "feature-ubsan"]
+        },
+        // Combined
+        {
+            "name": "unix-clang-debug-asan-ubsan",
+            "displayName": "Clang (Unix) [Debug][ASAN][UBSAN]",
+            "description": "System Clang on Linux/macOS with Address and Undefined sanitisers",
+            "inherits": ["debug", "unix-clang", "feature-asan", "feature-ubsan"]
+        },
+        {
+            "name": "unix-clang-debug-msan-ubsan",
+            "displayName": "Clang (Unix) [Debug][MSAN][UBSAN]",
+            "description": "System Clang on Linux/macOS with Memory and Undefined sanitisers",
+            "inherits": ["debug", "unix-clang", "feature-msan", "feature-ubsan"]
+        },
+        {
+            "name": "unix-clang-debug-tsan-ubsan",
+            "displayName": "Clang (Unix) [Debug][TSAN][UBSAN]",
+            "description": "System Clang on Linux/macOS with Thread and Undefined sanitisers",
+            "inherits": ["debug", "unix-clang", "feature-tsan", "feature-ubsan"]
+        },
+        // Linux GCC
+        // Single
+        {
+            "name": "linux-gcc-debug-asan",
+            "displayName": "GCC (Linux) [Debug][ASAN]",
+            "description": "System GCC on Linux with Address sanitiser",
+            "inherits": ["debug", "linux-gcc", "feature-asan"]
+        },
+        {
+            "name": "linux-gcc-debug-msan",
+            "displayName": "GCC (Linux) [Debug][MSAN]",
+            "description": "System GCC on Linux with Memory sanitiser",
+            "inherits": ["debug", "linux-gcc", "feature-msan"]
+        },
+        {
+            "name": "linux-gcc-debug-tsan",
+            "displayName": "GCC (Linux) [Debug][TSAN]",
+            "description": "System GCC on Linux with Thread sanitiser",
+            "inherits": ["debug", "linux-gcc", "feature-tsan"]
+        },
+        {
+            "name": "linux-gcc-debug-ubsan",
+            "displayName": "GCC (Linux) [Debug][UBSAN]",
+            "description": "System GCC on Linux with Undefined sanitiser",
+            "inherits": ["debug", "linux-gcc", "feature-ubsan"]
+        },
+        // Combined
+        {
+            "name": "linux-gcc-debug-asan-ubsan",
+            "displayName": "GCC (Linux) [Debug][ASAN][UBSAN]",
+            "description": "System GCC on Linux with Address and Undefined sanitisers",
+            "inherits": ["debug", "linux-gcc", "feature-asan", "feature-ubsan"]
+        },
+        {
+            "name": "linux-gcc-debug-msan-ubsan",
+            "displayName": "GCC (Linux) [Debug][MSAN][UBSAN]",
+            "description": "System GCC on Linux with Memory and Undefined sanitisers",
+            "inherits": ["debug", "linux-gcc", "feature-msan", "feature-ubsan"]
+        },
+        {
+            "name": "linux-gcc-debug-tsan-ubsan",
+            "displayName": "GCC (Linux) [Debug][TSAN][UBSAN]",
+            "description": "System GCC on Linux with Thread and Undefined sanitisers",
+            "inherits": ["debug", "linux-gcc", "feature-tsan", "feature-ubsan"]
+        },
 
-    // --- macOS ---
-    // Single
-    {
-      "name": "mac-homebrew-gcc-debug-asan",
-      "displayName": "GCC (macOS brew) [Debug][ASAN]",
-      "description": "System GCC on macOS with Address sanitiser",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-asan"]
-    },
-    {
-      "name": "mac-homebrew-gcc-debug-msan",
-      "displayName": "GCC (macOS brew) [Debug][MSAN]",
-      "description": "System GCC on macOS with Memory sanitiser",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-msan"]
-    },
-    {
-      "name": "mac-homebrew-gcc-debug-tsan",
-      "displayName": "GCC (macOS brew) [Debug][TSAN]",
-      "description": "System GCC on macOS with Thread sanitiser",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-tsan"]
-    },
-    {
-      "name": "mac-homebrew-gcc-debug-ubsan",
-      "displayName": "GCC (macOS brew) [Debug][UBSAN]",
-      "description": "System GCC on macOS with Undefined sanitiser",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-ubsan"]
-    },
-    // Combined
-    {
-      "name": "mac-homebrew-gcc-debug-asan-ubsan",
-      "displayName": "GCC (macOS brew) [Debug][ASAN][UBSAN]",
-      "description": "System GCC on macOS with Address and Undefined sanitisers",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-asan", "feature-ubsan"]
-    },
-    {
-      "name": "mac-homebrew-gcc-debug-msan-ubsan",
-      "displayName": "GCC (macOS brew) [Debug][MSAN][UBSAN]",
-      "description": "System GCC on macOS with Memory and Undefined sanitisers",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-msan", "feature-ubsan"]
-    },
-    {
-      "name": "mac-homebrew-gcc-debug-tsan-ubsan",
-      "displayName": "GCC (macOS brew) [Debug][TSAN][UBSAN]",
-      "description": "System GCC on macOS with Thread and Undefined sanitisers",
-      "inherits": ["debug", "mac-homebrew-gcc", "feature-tsan", "feature-ubsan"]
-    },
+        // --- macOS ---
+        // Single
+        {
+            "name": "mac-homebrew-gcc-debug-asan",
+            "displayName": "GCC (macOS brew) [Debug][ASAN]",
+            "description": "System GCC on macOS with Address sanitiser",
+            "inherits": ["debug", "mac-homebrew-gcc", "feature-asan"]
+        },
+        {
+            "name": "mac-homebrew-gcc-debug-msan",
+            "displayName": "GCC (macOS brew) [Debug][MSAN]",
+            "description": "System GCC on macOS with Memory sanitiser",
+            "inherits": ["debug", "mac-homebrew-gcc", "feature-msan"]
+        },
+        {
+            "name": "mac-homebrew-gcc-debug-tsan",
+            "displayName": "GCC (macOS brew) [Debug][TSAN]",
+            "description": "System GCC on macOS with Thread sanitiser",
+            "inherits": ["debug", "mac-homebrew-gcc", "feature-tsan"]
+        },
+        {
+            "name": "mac-homebrew-gcc-debug-ubsan",
+            "displayName": "GCC (macOS brew) [Debug][UBSAN]",
+            "description": "System GCC on macOS with Undefined sanitiser",
+            "inherits": ["debug", "mac-homebrew-gcc", "feature-ubsan"]
+        },
+        // Combined
+        {
+            "name": "mac-homebrew-gcc-debug-asan-ubsan",
+            "displayName": "GCC (macOS brew) [Debug][ASAN][UBSAN]",
+            "description": "System GCC on macOS with Address and Undefined sanitisers",
+            "inherits": [
+                "debug",
+                "mac-homebrew-gcc",
+                "feature-asan",
+                "feature-ubsan"
+            ]
+        },
+        {
+            "name": "mac-homebrew-gcc-debug-msan-ubsan",
+            "displayName": "GCC (macOS brew) [Debug][MSAN][UBSAN]",
+            "description": "System GCC on macOS with Memory and Undefined sanitisers",
+            "inherits": [
+                "debug",
+                "mac-homebrew-gcc",
+                "feature-msan",
+                "feature-ubsan"
+            ]
+        },
+        {
+            "name": "mac-homebrew-gcc-debug-tsan-ubsan",
+            "displayName": "GCC (macOS brew) [Debug][TSAN][UBSAN]",
+            "description": "System GCC on macOS with Thread and Undefined sanitisers",
+            "inherits": [
+                "debug",
+                "mac-homebrew-gcc",
+                "feature-tsan",
+                "feature-ubsan"
+            ]
+        },
 
-    // --- Windows ---
-    {
-      "name": "win-msvc-debug-asan",
-      "displayName": "MSVC (Windows) [Debug][ASAN]",
-      "description": "MSVC with Address sanitiser",
-      "inherits": ["debug", "win-msvc", "feature-asan"]
-    },
-    {
-      "name": "win-msvc-trunk-debug-asan",
-      "displayName": "MSVC Trunk (Windows) [Debug][ASAN]",
-      "description": "MSVC trunk with Address sanitiser",
-      "inherits": ["debug", "win-msvc-trunk", "feature-asan"]
-    },
-    {
-      "name": "win-msvc-llvm-debug-asan",
-      "displayName": "MSVC LLVM (Windows) [Debug][ASAN]",
-      "description": "MSVC Clang-cl with Address sanitiser",
-      "inherits": ["debug", "win-msvc-llvm", "feature-asan"]
-    },
-    // MinGW64
-    // Single
-    {
-      "name": "win-mingw64-debug-asan",
-      "displayName": "MinGW64 (Windows) [Debug][ASAN]",
-      "description": "GCC on Windows via MinGW64 with Address sanitiser",
-      "inherits": ["debug", "win-mingw64", "feature-asan"]
-    },
-    {
-      "name": "win-mingw64-debug-msan",
-      "displayName": "MinGW64 (Windows) [Debug][MSAN]",
-      "description": "GCC on Windows via MinGW64 with Memory sanitiser",
-      "inherits": ["debug", "win-mingw64", "feature-msan"]
-    },
-    {
-      "name": "win-mingw64-debug-tsan",
-      "displayName": "MinGW64 (Windows) [Debug][TSAN]",
-      "description": "GCC on Windows via MinGW64 with Thread sanitiser",
-      "inherits": ["debug", "win-mingw64", "feature-tsan"]
-    },
-    {
-      "name": "win-mingw64-debug-ubsan",
-      "displayName": "MinGW64 (Windows) [Debug][UBSAN]",
-      "description": "GCC on Windows via MinGW64 with Undefined sanitiser",
-      "inherits": ["debug", "win-mingw64", "feature-ubsan"]
-    },
-    // Combined
-    {
-      "name": "win-mingw64-debug-asan-ubsan",
-      "displayName": "MinGW64 (Windows) [Debug][ASAN][UBSAN]",
-      "description": "GCC on Windows via MinGW64 with Address and Undefined sanitisers",
-      "inherits": ["debug", "win-mingw64", "feature-asan", "feature-ubsan"]
-    },
-    {
-      "name": "win-mingw64-debug-msan-ubsan",
-      "displayName": "MinGW64 (Windows) [Debug][MSAN][UBSAN]",
-      "description": "GCC on Windows via MinGW64 with Memory and Undefined sanitisers",
-      "inherits": ["debug", "win-mingw64", "feature-msan", "feature-ubsan"]
-    },
-    {
-      "name": "win-mingw64-debug-tsan-ubsan",
-      "displayName": "MinGW64 (Windows) [Debug][TSAN][UBSAN]",
-      "description": "GCC on Windows via MinGW64 with Thread and Undefined sanitisers",
-      "inherits": ["debug", "win-mingw64", "feature-tsan", "feature-ubsan"]
-    },
+        // --- Windows ---
+        {
+            "name": "win-msvc-debug-asan",
+            "displayName": "MSVC (Windows) [Debug][ASAN]",
+            "description": "MSVC with Address sanitiser",
+            "inherits": ["debug", "win-msvc", "feature-asan"]
+        },
+        {
+            "name": "win-msvc-trunk-debug-asan",
+            "displayName": "MSVC Trunk (Windows) [Debug][ASAN]",
+            "description": "MSVC trunk with Address sanitiser",
+            "inherits": ["debug", "win-msvc-trunk", "feature-asan"]
+        },
+        {
+            "name": "win-msvc-llvm-debug-asan",
+            "displayName": "MSVC LLVM (Windows) [Debug][ASAN]",
+            "description": "MSVC Clang-cl with Address sanitiser",
+            "inherits": ["debug", "win-msvc-llvm", "feature-asan"]
+        },
+        // MinGW64
+        // Single
+        {
+            "name": "win-mingw64-debug-asan",
+            "displayName": "MinGW64 (Windows) [Debug][ASAN]",
+            "description": "GCC on Windows via MinGW64 with Address sanitiser",
+            "inherits": ["debug", "win-mingw64", "feature-asan"]
+        },
+        {
+            "name": "win-mingw64-debug-msan",
+            "displayName": "MinGW64 (Windows) [Debug][MSAN]",
+            "description": "GCC on Windows via MinGW64 with Memory sanitiser",
+            "inherits": ["debug", "win-mingw64", "feature-msan"]
+        },
+        {
+            "name": "win-mingw64-debug-tsan",
+            "displayName": "MinGW64 (Windows) [Debug][TSAN]",
+            "description": "GCC on Windows via MinGW64 with Thread sanitiser",
+            "inherits": ["debug", "win-mingw64", "feature-tsan"]
+        },
+        {
+            "name": "win-mingw64-debug-ubsan",
+            "displayName": "MinGW64 (Windows) [Debug][UBSAN]",
+            "description": "GCC on Windows via MinGW64 with Undefined sanitiser",
+            "inherits": ["debug", "win-mingw64", "feature-ubsan"]
+        },
+        // Combined
+        {
+            "name": "win-mingw64-debug-asan-ubsan",
+            "displayName": "MinGW64 (Windows) [Debug][ASAN][UBSAN]",
+            "description": "GCC on Windows via MinGW64 with Address and Undefined sanitisers",
+            "inherits": [
+                "debug",
+                "win-mingw64",
+                "feature-asan",
+                "feature-ubsan"
+            ]
+        },
+        {
+            "name": "win-mingw64-debug-msan-ubsan",
+            "displayName": "MinGW64 (Windows) [Debug][MSAN][UBSAN]",
+            "description": "GCC on Windows via MinGW64 with Memory and Undefined sanitisers",
+            "inherits": [
+                "debug",
+                "win-mingw64",
+                "feature-msan",
+                "feature-ubsan"
+            ]
+        },
+        {
+            "name": "win-mingw64-debug-tsan-ubsan",
+            "displayName": "MinGW64 (Windows) [Debug][TSAN][UBSAN]",
+            "description": "GCC on Windows via MinGW64 with Thread and Undefined sanitisers",
+            "inherits": [
+                "debug",
+                "win-mingw64",
+                "feature-tsan",
+                "feature-ubsan"
+            ]
+        },
 
-    // --- Trunk ---
-    // single
-    {
-      "name": "gcc-trunk-debug-asan",
-      "displayName": "GCC Trunk [Debug][ASAN]",
-      "description": "Latest GCC development snapshot with Address sanitiser",
-      "inherits": ["debug", "gcc-trunk", "feature-asan"]
-    },
-    {
-      "name": "gcc-trunk-debug-msan",
-      "displayName": "GCC Trunk [Debug][MSAN]",
-      "description": "Latest GCC development snapshot with Memory sanitiser",
-      "inherits": ["debug", "gcc-trunk", "feature-msan"]
-    },
-    {
-      "name": "gcc-trunk-debug-tsan",
-      "displayName": "GCC Trunk [Debug][TSAN]",
-      "description": "Latest GCC development snapshot with Thread sanitiser",
-      "inherits": ["debug", "gcc-trunk", "feature-tsan"]
-    },
-    {
-      "name": "clang-trunk-release",
-      "displayName": "Clang Trunk [Release]",
-      "description": "Latest Clang development snapshot - Release build",
-      "inherits": ["release", "clang-trunk"]
-    },
-    // combined
-    {
-      "name": "gcc-trunk-debug-asan-ubsan",
-      "displayName": "GCC Trunk [Debug][ASAN][UBSAN]",
-      "description": "Latest GCC development snapshot with Address and Undefined sanitisers",
-      "inherits": ["debug", "gcc-trunk", "feature-asan", "feature-ubsan"]
-    },
-    {
-      "name": "gcc-trunk-debug-msan-ubsan",
-      "displayName": "GCC Trunk [Debug][MSAN][UBSAN]",
-      "description": "Latest GCC development snapshot with Memory and Undefined sanitisers",
-      "inherits": ["debug", "gcc-trunk", "feature-msan", "feature-ubsan"]
-    },
-    {
-      "name": "gcc-trunk-debug-tsan-ubsan",
-      "displayName": "GCC Trunk [Debug][TSAN][UBSAN]",
-      "description": "Latest GCC development snapshot with Thread and Undefined sanitisers",
-      "inherits": ["debug", "gcc-trunk", "feature-tsan", "feature-ubsan"]
-    }
-  ],
-  // prettier-ignore
-  "buildPresets": [
+        // --- Trunk ---
+        // single
+        {
+            "name": "gcc-trunk-debug-asan",
+            "displayName": "GCC Trunk [Debug][ASAN]",
+            "description": "Latest GCC development snapshot with Address sanitiser",
+            "inherits": ["debug", "gcc-trunk", "feature-asan"]
+        },
+        {
+            "name": "gcc-trunk-debug-msan",
+            "displayName": "GCC Trunk [Debug][MSAN]",
+            "description": "Latest GCC development snapshot with Memory sanitiser",
+            "inherits": ["debug", "gcc-trunk", "feature-msan"]
+        },
+        {
+            "name": "gcc-trunk-debug-tsan",
+            "displayName": "GCC Trunk [Debug][TSAN]",
+            "description": "Latest GCC development snapshot with Thread sanitiser",
+            "inherits": ["debug", "gcc-trunk", "feature-tsan"]
+        },
+        {
+            "name": "clang-trunk-release",
+            "displayName": "Clang Trunk [Release]",
+            "description": "Latest Clang development snapshot - Release build",
+            "inherits": ["release", "clang-trunk"]
+        },
+        // combined
+        {
+            "name": "gcc-trunk-debug-asan-ubsan",
+            "displayName": "GCC Trunk [Debug][ASAN][UBSAN]",
+            "description": "Latest GCC development snapshot with Address and Undefined sanitisers",
+            "inherits": ["debug", "gcc-trunk", "feature-asan", "feature-ubsan"]
+        },
+        {
+            "name": "gcc-trunk-debug-msan-ubsan",
+            "displayName": "GCC Trunk [Debug][MSAN][UBSAN]",
+            "description": "Latest GCC development snapshot with Memory and Undefined sanitisers",
+            "inherits": ["debug", "gcc-trunk", "feature-msan", "feature-ubsan"]
+        },
+        {
+            "name": "gcc-trunk-debug-tsan-ubsan",
+            "displayName": "GCC Trunk [Debug][TSAN][UBSAN]",
+            "description": "Latest GCC development snapshot with Thread and Undefined sanitisers",
+            "inherits": ["debug", "gcc-trunk", "feature-tsan", "feature-ubsan"]
+        }
+    ],
+    // prettier-ignore
+    "buildPresets": [
     // ====================
     // Base Build Settings
     // ====================
@@ -701,7 +731,7 @@
       "name": "base-build",
       "hidden": true,
       "jobs": 0,
-      "configuration": "Debug" 
+      "configuration": "Debug"
     },
 
     // ====================
