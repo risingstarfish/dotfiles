@@ -1,5 +1,6 @@
 ### General gitignore ###
 *.env
+.claude/
 
 # Visual Studio & VSCode
 .vs/
