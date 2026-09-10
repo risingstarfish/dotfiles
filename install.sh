@@ -311,6 +311,22 @@
 				"dev/clang-tidy"
 				"dev/editorconfig"
 
+				"pwsh/Microsoft.PowerShell_profile.ps1.*"
+				"pwsh/Set-MSVC-Environment.ps1.*"
+				"pwsh/Update-Modules.ps1.*"
+				"pwsh/Print-Env.ps1"
+				"pwsh/nproc.ps1"
+				"pwsh/sha256.ps1"
+				"pwsh/sha1.ps1"
+				"pwsh/md5.ps1"
+
+				"oh-my-posh/themes/tiger.omp.json"
+				"oh-my-posh/themes/agnoster.omp.json"
+				"oh-my-posh/themes/kushal.omp.json"
+				"oh-my-posh/themes/powerlevel10k_classic.omp.json"
+				"oh-my-posh/themes/powerlevel10k_lean.omp.json"
+				"oh-my-posh/themes/powerlevel10k_modern.omp.json"
+
 				"topgrade/topgrade.toml"
 
 				"fastfetch/config.jsonc.*"
@@ -535,7 +551,7 @@ EOF
 			fi
 		}
 
-		# https://github.com/HyDE-Project/HyDE/blob/master/Scripts/version.sh
+		# https://github.com/HyDE-Project/HyDE/blob/master/version.sh
 		dotfiles::print_version() {
 			local dotfiles_install_dir
 			local dotfiles_branch

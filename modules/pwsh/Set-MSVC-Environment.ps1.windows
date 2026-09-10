@@ -110,8 +110,8 @@ function Set-MSVC-Environment {
     $normalizePath = { param([string[]]$arr) $arr | ForEach-Object { $_.Trim().TrimEnd('\') } | Where-Object { $_ } | Sort-Object }
     $currentInc = & $normalizePath ($env:INCLUDE -split ';')
     $currentLib = & $normalizePath ($env:LIB -split ';')
-    $newInc     = & $normalizePath $incPaths
-    $newLib     = & $normalizePath $libPaths
+    $newInc = & $normalizePath $incPaths
+    $newLib = & $normalizePath $libPaths
 
     # Strict comparison: must match in count AND content
     $incMatch = ($currentInc.Count -eq $newInc.Count) -and ($currentInc -join ';' -eq $newInc -join ';')
@@ -140,13 +140,15 @@ function Set-MSVC-Environment {
         if (-not $incMatch) {
             Write-Host "Old INCLUDE:`n$(& $formatPaths $currentInc)" -ForegroundColor Yellow
             Write-Host "New INCLUDE:`n$(& $formatPaths $newInc)" -ForegroundColor Green
-        } else {
+        }
+        else {
             Write-Host "Current INCLUDE:`n$(& $formatPaths $currentInc)" -ForegroundColor DarkGray
         }
         if (-not $libMatch) {
             Write-Host "Old LIB:`n$(& $formatPaths $currentLib)" -ForegroundColor Yellow
             Write-Host "New LIB:`n$(& $formatPaths $newLib)" -ForegroundColor Green
-        } else {
+        }
+        else {
             Write-Host "Current LIB:`n$(& $formatPaths $currentLib)" -ForegroundColor DarkGray
         }
     }

@@ -278,7 +278,7 @@ dotfiles::file_perm() {
 			printf '%s' "${HOME}/dev/CMakeUserPresets.json"
 			;;
 		modules/dev/gen-cmakepreset.py)
-			printf '%s' "${HOME}/dev/gen-cmakepreset.py"
+			printf '%s' "${HOME}/.local/bin/gen-cmakepreset.py"
 			;;
 		modules/dev/internal-flags.cmake)
 			printf '%s' "${HOME}/dev/internal-flags.cmake"
@@ -295,6 +295,53 @@ dotfiles::file_perm() {
 		modules/dev/editorconfig)
 			printf '%s' "${HOME}/dev/.editorconfig"
 			;;
+
+			# pwsh
+		modules/pwsh/Microsoft.PowerShell_profile.ps1.*)
+			printf '%s' "${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
+			;;
+		modules/pwsh/Set-MSVC-Environment.ps1.*)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
+			;;
+		modules/pwsh/Update-Modules.ps1.*)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
+			;;
+		modules/pwsh/Print-Env.ps1)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
+			;;
+		modules/pwsh/nproc.ps1)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/nproc.ps1"
+			;;
+		modules/pwsh/sha256.ps1)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/sha256.ps1"
+			;;
+		modules/pwsh/sha1.ps1)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/sha1.ps1"
+			;;
+		modules/pwsh/md5.ps1)
+			printf '%s' "${HOME}/Documents/Powershell/Scripts/md5.ps1"
+			;;
+
+		# oh-my-posh
+		modules/oh-my-posh/themes/tiger.omp.json)
+			printf '%s' "${HOME}/.oh-my-posh/themes/tiger.omp.json"
+			;;
+		modules/oh-my-posh/themes/agnoster.omp.json)
+			printf '%s' "${HOME}/.oh-my-posh/themes/agnoster.omp.json"
+			;;
+		modules/oh-my-posh/themes/kushal.omp.json)
+			printf '%s' "${HOME}/.oh-my-posh/themes/kushal.omp.json"
+			;;
+		modules/oh-my-posh/themes/powerlevel10k_classic.omp.json)
+			printf '%s' "${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
+			;;
+		modules/oh-my-posh/themes/powerlevel10k_lean.omp.json)
+			printf '%s' "${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
+			;;
+		modules/oh-my-posh/themes/powerlevel10k_modern.omp.json)
+			printf '%s' "${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
+			;;
+
 		# tmux
 		modules/tmux/tmux.conf.*)
 			printf '%s' "${HOME}/.tmux.conf"

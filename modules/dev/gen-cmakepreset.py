@@ -222,7 +222,7 @@ HOSTS = [
             "SYSTEM": "/usr",
             "GCC_TRUNK": "$env{HOME}/opt/gcc-trunk",
             "CLANG_TRUNK": "$env{HOME}/opt/clang-trunk",
-            "CLANG_P2996": "$env{HOME}/opt/gcc-p2996",
+            "CLANG_P2996": "$env{HOME}/opt/clang-p2996",
         },
     },
     {
@@ -263,10 +263,10 @@ HOSTS = [
         "environment": {
             "GCC_TRUNK": "$env{USERPROFILE}/opt/gcc-trunk",
             "CLANG_TRUNK": "$env{USERPROFILE}/opt/clang-trunk",
-            "CLANG_P2996": "$env{USERPROFILE}/opt/gcc-p2996",
-            "MSVC": "$env{USERPROFILE}/opt/win-msvc",
-            "MSVC_TRUNK": "$env{USERPROFILE}/opt/win-msvc-trunk",
-            "MSVC_LLVM": "$env{USERPROFILE}/opt/win-msvc-llvm",
+            "CLANG_P2996": "$env{USERPROFILE}/opt/clang-p2996",
+            "MSVC": "$env{USERPROFILE}/opt/msvc",
+            "MSVC_TRUNK": "$env{USERPROFILE}/opt/msvc-trunk",
+            "MSVC_LLVM": "$env{USERPROFILE}/opt/msvc-llvm",
             "MINGW64": "$env{USERPROFILE}/opt/mingw64",
         },
     },
@@ -282,14 +282,6 @@ BASE = {
     "generator": "Ninja",
     "binaryDir": "${sourceDir}/build/${presetName}",
     "installDir": "${sourceDir}/install/${presetName}",
-    "architecture": {
-        "value": "x64",
-        "strategy": "external",
-    },
-    "toolset": {
-        "value": "host=x64",
-        "strategy": "external",
-    },
     "cacheVariables": {
         "CMAKE_C_COMPILER_LAUNCHER": "ccache",
         "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
@@ -308,11 +300,6 @@ BASE = {
         "SANITIZE_UNDEFINED": "OFF",
         "SANITIZE_MEMORY": "OFF",
         "SANITIZE_THREAD": "OFF",
-        #
-        "ENABLE_CPPCHECK": "OFF",
-        "ENABLE_CLANG_TIDY": "OFF",
-        "USE_LIBCPP": "OFF",
-        "VISUAL_STUDIO_BUILD_WITH_DEBUG_INFO_FOR_PROFILING": "OFF",
     },
 }
 
@@ -404,8 +391,7 @@ def _sanitizer_configure_presets():
                         f"{tc.description} with {' and '.join(w.capitalize() for w in words)} "
                         f"{'sanitiser' if len(singles) == 1 else 'sanitisers'}"
                     ),
-                    "inherits": ["debug", tc.name]
-                    + [f"feature-{s}" for s in singles],
+                    "inherits": ["debug", tc.name] + [f"feature-{s}" for s in singles],
                 }
             )
     return out
