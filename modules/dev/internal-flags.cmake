@@ -66,7 +66,7 @@ if(SANITIZE_MEMORY)
     endif()
 endif()
 
-if(SANITIZE_THREADS)
+if(SANITIZE_THREAD)
     message(STATUS "Setting both the thread sanitizer \
 and the undefined-behavior sanitizer."
     )
@@ -85,7 +85,7 @@ endif()
 
 get_cmake_property(is_multi_config GENERATOR_IS_MULTI_CONFIG)
 if(NOT is_multi_config AND NOT CMAKE_BUILD_TYPE)
-    # Deliberately not including SANITIZE_THREADS since thread behavior
+    # Deliberately not including SANITIZE_THREAD since thread behavior
     # depends on the build type.
     if(SANITIZE_ADDRESS OR SANITIZE_UNDEFINED)
         message(STATUS "No build type selected and you have enabled the sanitizer, \

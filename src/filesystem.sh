@@ -277,6 +277,9 @@ dotfiles::file_perm() {
 		modules/dev/CMakeUserPresets.json)
 			printf '%s' "${HOME}/dev/CMakeUserPresets.json"
 			;;
+		modules/dev/gen-cmakepreset.py)
+			printf '%s' "${HOME}/dev/gen-cmakepreset.py"
+			;;
 		modules/dev/internal-flags.cmake)
 			printf '%s' "${HOME}/dev/internal-flags.cmake"
 			;;

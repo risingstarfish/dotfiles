@@ -1044,7 +1044,7 @@
   "spinnerTipsEnabled": false,
   "effortLevel": "xhigh",
   "autoUpdatesChannel": "stable",
+  "tui": "fullscreen",
   "skipWorkflowUsageWarning": false,
-  "theme": "auto",
-  "tui": "fullscreen"
+  "theme": "auto"
 }

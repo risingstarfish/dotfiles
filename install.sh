@@ -304,6 +304,7 @@
 				"ssh/allowed_signers.gen"
 
 				"dev/CMakeUserPresets.json"
+				"dev/gen-cmakepreset.py"
 				"dev/internal-flags.cmake"
 				"dev/cmake-format.py"
 				"dev/clang-format"
