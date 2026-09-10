@@ -7,9 +7,9 @@ fi
 readonly __ALIASES_INCLUDED__=1
 ################
 # utility
-alias ez='exec zsh'                       # restart zsh shell
+alias ez='exec zsh'                         # restart zsh shell
 alias paths='echo ${PATH} | tr -s ":" "\n"' # print $PATH newline separated
-alias sudo='sudo '                        # Enable aliases to be sudo’ed
+alias sudo='sudo '                          # Enable aliases to be sudo’ed
 alias c='clear'
 
 # Navigation
@@ -88,6 +88,8 @@ fi
 case "$(uname -s)" in
 Darwin*)
 	alias brewup='brew update && brew upgrade && brew cleanup'
+	alias sleep-disable='sudo pmset -a disablesleep 1'
+	alias sleep-enable='sudo pmset -a disablesleep 0'
 
 	# Lock the screen (when going AFK)
 	alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
