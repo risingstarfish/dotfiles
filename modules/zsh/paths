@@ -16,12 +16,11 @@ typeset -U PATH # ensure entries are unique
 # Various tools
 prepend_path "${HOME}/.local/bin"
 
+# Clang
+prepend_path "${HOME}/opt/clang-p2996/bin"
+prepend_path "${HOME}/opt/clang-trunk/bin"
 # GCC
 prepend_path "${HOME}/opt/gcc-trunk/bin"
-
-# Clang
-prepend_path "${HOME}/opt/clang-trunk/bin"
-prepend_path "${HOME}/opt/clang-p2996/bin"
 
 # llamacpp
 prepend_path "${HOME}/opt/llamacpp/bin"

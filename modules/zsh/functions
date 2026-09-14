@@ -84,7 +84,7 @@
 			if _rs_cd "${target_dir}"; then
 				return 0
 			fi
-			
+
 			_err "could not change to directory ${target_dir}"
 			return 1
 		fi
@@ -345,4 +345,30 @@ function fs() {
 			esac
 		done
 	}
+}
+
+# docker
+docker() {
+	if ! command docker info >/dev/null 2>&1; then
+		echo "Docker is not running. Starting Docker..."
+
+		if [[ "$OSTYPE" == "darwin"* ]]; then
+			open -a Docker
+			echo "Waiting for Docker Desktop to initialize..."
+			while ! command docker info >/dev/null 2>&1; do
+				sleep 2
+			done
+		elif command -v systemctl >/dev/null 2>&1; then
+			# Linux with systemd
+			sudo systemctl start docker
+		elif command -v service >/dev/null 2>&1; then
+			# older Linux with init.d
+			sudo service docker start
+		else
+			echo "Error: Could not determine how to start Docker on this OS."
+			return 1
+		fi
+	fi
+
+	command docker "$@"
 }
