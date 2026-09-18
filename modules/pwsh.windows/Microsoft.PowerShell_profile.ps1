@@ -14,9 +14,9 @@ if (-not $env:HOME) {
     $env:HOME = $env:USERPROFILE
 }
 
-#if ($env:TMUX -or $env:PSMUX) {
-#    Remove-Item Function:\Set-Location -ErrorAction SilentlyContinue
-#}
+if ($env:TMUX -or $env:PSMUX) {
+    Remove-Item Function:\Set-Location -ErrorAction SilentlyContinue
+}
 
 Import-Module syntax-highlighting
 Import-Module cd-extras

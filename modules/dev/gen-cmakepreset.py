@@ -174,15 +174,6 @@ TOOLCHAINS = [
         },
     ),
     Toolchain(
-        "win-gcc-trunk",
-        "host-windows",
-        "GCC Trunk (Windows)",
-        "Latest GCC development snapshot",
-        "$env{GCC_TRUNK}/bin/gcc.exe",
-        "$env{GCC_TRUNK}/bin/g++.exe",
-        sanitizers=FULL,
-    ),
-    Toolchain(
         "win-clang-trunk",
         "host-windows",
         "Clang Trunk (Windows)",
