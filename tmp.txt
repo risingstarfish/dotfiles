@@ -1,0 +1,85 @@
+music player
+
+terminal based (maybe qt)
+
+SECTIONS:
+audio engine
+    play pause stop next previous
+    seek to timestamp
+    volume
+    repeat/shuffle
+    queue
+    now-playing info
+    sample rate/bit depth
+    
+Home
+    Now playing
+    Recently played
+    Favourites
+Playlists
+    Favourites
+    Create / rename / delete
+Search
+    Full-text search across song / artist / album / playlist names
+    Filter / facet by artist, year, genre, rating
+    Fuzzy or prefix matching depending on UX
+Library
+    Favourites
+    Artists
+    Albums
+    Songs
+    ><
+    files moved/deleted
+    rescan/reimport
+    cover art!!
+Import/Export
+    playlists
+    songs
+    albums
+    library
+Settings
+    Playback
+        output device
+        replay gain
+        replay mode
+        buffer size
+        pre-buffer amount
+        Crossfade + Duration
+    Equaliser
+        PEACE
+    Database
+        Library root
+        scan interval
+        DB export/backup/reset
+        Rebuild index
+        whitelist
+        blacklist
+    Preferences
+        Language
+        Time Zone
+        Time Format
+        Keyboard shortcut remapping    
+        Notification style (tray icon, "Now Playing" tooltip)
+        Media keys – global hotkeys 
+        Startup/Close
+            Exit on close/minimise on close
+            start with os
+        Last.fm / scrobbling
+        preffered audio format
+        Logging
+            log dir
+            log level
+    UI
+        Theme
+        Colour
+        virtual overlay
+        progress bar
+        
+nice to have
+    trimming
+    file formast conversion
+    export to other source (cd M3U etc)
+    statistics
+    i18n/i10n
+
+sqlite3 local database to track songs
