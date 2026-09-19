@@ -6,7 +6,7 @@ if [[ -n ${__ARGPARSE_SH_INCLUDED__:-}     ]]; then
 fi
 readonly __ARGPARSE_SH_INCLUDED__=1
 
-dotfiles::argparse() {
+argparse() {
     UNINSTALL=0
     # setup
     DOTFILES_INSTALL_DIR="${DOTFILES_INSTALL_DIR:-${HOME}/dotfiles}"
