@@ -1,0 +1,54 @@
+# https://google.github.io/styleguide/shellguide.html#s5.1-indentation
+
+[*]
+indent_style = space
+indent_size = 4
+tab_width = 4
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.sh]
+# --language-dialect
+shell_variant      = posix
+simplify           = true
+binary_next_line   = true
+# --case-indent
+switch_case_indent = true
+space_redirects    = true
+keep_padding       = true
+# --func-next-line
+function_next_line = false
+block_next_line    = true
+minify             = false
+
+[[zsh]]
+# --language-dialect
+shell_variant      = zsh
+simplify           = true
+binary_next_line   = true
+# --case-indent
+switch_case_indent = true
+space_redirects    = true
+keep_padding       = true
+# --func-next-line
+function_next_line = false
+block_next_line    = true
+minify             = false
+[[bash]]
+# --language-dialect
+shell_variant      = bash
+simplify           = true
+binary_next_line   = true
+# --case-indent
+switch_case_indent = true
+space_redirects    = true
+keep_padding       = true
+# --func-next-line
+function_next_line = false
+block_next_line    = true
+minify             = false
+
+[*.txt]
+indent_size = false
