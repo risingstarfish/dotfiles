@@ -10,7 +10,7 @@ param (
     [int]$NgL = 999,
     
     [ValidateRange(4096, 262144)]
-    [int]$CtxSize = 160000, #131072,
+    [int]$CtxSize = 131072,
 
     [ValidateSet("xhigh", "medium", "low")]
     [string]$Reasoning = "xhigh",
