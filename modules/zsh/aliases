@@ -7,7 +7,7 @@ fi
 readonly __ALIASES_INCLUDED__=1
 ################
 # utility
-alias ez='exec zsh'                         # restart zsh shell
+alias ez='exec zsh -l'                      # restart zsh shell
 alias paths='echo ${PATH} | tr -s ":" "\n"' # print $PATH newline separated
 alias sudo='sudo '                          # Enable aliases to be sudo’ed
 alias c='clear'
