@@ -214,62 +214,63 @@ set_module_map() {
         local -r topgrade_dest="${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
     fi
 
+    # display name | source location | target location | post-install command
     readonly MODULE_MAP=(
-        "zsh/zshrc|${HOME}/.zshrc"
-        "zsh/zsh_options|${HOME}/.zsh_options"
-        "zsh/zstyles|${HOME}/.zstyles"
-        "zsh/zimrc|${HOME}/.zimrc"
-        "zsh/p10k.zsh|${HOME}/.p10k.zsh"
-        "zsh/exports|${HOME}/.exports"
-        "zsh/paths|${HOME}/.paths"
-        "zsh/aliases|${HOME}/.aliases"
-        "zsh/functions|${HOME}/.functions"
-        "zsh/zshrc.toggles|${HOME}/.zshrc.toggles"
+        ".zshrc|zsh/zshrc|${HOME}/.zshrc"
+        ".zsh_options|zsh/zsh_options|${HOME}/.zsh_options"
+        ".zstyles|zsh/zstyles|${HOME}/.zstyles"
+        ".zimrc|zsh/zimrc|${HOME}/.zimrc"
+        ".p10k.zsh|zsh/p10k.zsh|${HOME}/.p10k.zsh"
+        ".exports|zsh/exports|${HOME}/.exports"
+        ".paths|zsh/paths|${HOME}/.paths"
+        ".aliases|zsh/aliases|${HOME}/.aliases"
+        ".functions|zsh/functions|${HOME}/.functions"
+        ".zshrc.toggles|zsh/zshrc.toggles|${HOME}/.zshrc.toggles"
 
-        "bash/bashrc|${HOME}/.bashrc"
+        ".bashrc|bash/bashrc|${HOME}/.bashrc"
 
-        "git/gitconfig|${HOME}/.gitconfig"
-        "git/gitconfig.local.${TARGET_OS}|${HOME}/.gitconfig.local"
-        "git/gitignore|${HOME}/.gitignore"
-        "git/gitattributes|${HOME}/.gitattributes"
-        "git/diff-so-fancy|${HOME}/.local/bin/diff-so-fancy|chmod +x ${HOME}/.local/bin/diff-so-fancy"
+        ".gitconfig|git/gitconfig|${HOME}/.gitconfig"
+        ".gitconfig.local|git/gitconfig.local.${TARGET_OS}|${HOME}/.gitconfig.local"
+        ".gitignore|git/gitignore|${HOME}/.gitignore"
+        ".gitattributes|git/gitattributes|${HOME}/.gitattributes"
+        "diff-so-fancy|git/diff-so-fancy|${HOME}/.local/bin/diff-so-fancy|chmod +x ${HOME}/.local/bin/diff-so-fancy"
 
-        "ssh/config|${HOME}/.ssh/config|chmod 600 ${HOME}/.ssh/config"
-        "ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers"
+        "config|ssh/config|${HOME}/.ssh/config|chmod 600 ${HOME}/.ssh/config"
+        "allowed_signers|ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers"
 
-        "dev/gen-cmakepreset.py|${HOME}/.local/bin/gen-cmakepreset.py|chmod 600 ${HOME}/.local/bin/gen-cmakepreset.py"
-        "dev/internal-flags.cmake|${HOME}/dev/internal-flags.cmake"
-        "dev/cmake-format.py|${HOME}/dev/.cmake-format.py"
-        "dev/clang-format|${HOME}/dev/.clang-format"
-        "dev/clang-tidy|${HOME}/dev/.clang-tidy"
-        "dev/editorconfig|${HOME}/dev/.editorconfig"
+        "gen-cmakepreset.py|dev/gen-cmakepreset.py|${HOME}/.local/bin/gen-cmakepreset.py|chmod 600 ${HOME}/.local/bin/gen-cmakepreset.py"
+        "internal-flags.cmake|dev/internal-flags.cmake|${HOME}/dev/internal-flags.cmake"
+        ".cmake-format.py|dev/cmake-format.py|${HOME}/dev/.cmake-format.py"
+        ".clang-format|dev/clang-format|${HOME}/dev/.clang-format"
+        ".clang-tidy|dev/clang-tidy|${HOME}/dev/.clang-tidy"
+        ".editorconfig|dev/editorconfig|${HOME}/dev/.editorconfig"
 
-        "pwsh.${TARGET_ENV}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
-        "pwsh.${TARGET_ENV}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
-        "pwsh.${TARGET_ENV}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
-        "pwsh.${TARGET_ENV}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
-        "pwsh.${TARGET_ENV}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
-        "pwsh.${TARGET_ENV}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
-        "pwsh.${TARGET_ENV}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
-        "pwsh.${TARGET_ENV}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
+        "Microsoft.PowerShell_profile.ps1|pwsh.${TARGET_ENV}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
+        "Set-MSVC-Environment.ps1|pwsh.${TARGET_ENV}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
+        "Update-Modules.ps1|pwsh.${TARGET_ENV}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
+        "Print-Env.ps1|pwsh.${TARGET_ENV}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
+        "nproc.ps1|pwsh.${TARGET_ENV}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
+        "sha256.ps1|pwsh.${TARGET_ENV}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
+        "sha1.ps1|pwsh.${TARGET_ENV}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
+        "md5.ps1|pwsh.${TARGET_ENV}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
 
         # --- Oh My Posh ---
-        "oh-my-posh.${TARGET_ENV}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
-        "oh-my-posh.${TARGET_ENV}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
-        "oh-my-posh.${TARGET_ENV}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
-        "oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
-        "oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
-        "oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
+        "tiger.omp.json|oh-my-posh.${TARGET_ENV}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
+        "agnoster.omp.json|oh-my-posh.${TARGET_ENV}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
+        "kushal.omp.json|oh-my-posh.${TARGET_ENV}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
+        "powerlevel10k_classic.omp.json|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
+        "powerlevel10k_lean.omp.json|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
+        "powerlevel10k_modern.omp.json|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
 
-        "topgrade/topgrade.toml|${topgrade_dest}"
-        "fastfetch/config.jsonc.${TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
-        "tmux/tmux.conf.${TARGET_OS}|${HOME}/.tmux.conf"
-        "curl/curlrc|${HOME}/.curlrc"
-        "wget/wgetrc|${HOME}/.wgetrc"
-        "shellcheck/shellcheckrc|${HOME}/.shellcheckrc"
+        "topgrade.toml|topgrade/topgrade.toml|${topgrade_dest}"
+        "config.jsonc|fastfetch/config.jsonc.${TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
+        ".tmux.conf|tmux/tmux.conf.${TARGET_OS}|${HOME}/.tmux.conf"
+        ".curlrc|curl/curlrc|${HOME}/.curlrc"
+        ".wgetrc|wget/wgetrc|${HOME}/.wgetrc"
+        ".shellcheckrc|shellcheck/shellcheckrc|${HOME}/.shellcheckrc"
 
-        "claude/settings.json|${HOME}/.claude/settings.json"
-        "claude/plugin.json|${HOME}/.claude/plugin.json"
+        "settings.json|claude/settings.json|${HOME}/.claude/settings.json"
+        "plugin.json|claude/plugin.json|${HOME}/.claude/plugin.json"
     )
 }
 
@@ -281,7 +282,7 @@ set_available_modules() {
     local -a active_modules=()
 
     for item in "${MODULE_MAP[@]}"; do
-        IFS='|' read -r src dest post_cmd <<< "${item}"
+        IFS='|' read -r name src dest post_cmd <<< "${item}"
 
         # skip if not available on os/runtime
         if [[ ! -e "${MODULE_DIR}/${src}"   ]]; then
