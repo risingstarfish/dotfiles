@@ -116,6 +116,7 @@ list_modules() {
         local _dest
         local _ftype
         while IFS=$'\t' read -r _src _dest _ftype; do
+            _ftype="${_ftype%$'\r'}" # windows crlf
             [[ -n ${_src} ]] && {
                 manifest_sources+=("${_src}")
                 manifest_dests+=("${_dest}")
@@ -179,9 +180,7 @@ list_modules() {
                         fi
                         ;;
                     *)
-                        printf 'Error: invalid type %s\n' "${ftype}" >&2
-                        printf 'Something went wrong.' >&2
-                        exit 1
+                        die 1 'invalid type detected: %s.\nSomething went wrong!' "${ftype}"
                         ;;
                 esac
                 break
@@ -236,6 +235,7 @@ print_verification()   {
     local dest
 
     while IFS=$'\t' read -r src dest ftype; do
+        ftype="${ftype%$'\r'}"
         [[ -z ${dest}   ]] && continue
         case "${ftype}" in
             merged)
@@ -266,8 +266,8 @@ print_verification()   {
                 fi
                 ;;
             *)
-                printf 'Error: invalid type detected: %s\n' "${ftype}" >&2
-                exit 1
+                printf 'Error: invalid type detected: %s.\nSomething went wrong!\n' "${ftype}" >&2
+                return 1
                 ;;
         esac
     done < "${MANIFEST}"
@@ -289,7 +289,7 @@ print_verification()   {
         printf '           Symlinks  : %2d OK, %2d broken\n' "${ok_symlink}" "${broke_symlink}" >&2
         printf '           Generated : %2d OK, %2d broken\n' "${ok_generated}" "${broke_generated}" >&2
         printf '           Merged    : %2d OK, %2d broken\n' "${ok_merged}" "${broke_merged}" >&2
-        printf >&2
+        printf '\n' >&2
         printf '  [verify] Broken File Details:\n' >&2
         # print exactly which files are broken
         if [[ ${broke_symlink} -gt 0   ]]; then
@@ -310,7 +310,7 @@ print_verification()   {
             done
         fi
 
-        echo "" >&2
+        printf "\n" >&2
         return 1
     fi
 }
@@ -331,17 +331,32 @@ EOF
 }
 
 print_end() {
-    if (("${DOTFILES_AUTORESTART:-0}")); then
-        cat << 'EOF'
+    if ((DOTFILES_AUTORESTART)); then
+        if is_windows_bash; then
+            cat << 'EOF'
+
+╭───────────────────────────────────────────╮
+│                                           │
+│          INSTALLATION COMPLETE!           │
+│                                           │
+│  Returning to shell...                    │
+│                                           │
+╰───────────────────────────────────────────╯
+
+EOF
+        else
+            cat << 'EOF'
 
 ╭───────────────────────────────────────────╮
 │                                           │
 │          INSTALLATION COMPLETE!           │
 │                                           │
 │  Restarting shell...                      │
+│                                           │
 ╰───────────────────────────────────────────╯
 
 EOF
+        fi
     else
         cat << 'EOF'
 
@@ -349,13 +364,10 @@ EOF
 │                                           │
 │          INSTALLATION COMPLETE!           │
 │                                           │
-│  Run exec zsh to apply your changes.      │
+│  Run `exec zsh` to apply your changes.    │
+│                                           │
 ╰───────────────────────────────────────────╯
 
 EOF
     fi
-}
-
-print_help_error_msg() {
-    printf 'Run `bash %s --help` for valid options.\n' "$(basename "$0")" >&2
 }

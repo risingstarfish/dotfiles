@@ -36,6 +36,7 @@ readonly DOTFILES_PROMPT_WINDOWS_HANDOFF="${DOTFILES_PROMPT_WINDOWS_HANDOFF:-1}"
 
 # src files
 readonly SOURCE_FILES=(
+    "src/utility.sh" # keep first
     "src/print.sh"
     "src/argparse.sh"
 )
@@ -72,7 +73,7 @@ set_src_path() {
     local source_path="${BASH_SOURCE[0]}"
     # piped to bash
     if [[ -z ${source_path} ]]; then
-              printf 'Error: unable to determine source path.\n' >&2
+        printf       'Error: unable to determine source path.\n' >&2
         return 1
     fi
 
@@ -299,50 +300,6 @@ set_available_modules() {
     readonly AVAILABLE_MODULES
 }
 
-# Prompts the user to continue.
-# Exits the script if the user chooses No (n/N).
-# Usage: prompt_continue
-#
-# Arguments:
-#   $1 (format) : (Optional) The warning message, or a printf-style format string.
-#   $@ (args)   : (Optional) Arguments to populate the format string.
-prompt_continue() {
-    local msg
-    if [[ $# -eq 0 ]]; then
-        msg=""
-    elif [[ $# -gt 1 ]]; then
-        printf -v msg "$@"
-    else
-        printf -v msg '%b' "$1"
-    fi
-
-    if [[ -n $msg ]]; then
-        printf "%s\n" "$msg" >&2
-    fi
-
-    local choice
-    while true; do
-        echo
-        if ! read -r -p 'Do you want to continue anyway? [y/N]: ' choice; then
-            printf 'Error: No input available for prompt.\n' >&2
-            return 1
-        fi
-
-        case "$choice" in
-            [yY])
-                return 0
-                ;;
-            [nN])
-                printf 'Aborting installation!\n' >&2
-                exit 130
-                ;;
-            *)
-                printf 'Error: Invalid input. Please enter y or n.\n' >&2
-                ;;
-        esac
-    done
-}
-
 check_exists() {
     local -r -a paths=("$@")
     local -a missing_paths=()
@@ -351,16 +308,11 @@ check_exists() {
     for path in "${paths[@]}"; do
         local target_path="$path"
 
-        # If path is relative (does not start with '/' or '~')
         if [[ $path != /* ]] && [[ $path != ~* ]]; then
-            # Resolve relative paths against SRC_PATH
             target_path="${prefix}${path}"
         fi
 
-        # Check existence of the resolved path
         if [[ ! -e $target_path ]]; then
-            # Strip the SRC_PATH prefix for clean output.
-            # Absolute paths outside SRC_PATH remain unmodified.
             missing_paths+=("${target_path#"$prefix"}")
         fi
     done
@@ -378,12 +330,41 @@ check_exists() {
     return 0
 }
 
-initialise() {
-    bash_version_check || return 1
+source_files() {
+    for file in "${SOURCE_FILES[@]}"; do
+        if [[ -z ${file} ]]; then
+            printf 'Error: source_file called without a file path argument.\n' >&2
+            return 1
+        fi
 
-    set_src_path || return 1   # SRC_PATH
-    set_module_dir || return 1 # MODULE_DIR
-    set_target_env || {        # TARGET_OS TARGET_RUNTIME TARGET_ENV
+        if [[ ! -f ${file} ]]; then
+            printf 'Error: cannot source "%s": File does not exist or is a directory.\n' "${file}" >&2
+            return 1
+        fi
+
+        if [[ ! -r ${file} ]]; then
+            printf 'Error: cannot source "%s": Read permission denied.\n' "${file}" >&2
+            return 1
+        fi
+
+        source "${file}" || {
+            local ec=$?
+            printf 'Error: file "%s" was read, but execution failed with exit code %d.\n' "${file}" "${ec}" >&2
+            return 1
+        }
+    done
+}
+
+initialise() {
+    bash_version_check || exit 1
+
+    set_src_path || exit 1   # SRC_PATH
+    # check src/
+    check_exists "${SOURCE_FILES[@]}" || exit 1
+    source_files "${SOURCE_FILES[@]}" || exit 1
+
+    set_module_dir || exit 1 # MODULE_DIR
+    set_target_env || {      # TARGET_OS TARGET_RUNTIME TARGET_ENV
         printf 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.\n' >&2
         prompt_continue 'Some functionality may be limited.'
     }
@@ -397,48 +378,51 @@ initialise() {
     set_available_modules # AVAILABLE_MODULES
 }
 
-source_files() {
-    for file in "${SOURCE_FILES[@]}"; do
-        if [[ -z ${file} ]]; then
-            printf 'Error: source_file called without a file path argument.\n' >&2
-            return 1
-        fi
-
-        if [[ ! -f ${file} ]]; then
-            printf 'Error: Cannot source "%s": File does not exist or is a directory.\n' "${file}" >&2
-            return 1
-        fi
-
-        if [[ ! -r ${file} ]]; then
-            printf 'Error: Cannot source "%s": Read permission denied.\n' "${file}" >&2
-            return 1
-        fi
-
-        source "${file}" || {
-            local ec=$?
-            printf 'Error: File "%s" was read, but execution failed with exit code %d.\n' "${file}" "${ec}" >&2
-            return 1
-        }
-    done
-}
-
 main() {
-    initialise || exit 1
-
-    check_exists "${SOURCE_FILES[@]}" || exit 1
-    source_files "${SOURCE_FILES[@]}" || exit 1
+    initialise
 
     argparse "$@"
+    readonly MAIN_ACTION \
+        REMOVE_SET INCLUDE_SET EXCLUDE_SET \
+        DRY_RUN INTERACTIVE NOCONFIRM FORCE DOTFILES_AUTORESTART \
+        NO_BACKUP NO_DEPS \
+        LOG_LEVEL NO_LOG
 
     print_banner
 
-    # TODO: logic
+    # TODO: logging, dry run etc
+
+    case "$MAIN_ACTION" in
+        install)
+            #run_install
+            ;;
+        remove)
+            #run_remove
+            ;;
+        uninstall)
+            #run_uninstall
+            ;;
+        update)
+            #run_update
+            ;;
+        repair)
+            #run_repair
+            ;;
+        reset)
+            #run_reset
+            ;;
+    esac
 
     print_end
 
-    if (("${DOTFILES_AUTORESTART:-0}")); then
-        exec zsh
+    if [[ ${DRY_RUN} -eq 0 && ${DOTFILES_AUTORESTART} -eq 1 ]]; then
+        if is_windows_bash; then
+            exit 0
+        else
+            exec "${SHELL:-/bin/zsh}" -l
+        fi
     fi
+
     exit 0
 
 }

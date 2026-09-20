@@ -6,49 +6,12 @@ if [[ -n ${__ARGPARSE_SH_INCLUDED__:-}     ]]; then
 fi
 readonly __ARGPARSE_SH_INCLUDED__=1
 
-parse_module_list()  {
-    local -n arr="$2"
-    local mod
-    local valid
-    local -a mods
-
-    IFS=';' read -ra mods <<< "$1"
-    for m in "${mods[@]}"; do
-        # trim whitespace
-        m="${m#"${m%%[![:space:]]*}"}"
-        m="${m%"${m##*[![:space:]]}"}"
-        [[ -z $m   ]] && continue
-
-        valid=0
-        if [[ $m == */*   ]]; then
-            for mod in "${AVAILABLE_MODULES[@]}"; do
-                if [[ $mod == "$m" || $mod == "$m/"*     ]]; then
-                    valid=1
-                    break
-                fi
-            done
-        else
-            for mod in "${AVAILABLE_MODULES[@]}"; do
-                [[ ${mod%%/*} == "$m"   ]] && valid=1 && break
-            done
-        fi
-
-        if [[ $valid -eq 0 ]]; then
-            printf 'Error: unknown module "%s".\n' "$m" >&2
-            printf 'Run with --list to see valid modules.\n' >&2
-            exit 2
-        fi
-        arr+=("$m")
-    done
-}
-
 # $1 = value to test
 # $2 = full message
 # $3 = new flag
 _assert_string_unset() {
     if [[ -n ${1}   ]]; then
-        printf 'Error: %s. Conflicting flag: "%s"\n' "${2}" "${3}" >&2
-        exit 2
+        die 2 '%s. Conflicting flag: "%s"' "${2}" "${3}"
     fi
 }
 
@@ -57,8 +20,7 @@ _assert_string_unset() {
 # $3 = flag name
 _assert_flag_unset() {
     if [[ $1 -eq 1     ]]; then
-        printf 'Error: %s. Conflicting flag: "%s"\n' "${2}" "${3}" >&2
-        exit 2
+        die 2 '%s. Conflicting flag: "%s"' "${2}" "${3}"
     fi
 }
 
@@ -92,8 +54,7 @@ assert_force_unset() {
 # $2 = value to validate
 require_arg() {
     if [[ -z ${2:-} || ${2} == -* ]]; then
-        printf 'Error: missing argument for %s.\n' "$1" >&2
-        exit 2
+        die 2 'missing argument for %s.' "$1"
     fi
 }
 
@@ -110,6 +71,7 @@ argparse() {
     NOCONFIRM=0
     FORCE=0
     DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0}
+    local autorestart_cli_flag=0
     NO_BACKUP=0
     NO_DEPS=0
 
@@ -231,6 +193,7 @@ argparse() {
                 ;;
             -K | --autorestart)
                 DOTFILES_AUTORESTART=1
+                autorestart_cli_flag=1
                 shift
                 ;;
             --no-backup)
@@ -262,8 +225,7 @@ argparse() {
                         shift 2
                         ;;
                     *)
-                        printf 'Error: invalid log level "%s". Use: debug, info, warn, or error\n' "$2" >&2
-                        exit 2
+                        die 2 'invalid log level "%s". Use: debug, info, warn, or error' "$2"
                         ;;
                 esac
                 ;;
@@ -274,25 +236,21 @@ argparse() {
                         LOG_LEVEL="${1#*=}"
                         ;;
                     *)
-                        printf 'Error: invalid log level "%s". Use: debug, info, warn, or error\n' "${1#*=}" >&2
-                        exit 2
+                        die 2 'invalid log level "%s". Use: debug, info, warn, or error' "${1#*=}"
                         ;;
                 esac
                 shift
                 ;;
             --no-log)
                 if [[ -n $LOG_LEVEL   ]]; then
-                    printf 'Error: log level already set to "%s". Cannot use %s.\n' "$LOG_LEVEL" "$1" >&2
-                    exit 2
+                    die 2 'log level already set to "%s". Cannot use %s.' "$LOG_LEVEL" "$1"
                 fi
                 NO_LOG=1
                 shift
                 ;;
 
             *)
-                printf 'Error: invalid parameter "%s"\n' "$1" >&2
-                print_help_error_msg
-                exit 2
+                die 2 'invalid parameter "%s"\nRun `bash %s --help` for valid options.' "$1" "$(basename "$0")"
                 ;;
         esac
     done
@@ -304,53 +262,53 @@ argparse() {
 
     # validation
     if [[ -z $MAIN_ACTION ]]; then
-        printf 'Error: no action specified. Use --install, --update, --remove, --repair, --reset, or --uninstall.\n' >&2
-        print_help_error_msg
-        exit 2
+        die 2 'no action specified.\nRun `bash %s --help` for valid options.' "$(basename "$0")"
     fi
-
-    if [[ ${MAIN_ACTION} == "remove" ]]; then
-        if [[ ${#INCLUDE_SET[@]} -gt 0 || ${#EXCLUDE_SET[@]} -gt 0 ]]; then
-            printf 'Error: --include/--exclude is not supported with --remove\n' >&2
-            exit 2
-        fi
-    fi
-
-    if [[ ${MAIN_ACTION} == "update" ]]; then
-        if [[ ${#INCLUDE_SET[@]} -gt 0 || ${#EXCLUDE_SET[@]} -gt 0 ]]; then
-            printf 'Error: --include/--exclude is not supported with --update\n' >&2
-            exit 2
-        fi
-    fi
-
-    if [[ ${NO_BACKUP} -eq 1 && ${MAIN_ACTION} == "reset" ]]; then
-        printf 'Error: --no-backup is not allowed with --reset\n' >&2
-        exit 2
-    fi
-
-    if [[ ${#REMOVE_SET[@]} -eq 0 && ${MAIN_ACTION} == "remove" ]]; then
-        printf 'Error: no modules specified for --remove\n' >&2
-        exit 2
-    fi
-
-    case "$MAIN_ACTION" in
-        install)
-            #run_install
-            ;;
-        remove)
-            #run_remove
-            ;;
-        uninstall)
-            #run_uninstall
-            ;;
-        update)
-            #run_update
-            ;;
-        repair)
-            #run_repair
-            ;;
-        reset)
-            #run_reset
+    case $MAIN_ACTION in
+        remove | update | uninstall | reset | repair)
+            [[ ${#INCLUDE_SET[@]} -gt 0 || ${#EXCLUDE_SET[@]} -gt 0 ]] \
+                && die 2 "--include/--exclude not supported with --$MAIN_ACTION"
             ;;
     esac
+
+    if [[ $MAIN_ACTION == remove ]] && [[ ${#REMOVE_SET[@]} -eq 0 ]]; then
+        die 2 "no modules for --remove"
+    fi
+    if [[ $MAIN_ACTION == reset && $NO_BACKUP -eq 1 ]]; then
+        die 2 "--no-backup not allowed with --reset"
+    fi
+
+    case "${MAIN_ACTION}" in
+        reset | uninstall | remove)
+            if [[ ${NO_DEPS} -eq 1 ]]; then
+                die 2 '--no-deps has no effect with --%s' "${MAIN_ACTION}"
+            fi
+            ;;
+    esac
+
+    if [[ ${MAIN_ACTION} == uninstall && ${NO_BACKUP} -eq 1 ]]; then
+        die 2 '--no-backup is redundant with --uninstall (it deletes backups itself)'
+    fi
+
+    if [[ ${DRY_RUN} -eq 1 ]]; then
+        if [[ ${DOTFILES_AUTORESTART} -eq 1 ]]; then
+            if [[ ${autorestart_cli_flag} -eq 1 ]]; then
+                die 2 '--autorestart is not meaningful with --dry-run'
+            fi
+            DOTFILES_AUTORESTART=0
+        fi
+
+        if [[ ${INTERACTIVE} -eq 1 ]]; then
+            die 2 '--interactive is meaningless with --dry-run'
+        fi
+        if [[ ${FORCE} -eq 1 ]]; then
+            die 2 '--force is meaningless with --dry-run'
+        fi
+        if [[ ${NO_BACKUP} -eq 1 ]]; then
+            die 2 '--no-backup is meaningless with --dry-run'
+        fi
+        if [[ ${NO_DEPS} -eq 1 ]]; then
+            die 2 '--no-deps is meaningless with --dry-run'
+        fi
+    fi
 }
