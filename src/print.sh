@@ -15,16 +15,12 @@ USAGE: bash $(basename "$0") <action> [options]
 ALL ACTIONS:
 
 INSTALL
-  -i, --install              Install (or reinstall) all available dotfiles.
-  -u, --update               Update from Git and copy/link.
+      --install              Install (or reinstall) all available dotfiles.
+      --uninstall            Deletes symlinks, logs, and backups, then deletes install directory.
+  -u, --update               Update from Git before installing.
   -r, --repair               Remove orphaned symlinks and generated files, then re-link/generate.
       --reset                Remove all symlinks and generated files managed by this tool.
                              (note: copied/merged files will remain)
-  -b, --backup [file...]     Copy current managed file(s) to the backup directory. Without
-                             arguments, backs up all managed files.
-      --clean-backups [N]    Remove backups older than <N> days. (default: 7, 0 = all)
-      --clean-all            Remove all backups and log.
-      --uninstall            Deletes symlinks, logs, and backups, then deletes install directory.
 
 INFORMATION
   -l, --list                 Display all available modules, status, and information.
@@ -36,7 +32,7 @@ INFORMATION
 ALL OPTIONS:
 
 MODULES
-  -I, --include <module...>  Install ONLY the specified modules <module>, semicolon-separated.
+  -i, --include <module...>  Install ONLY the specified modules <module>, semicolon-separated.
   -x, --exclude <module...>  Install all modules EXCEPT specified <module>, semicolon-separated.
 
 BEHAVIOUR
@@ -47,7 +43,7 @@ BEHAVIOUR
   -f, --force                Overwrite existing files/links.
   -K, --autorestart          Automatically restart shell at script end.
       --no-backup            Delete existing conflicting files instead of backing up.
-      --no-deps              Skip dotfiles dependency installation.
+      --no-deps              Skip dotfiles dependency post installation.
 
 LOGGING
   -v, --verbose              Print detailed step-by-step instructions.
@@ -154,7 +150,7 @@ list_modules() {
             current_category="${category}"
         fi
 
-         local status="✗"
+        local  status="✗"
         local i
         for i in "${!manifest_sources[@]}"; do
             if [[ ${manifest_sources[$i]} == "$src_file" ]]; then
@@ -217,6 +213,107 @@ list_modules() {
     done
 
     echo
+}
+
+print_verification()   {
+    if [[ ! -f "${MANIFEST}" ]]; then
+        printf 'No manifest found. Nothing to verify.\n'
+        return 0
+    fi
+
+    local -a broken_merged_files=()
+    local -a broken_generated_files=()
+    local -a broken_symlink_files=()
+
+    local broke_merged=0
+    local broke_generated=0
+    local broke_symlink=0
+
+    local ok_merged=0
+    local ok_generated=0
+    local ok_symlink=0
+
+    local src
+    local dest
+
+    while IFS=$'\t' read -r src dest ftype; do
+        [[ -z "${dest}" ]] && continue
+        case "${ftype}" in
+            merged)
+                # healthy if file exists and has both sentinels
+                if [[ -f "${dest}" ]] \
+                    && grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" \
+                    && grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
+                    ok_merged=$((ok_merged + 1))
+                else
+                    broken_merged_files+=("${dest}")
+                    printf '  [merged] %s (missing or broken sentinels)\n' "${dest}" >&2
+                fi
+                ;;
+            generated)
+                if [[ -f "${dest}" && -s "${dest}" ]]; then
+                    ok_generated=$((ok_generated + 1))
+                else
+                    broken_generated_files+=("${dest}")
+                    printf '  [generated] %s (missing or empty)\n' "${dest}" >&2
+                fi
+                ;;
+            symlink)
+                if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
+                    ok_symlink=$((ok_symlink + 1))
+                else
+                    broken_symlink_files+=("${dest}")
+                    printf '  [symlink] %s (broken or incorrect target)\n' "${dest}" >&2
+                fi
+                ;;
+            *)
+                printf 'Error: invalid type detected: %s\n' "${ftype}" >&2
+                exit 1
+                ;;
+        esac
+    done < "${MANIFEST}"
+
+    broke_symlink="${#broken_symlink_files[@]}"
+    broke_merged="${#broken_merged_files[@]}"
+    broke_generated="${#broken_generated_files[@]}"
+
+    local total_broken=$((broke_symlink + broke_merged + broke_generated))
+    local total_ok=$((ok_merged + ok_generated + ok_symlink))
+    local total=$((total_broken + total_ok))
+
+    if [[ ${total_broken} -eq 0 ]]; then
+        printf '  [verify] OK: All %d files verified successfully.\n' "${total_ok}"
+        printf '           (%d symlinks, %d generated, %d merged)\n' "${ok_symlink}" "${ok_generated}" "${ok_merged}"
+        return 0
+    else
+        printf '  [verify] NOT OK: %d out of %d files are broken.\n' "${total_broken}" "${total}" >&2
+        printf '           Symlinks  : %2d OK, %2d broken\n' "${ok_symlink}" "${broke_symlink}" >&2
+        printf '           Generated : %2d OK, %2d broken\n' "${ok_generated}" "${broke_generated}" >&2
+        printf '           Merged    : %2d OK, %2d broken\n' "${ok_merged}" "${broke_merged}" >&2
+        printf >&2
+        printf '  [verify] Broken File Details:\n' >&2
+        # print exactly which files are broken
+        if [[ "${broke_symlink}" -gt 0 ]]; then
+            for f in "${broken_symlink_files[@]}"; do
+                printf '    - [symlink]   %s (broken or incorrect target)\n' "${f}" >&2
+            done
+        fi
+
+        if [[ "${broke_generated}" -gt 0 ]]; then
+            for f in "${broken_generated_files[@]}"; do
+                printf '    - [generated] %s (missing or empty)\n' "${f}" >&2
+            done
+        fi
+
+        if [[ "${broke_merged}" -gt 0 ]]; then
+            for f in "${broken_merged_files[@]}"; do
+                printf '    - [merged]    %s (missing or broken sentinels)\n' "${f}" >&2
+            done
+        fi
+
+        echo "" >&2
+        return 1
+    fi
 }
 
 print_banner() {

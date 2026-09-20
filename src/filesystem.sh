@@ -376,7 +376,7 @@ dotfiles::file_perm() {
 		# topgrade
 		modules/topgrade/topgrade.toml)
 			if [[ "${TARGET_OS}" == "${OS_WINDOWS}" ]]; then
-				printf '%s' "${APPDATA:-${HOME}/.config}/topgrade.toml"
+				printf '%s' "${APPDATA}/topgrade/topgrade.toml"
 			else
 				printf '%s' "${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
 			fi

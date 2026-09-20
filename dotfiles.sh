@@ -37,6 +37,7 @@ readonly DOTFILES_PROMPT_WINDOWS_HANDOFF="${DOTFILES_PROMPT_WINDOWS_HANDOFF:-1}"
 # src files
 readonly SOURCE_FILES=(
     "src/print.sh"
+    "src/argparse.sh"
 )
 
 # functions
@@ -106,7 +107,7 @@ set_module_dir() {
 # Returns:
 #   0 if TARGET_OS and TARGET_RUNTIME are set
 #   1 if TARGET_OS and TARGET_RUNTIME remain 'unknown'
-set_os_runtime() {
+set_target_env() {
     [[ -n ${TARGET_OS:-} || -n ${TARGET_RUNTIME:-} ]] && return 0
 
     local kernel_name
@@ -191,7 +192,7 @@ set_windows_sudo() {
 }
 
 # Detect if script was run as sudo or root.
-set_elevated() {
+set_is_elevated() {
     [[ -n ${IS_ELEVATED:-}  ]] && return 0
 
     IS_ELEVATED=0
@@ -207,7 +208,7 @@ set_module_map() {
     [[ -n ${MODULE_MAP:-}  ]] && return 0
 
     if [[ ${TARGET_OS} == "${OS_WINDOWS}"   ]]; then
-        local -r topgrade_dest="${APPDATA:-${HOME}/.config}/topgrade.toml"
+        local -r topgrade_dest="${APPDATA}/topgrade/topgrade.toml"
     else
         local -r topgrade_dest="${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
     fi
@@ -379,9 +380,10 @@ check_exists() {
 
 initialise() {
     bash_version_check || return 1
+
     set_src_path || return 1   # SRC_PATH
     set_module_dir || return 1 # MODULE_DIR
-    set_os_runtime || {      # TARGET_OS TARGET_RUNTIME TARGET_ENV
+    set_target_env || {        # TARGET_OS TARGET_RUNTIME TARGET_ENV
         printf 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.\n' >&2
         prompt_continue 'Some functionality may be limited.'
     }
@@ -390,7 +392,7 @@ initialise() {
         set_windows_sudo # WINDOWS_SUDO
     fi
 
-    set_elevated          # IS_ELEVATED
+    set_is_elevated       # IS_ELEVATED
     set_module_map        # MODULE_MAP
     set_available_modules # AVAILABLE_MODULES
 }
@@ -422,10 +424,11 @@ source_files() {
 
 main() {
     initialise || exit 1
+
     check_exists "${SOURCE_FILES[@]}" || exit 1
     source_files "${SOURCE_FILES[@]}" || exit 1
 
-    #argparse "$@"
+    argparse "$@"
 
     print_banner
 
