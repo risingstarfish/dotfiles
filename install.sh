@@ -471,7 +471,7 @@ ACTIONS
   -r, --repair               Remove orphaned symlinks and generated files, then re-link/generate.
       --reset                Remove all symlinks and generated files managed by this tool.
                              (note: copied/merged files will remain)
-  -b, --backup [file...]     Copy current managed file(s) to the backup directory. Without 
+  -b, --backup [file...]     Copy current managed file(s) to the backup directory. Without
                              arguments, backs up all managed files.
       --clean-backups [N]    Remove backups older than <N> days. (default: 7, 0 = all)
       --clean-logs [N]       Remove logs older than <N> days. (default: 7, 0 = all)
@@ -491,7 +491,7 @@ RESTORE
       --restore [file...]    Restore file(s) from the most recent backup.
                              Without arguments, lists restorable files.
       --restore-all          Restore ALL files from the most recent backup run.
-      --from <run>           Restore from a specific run (e.g. 2026-07-16/14-52-31).  
+      --from <run>           Restore from a specific run (e.g. 2026-07-16/14-52-31).
                              (default: most recent)
       --backup-list <N>      Show <N> available backup runs and their files. (default: 5)
 
@@ -507,7 +507,7 @@ BEHAVIOUR
 LOGGING
   -v, --verbose              Print detailed step-by-step instructions.
   -q, --quiet                Suppress all standard output except errors.
-      --log-level <level>    Set log verbosity <level>. Valid options are: debug, info, warn, or 
+      --log-level <level>    Set log verbosity <level>. Valid options are: debug, info, warn, or
                              error. (default: info)
       --no-log               Disable writing to the log file.
 
@@ -862,7 +862,7 @@ EOF
 			cat <<EOF
 
 TODO: short description of example
-TODO: command 
+TODO: command
 
 bash ${program}
 
@@ -873,13 +873,13 @@ EOF
 		dotfiles::print_banner() {
 			cat <<'EOF'
 
-  ____        _    __ _ _           
- |  _ \  ___ | |_ / _(_) | ___  ___ 
+  ____        _    __ _ _
+ |  _ \  ___ | |_ / _(_) | ___  ___
  | | | |/ _ \| __| |_| | |/ _ \/ __|
  | |_| | (_) | |_|  _| | |  __/\__ \
  |____/ \___/ \__|_| |_|_|\___||___/
  -----------------------------------
-     Automated Environment Setup      
+     Automated Environment Setup
  -----------------------------------
 
 EOF

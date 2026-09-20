@@ -16,22 +16,22 @@ ALL ACTIONS:
 
 INSTALL
       --install              Install (or reinstall) all available dotfiles.
-      --uninstall            Deletes symlinks, logs, and backups, then deletes install directory.
   -u, --update               Update from Git before installing.
-  -r, --repair               Remove orphaned symlinks and generated files, then re-link/generate.
+  -r, --remove <module...>   Remove target modules <module>, semicolon-separated.
+  -R, --repair               Remove orphaned symlinks and generated files, then re-link/generate.
       --reset                Remove all symlinks and generated files managed by this tool.
                              (note: copied/merged files will remain)
+      --uninstall            Deletes symlinks, logs, and backups, then deletes install directory.
 
 INFORMATION
-  -l, --list                 Display all available modules, status, and information.
-      --verify               Check all managed symlinks. (exit 0 = healthy, 1 = broken)
-      --examples             Show some example commands.
+  -l, --list                 Display all available modules.
+      --verify               Check all managed dotfiles. (exit 0 = healthy, 1 = broken)
       --version              Show the version and git information of this program.
   -h, --help                 Show this help message.
 
 ALL OPTIONS:
 
-MODULES
+INSTALL MODULES
   -i, --include <module...>  Install ONLY the specified modules <module>, semicolon-separated.
   -x, --exclude <module...>  Install all modules EXCEPT specified <module>, semicolon-separated.
 
@@ -50,11 +50,10 @@ LOGGING
   -q, --quiet                Suppress all standard output except errors.
       --log-level <level>    Set log verbosity <level>. Valid options are: debug, info, warn, or
                              error. (default: info)
-      --no-log               Disable writing to the log file.
+      --no-log               Disable logging to stdout (still writes to file).
 
 ENVIRONMENT VARIABLES
   Global (Always Active):
-    DOTFILES_INSTALL_DIR     Target directory for installation. (default: ~/dotfiles)
     DOTFILES_LOG_DIR         Path to store log files. (default: ~/.config/dotfiles/logs)
     DOTFILES_CACHE_DIR       Path to store temporary cache. (default: ~/.cache/dotfiles)
     DOTFILES_LOG             Set to 0 or false to disable log file writing. (default: 1)
@@ -216,7 +215,7 @@ list_modules() {
 }
 
 print_verification()   {
-    if [[ ! -f "${MANIFEST}" ]]; then
+    if [[ ! -f ${MANIFEST}   ]]; then
         printf 'No manifest found. Nothing to verify.\n'
         return 0
     fi
@@ -237,11 +236,11 @@ print_verification()   {
     local dest
 
     while IFS=$'\t' read -r src dest ftype; do
-        [[ -z "${dest}" ]] && continue
+        [[ -z ${dest}   ]] && continue
         case "${ftype}" in
             merged)
                 # healthy if file exists and has both sentinels
-                if [[ -f "${dest}" ]] \
+                if [[ -f ${dest}   ]] \
                     && grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" \
                     && grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
                     ok_merged=$((ok_merged + 1))
@@ -251,7 +250,7 @@ print_verification()   {
                 fi
                 ;;
             generated)
-                if [[ -f "${dest}" && -s "${dest}" ]]; then
+                if [[ -f ${dest} && -s ${dest}     ]]; then
                     ok_generated=$((ok_generated + 1))
                 else
                     broken_generated_files+=("${dest}")
@@ -259,7 +258,7 @@ print_verification()   {
                 fi
                 ;;
             symlink)
-                if [[ -L "${dest}" && -e "${dest}" && "$(readlink "${dest}")" == "${src}" ]]; then
+                if [[ -L ${dest} && -e ${dest} && "$(    readlink "${dest}")" == "${src}" ]]; then
                     ok_symlink=$((ok_symlink + 1))
                 else
                     broken_symlink_files+=("${dest}")
@@ -293,19 +292,19 @@ print_verification()   {
         printf >&2
         printf '  [verify] Broken File Details:\n' >&2
         # print exactly which files are broken
-        if [[ "${broke_symlink}" -gt 0 ]]; then
+        if [[ ${broke_symlink} -gt 0   ]]; then
             for f in "${broken_symlink_files[@]}"; do
                 printf '    - [symlink]   %s (broken or incorrect target)\n' "${f}" >&2
             done
         fi
 
-        if [[ "${broke_generated}" -gt 0 ]]; then
+        if [[ ${broke_generated} -gt 0   ]]; then
             for f in "${broken_generated_files[@]}"; do
                 printf '    - [generated] %s (missing or empty)\n' "${f}" >&2
             done
         fi
 
-        if [[ "${broke_merged}" -gt 0 ]]; then
+        if [[ ${broke_merged} -gt 0   ]]; then
             for f in "${broken_merged_files[@]}"; do
                 printf '    - [merged]    %s (missing or broken sentinels)\n' "${f}" >&2
             done
@@ -355,4 +354,8 @@ EOF
 
 EOF
     fi
+}
+
+print_help_error_msg() {
+    printf 'Run `bash %s --help` for valid options.\n' "$(basename "$0")" >&2
 }

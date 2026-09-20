@@ -17,19 +17,19 @@ parse_module_list()  {
         # trim whitespace
         m="${m#"${m%%[![:space:]]*}"}"
         m="${m%"${m##*[![:space:]]}"}"
-        [[ -z "$m" ]] && continue
+        [[ -z $m   ]] && continue
 
         valid=0
-        if [[ "$m" == */* ]]; then
+        if [[ $m == */*   ]]; then
             for mod in "${AVAILABLE_MODULES[@]}"; do
-                if [[ "$mod" == "$m" || "$mod" == "$m/"* ]]; then
+                if [[ $mod == "$m" || $mod == "$m/"*     ]]; then
                     valid=1
                     break
                 fi
             done
         else
             for mod in "${AVAILABLE_MODULES[@]}"; do
-                [[ "${mod%%/*}" == "$m" ]] && valid=1 && break
+                [[ ${mod%%/*} == "$m"   ]] && valid=1 && break
             done
         fi
 
@@ -42,22 +42,50 @@ parse_module_list()  {
     done
 }
 
-assert_no_action() {
-    if [[ -n "$ACTION" ]]; then
-        printf 'Error: action already set to "%s". Conflicting flag: %s\n' "$ACTION" "$1" >&2
+# $1 = value to test
+# $2 = full message
+# $3 = new flag
+_assert_string_unset() {
+    if [[ -n ${1}   ]]; then
+        printf 'Error: %s. Conflicting flag: "%s"\n' "${2}" "${3}" >&2
         exit 2
     fi
 }
 
+# $1 = sentinel value (0 = unset, 1 = set)
+# $2 = message
+# $3 = flag name
+_assert_flag_unset() {
+    if [[ $1 -eq 1     ]]; then
+        printf 'Error: %s. Conflicting flag: "%s"\n' "${2}" "${3}" >&2
+        exit 2
+    fi
+}
+
+assert_main_action_unset() {
+    _assert_string_unset "${MAIN_ACTION}" "action already set to \"${MAIN_ACTION}\"" "${1}"
+}
+
 assert_log_level_unset() {
-    if [[ -n "$LOG_LEVEL" ]]; then
-        printf 'Error: log level already set to "%s". Conflicting flag: %s\n' "$LOG_LEVEL" "$1" >&2
-        exit 2
-    fi
-    if [[ "$LOG_ENABLED" -eq 0 ]]; then
-        printf 'Error: --no-log was specified. Conflicting flag: %s\n' "$1" >&2
-        exit 2
-    fi
+    _assert_string_unset "${LOG_LEVEL}" "log level already set to \"${LOG_LEVEL}\"" "${1}"
+    _assert_flag_unset "${NO_LOG}" "logging is disabled via --no-log" "${1}"
+}
+
+assert_exclude_modules_unset() {
+    _assert_flag_unset "${EXCLUDE_SET}" "excluded modules is already set" "${1}"
+}
+assert_include_modules_unset() {
+    _assert_flag_unset "${INCLUDE_SET}" "included modules is already set" "${1}"
+}
+
+assert_interactive_unset() {
+    _assert_flag_unset "${INTERACTIVE}" "interactive mode is already set" "$1"
+}
+assert_noconfirm_unset() {
+    _assert_flag_unset "${NOCONFIRM}" "noconfirm is already set" "$1"
+}
+assert_force_unset() {
+    _assert_flag_unset "${FORCE}" "force mode is already set" "$1"
 }
 
 # $1 = flag name (for error message)
@@ -70,26 +98,23 @@ require_arg() {
 }
 
 argparse() {
-    ACTION=""
-    # INSTALL=0
-    # UNINSTALL=0
-    # UPDATE=0
-    # REPAIR=0
-    # RESET=0
+    MAIN_ACTION=""
 
-    INCLUDE_MODULES=()
-    EXCLUDE_MODULES=()
+    REMOVE_SET=()
+
+    INCLUDE_SET=()
+    EXCLUDE_SET=()
 
     DRY_RUN=0
     INTERACTIVE=0
     NOCONFIRM=0
     FORCE=0
-    DOTFILES_AUTORESTART=0
+    DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0}
     NO_BACKUP=0
     NO_DEPS=0
 
-    LOG_LEVEL=''
-    LOG_ENABLED=1
+    LOG_LEVEL=""
+    NO_LOG=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -100,10 +125,6 @@ argparse() {
                 ;;
             --version)
                 print_version
-                exit 0
-                ;;
-            --examples)
-                print_examples
                 exit 0
                 ;;
             --verify)
@@ -118,48 +139,72 @@ argparse() {
 
             # install
             --install)
-                assert_no_action "$1"
-                ACTION="install"
+                assert_main_action_unset "$1"
+                MAIN_ACTION="install"
+                shift
+                ;;
+            -r | --remove)
+                assert_main_action_unset "$1"
+                assert_exclude_modules_unset "${1}"
+                assert_include_modules_unset "${1}"
+                require_arg "${1}" "${2:-}"
+                parse_module_list "${2}" REMOVE_SET
+                MAIN_ACTION="remove"
+                shift 2
+                ;;
+            --remove=*)
+                assert_main_action_unset "${1%%=*}"
+                assert_exclude_modules_unset "${1%%=*}"
+                assert_include_modules_unset "${1%%=*}"
+                require_arg "${1%%=*}" "${1#*=}"
+                parse_module_list "${1#*=}" REMOVE_SET
+                MAIN_ACTION="remove"
                 shift
                 ;;
             --uninstall)
-                assert_no_action "$1"
-                ACTION="uninstall"
+                assert_main_action_unset "$1"
+                MAIN_ACTION="uninstall"
                 shift
                 ;;
             -u | --update)
-                assert_no_action "$1"
-                ACTION="update"
+                assert_main_action_unset "$1"
+                MAIN_ACTION="update"
                 shift
                 ;;
-            -r | --repair)
-                assert_no_action "$1"
-                ACTION="repair"
+            -R | --repair)
+                assert_main_action_unset "$1"
+                MAIN_ACTION="repair"
                 shift
                 ;;
             --reset)
-                assert_no_action "$1"
-                ACTION="reset"
+                assert_main_action_unset "$1"
+                MAIN_ACTION="reset"
                 shift
                 ;;
 
             # modules
             -i | --include)
+                assert_exclude_modules_unset "${1}"
                 require_arg "$1" "${2:-}"
-                parse_module_list "$2" INCLUDE_MODULES
+                parse_module_list "$2" INCLUDE_SET
                 shift 2
                 ;;
             -i=* | --include=*)
-                parse_module_list "${1#*=}" INCLUDE_MODULES
+                assert_exclude_modules_unset "${1%%=*}"
+                require_arg "${1%%=*}" "${1#*=}"
+                parse_module_list "${1#*=}" INCLUDE_SET
                 shift
                 ;;
             -x | --exclude)
+                assert_include_modules_unset "${1}"
                 require_arg "$1" "${2:-}"
-                parse_module_list "$2" EXCLUDE_MODULES
+                parse_module_list "$2" EXCLUDE_SET
                 shift 2
                 ;;
             -x=* | --exclude=*)
-                parse_module_list "${1#*=}" EXCLUDE_MODULES
+                assert_include_modules_unset "${1%%=*}"
+                require_arg "${1%%=*}" "${1#*=}"
+                parse_module_list "${1#*=}" EXCLUDE_SET
                 shift
                 ;;
 
@@ -169,14 +214,18 @@ argparse() {
                 shift
                 ;;
             -I | --interactive)
+                assert_force_unset "${1}"
+                assert_noconfirm_unset "${1}"
                 INTERACTIVE=1
                 shift
                 ;;
             --noconfirm | -y | --yes)
+                assert_interactive_unset "${1}"
                 NOCONFIRM=1
                 shift
                 ;;
             -f | --force)
+                assert_interactive_unset "${1}"
                 FORCE=1
                 shift
                 ;;
@@ -208,18 +257,18 @@ argparse() {
                 assert_log_level_unset "$1"
                 require_arg     "$1" "${2:-}"
                 case "$2" in
-                    debug |     info | warn | error)
+                    debug | info | warn | error)
                         LOG_LEVEL="$2"
-                        shift     2
+                        shift 2
                         ;;
                     *)
-                        printf     'Error: invalid log level "%s". Use: debug, info, warn, or error\n' "$2" >&2
-                        exit     2
+                        printf 'Error: invalid log level "%s". Use: debug, info, warn, or error\n' "$2" >&2
+                        exit 2
                         ;;
                 esac
                 ;;
             --log-level=*)
-                assert_log_level_unset "$1"
+                assert_log_level_unset "${1%%=*}"
                 case "${1#*=}" in
                     debug | info | warn | error)
                         LOG_LEVEL="${1#*=}"
@@ -232,35 +281,64 @@ argparse() {
                 shift
                 ;;
             --no-log)
-                if [[ -n "$LOG_LEVEL" ]]; then
+                if [[ -n $LOG_LEVEL   ]]; then
                     printf 'Error: log level already set to "%s". Cannot use %s.\n' "$LOG_LEVEL" "$1" >&2
                     exit 2
                 fi
-                LOG_ENABLED=0
+                NO_LOG=1
                 shift
                 ;;
 
             *)
                 printf 'Error: invalid parameter "%s"\n' "$1" >&2
-                printf 'Run `bash %s --help` for valid options.\n' "$(basename "$0")" >&2
+                print_help_error_msg
                 exit 2
                 ;;
         esac
     done
 
     # default values
-    if [[ -z "$LOG_LEVEL" ]]; then
+    if [[ -z $LOG_LEVEL ]]; then
         LOG_LEVEL="info"
     fi
 
-    if [[ -z "$ACTION" ]]; then
-        printf 'Error: no action specified. Use --install, --update, --repair, --reset, or --uninstall.\n' >&2
+    # validation
+    if [[ -z $MAIN_ACTION ]]; then
+        printf 'Error: no action specified. Use --install, --update, --remove, --repair, --reset, or --uninstall.\n' >&2
+        print_help_error_msg
         exit 2
     fi
 
-    case "$ACTION" in
+    if [[ ${MAIN_ACTION} == "remove" ]]; then
+        if [[ ${#INCLUDE_SET[@]} -gt 0 || ${#EXCLUDE_SET[@]} -gt 0 ]]; then
+            printf 'Error: --include/--exclude is not supported with --remove\n' >&2
+            exit 2
+        fi
+    fi
+
+    if [[ ${MAIN_ACTION} == "update" ]]; then
+        if [[ ${#INCLUDE_SET[@]} -gt 0 || ${#EXCLUDE_SET[@]} -gt 0 ]]; then
+            printf 'Error: --include/--exclude is not supported with --update\n' >&2
+            exit 2
+        fi
+    fi
+
+    if [[ ${NO_BACKUP} -eq 1 && ${MAIN_ACTION} == "reset" ]]; then
+        printf 'Error: --no-backup is not allowed with --reset\n' >&2
+        exit 2
+    fi
+
+    if [[ ${#REMOVE_SET[@]} -eq 0 && ${MAIN_ACTION} == "remove" ]]; then
+        printf 'Error: no modules specified for --remove\n' >&2
+        exit 2
+    fi
+
+    case "$MAIN_ACTION" in
         install)
             #run_install
+            ;;
+        remove)
+            #run_remove
             ;;
         uninstall)
             #run_uninstall
