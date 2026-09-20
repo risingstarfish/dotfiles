@@ -394,22 +394,22 @@ main() {
 
     case "$MAIN_ACTION" in
         install)
-            #run_install
+            printf 'TODO: run_install'
             ;;
         remove)
-            #run_remove
+            printf 'TODO: run_remove'
             ;;
         uninstall)
-            #run_uninstall
+            printf 'TODO: run_uninstall'
             ;;
         update)
-            #run_update
+            printf 'TODO: run_update'
             ;;
         repair)
-            #run_repair
+            printf 'TODO: run_repair'
             ;;
         reset)
-            #run_reset
+            printf 'TODO: run_reset'
             ;;
     esac
 
