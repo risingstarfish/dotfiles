@@ -390,7 +390,7 @@ main() {
 
     print_banner
 
-    # TODO: logging, dry run etc
+    printf '# TODO: logging, dry run etc'
 
     case "$MAIN_ACTION" in
         install)
@@ -416,15 +416,12 @@ main() {
     print_end
 
     if [[ ${DRY_RUN} -eq 0 && ${DOTFILES_AUTORESTART} -eq 1 ]]; then
-        if is_windows_bash; then
-            exit 0
-        else
+        if ! is_windows_bash; then
             exec "${SHELL:-/bin/zsh}" -l
         fi
     fi
 
     exit 0
-
 }
 
 main "$@"
