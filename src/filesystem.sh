@@ -6,4 +6,14 @@ if [[ -n ${__FILESYSTEM_SH_INCLUDED__:-}     ]]; then
 fi
 readonly __FILESYSTEM_SH_INCLUDED__=1
 
+symlink_all() {
+    :
+}
 
+copy_all() {
+    :
+}
+
+generate_all() {
+    :
+}

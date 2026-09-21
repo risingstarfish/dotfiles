@@ -177,10 +177,12 @@ do_install() {
     log_debug "${FUNCNAME[0]}: Initialized local module and file arrays"
 
     local rc=0
+    local num_err=0
     log_trace "${FUNCNAME[0]}: Initialized status tracer rc=${rc}"
-    #symlink_all || rc=1
-    #copy_all || rc=1
-    #generate_all || rc=1
+
+    symlink_all "${num_err}" || rc=1
+    copy_all "${num_err}" || rc=1
+    generate_all "${num_err}" || rc=1
 
     log_trace "${FUNCNAME[0]}: Evaluating final status code rc=${rc}"
     if ((rc)); then
