@@ -261,8 +261,11 @@ argparse() {
     # default values
     if [[ -z $LOG_LEVEL ]]; then
         case "${DOTFILES_ENV}" in
-            development | testing)
+            development)
                 LOG_LEVEL="DEBUG"
+                ;;
+             testing)
+                LOG_LEVEL="TRACE"
                 ;;
             production)
                 LOG_LEVEL="INFO"
@@ -321,4 +324,10 @@ argparse() {
             die 2 '--no-deps is meaningless with --dry-run'
         fi
     fi
+
+    readonly MAIN_ACTION \
+        REMOVE_SET INCLUDE_SET EXCLUDE_SET \
+        DRY_RUN INTERACTIVE NOCONFIRM FORCE DOTFILES_AUTORESTART \
+        NO_BACKUP NO_DEPS \
+        LOG_LEVEL NO_LOG
 }

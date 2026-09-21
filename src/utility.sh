@@ -88,7 +88,7 @@ parse_module_list()  {
         else
             for mod in "${AVAILABLE_MODULES[@]}"; do
                 modname="${mod##*/}"
-                if [[ "${mod%%/*}" == "$m" || "$modname" == "$m" ]]; then
+                if [[ ${mod%%/*} == "$m" || $modname == "$m"     ]]; then
                     valid=1
                     break
                 fi
@@ -100,4 +100,24 @@ parse_module_list()  {
         fi
         arr+=("$m")
     done
+}
+
+timer_start() {
+    if [[ -n ${EPOCHREALTIME:-} ]]; then
+        _TIMER_START="${EPOCHREALTIME}"
+    else
+        _TIMER_START=$("${_LOG_DATE_CMD:-date}" +%s.%N 2> /dev/null || date +%s)
+    fi
+}
+
+timer_elapsed() {
+    local end
+    if [[ -n ${EPOCHREALTIME:-} ]]; then
+        end="${EPOCHREALTIME}"
+    else
+        end=$("${_LOG_DATE_CMD:-date}" +%s.%N 2> /dev/null || date +%s)
+    fi
+
+    # Calculate difference using awk (works cross-platform without 'bc')
+    awk -v start="${_TIMER_START}" -v end="${end}" 'BEGIN { printf "%.3fs", end - start }'
 }
