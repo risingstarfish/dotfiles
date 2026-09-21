@@ -36,9 +36,10 @@ readonly DOTFILES_PROMPT_WINDOWS_HANDOFF="${DOTFILES_PROMPT_WINDOWS_HANDOFF:-1}"
 
 # src files
 readonly SOURCE_FILES=(
-    "src/utility.sh" # keep first
+    "src/utility.sh"
     "src/print.sh"
     "src/argparse.sh"
+    "src/dependencies.sh"
 )
 
 # functions
@@ -254,7 +255,6 @@ set_module_map() {
         "sha1.ps1|pwsh.${TARGET_ENV}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
         "md5.ps1|pwsh.${TARGET_ENV}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
 
-        # --- Oh My Posh ---
         "tiger.omp.json|oh-my-posh.${TARGET_ENV}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
         "agnoster.omp.json|oh-my-posh.${TARGET_ENV}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
         "kushal.omp.json|oh-my-posh.${TARGET_ENV}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
