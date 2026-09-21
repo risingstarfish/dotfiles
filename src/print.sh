@@ -46,10 +46,10 @@ BEHAVIOUR
       --no-deps              Skip dotfiles dependency post installation.
 
 LOGGING
-  -v, --verbose              Print detailed step-by-step instructions.
+  -d, --debug                Print debug output (useful for diagnosing).
   -q, --quiet                Suppress all standard output except errors.
-      --log-level <level>    Set log verbosity <level>. Valid options are: debug, info, warn, or
-                             error. (default: info)
+      --log-level <level>    Set log verbosity <level>. Valid options are: debug, info, notice,
+                             warn, or error. (default: info)
       --no-log               Disable logging to stdout (still writes to file).
 
 ENVIRONMENT VARIABLES

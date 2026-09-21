@@ -7,12 +7,15 @@ if [[ -z ${HOME:-} || ! -d $HOME ]]; then
     exit 1
 fi
 
+readonly DOTFILES_ENV="${DOTFILES_ENV:-production}" # development testing production
 readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-$HOME/.config/dotfiles/logs}"
 readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-$HOME/.cache/dotfiles}"
 readonly MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
 
 readonly MERGE_TOP_SENTINEL='# --- Local Configuration (managed by dotfiles) ---'
 readonly MERGE_BOTTOM_SENTINEL='# --- Do not edit this line or above ---'
+
+readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"
 
 # OS
 readonly OS_CACHYOS='cachyos'
@@ -39,6 +42,8 @@ readonly SOURCE_FILES=(
     "src/utility.sh"
     "src/print.sh"
     "src/argparse.sh"
+    "src/logging.sh"
+    "src/action.sh"
     "src/dependencies.sh"
 )
 
@@ -301,6 +306,17 @@ set_available_modules() {
     readonly AVAILABLE_MODULES
 }
 
+set_dotfiles_ref() {
+    if ! git -C "${SRC_PATH}" rev-parse --git-dir > /dev/null 2>&1; then
+        printf 'Error: unable to determine git ref. Make sure this is a git repo.' >&2
+        return 1
+    fi
+
+    DOTFILES_REF="$(git -C "${SRC_PATH}" config --local dotfiles.ref 2> /dev/null || true)"
+    DOTFILES_REF="${DOTFILES_REF:-main}"
+    readonly DOTFILES_REF
+}
+
 check_exists() {
     local -r -a paths=("$@")
     local -a missing_paths=()
@@ -359,7 +375,8 @@ source_files() {
 initialise() {
     bash_version_check || exit 1
 
-    set_src_path || exit 1   # SRC_PATH
+    set_src_path || exit 1 # SRC_PATH
+
     # check src/
     check_exists "${SOURCE_FILES[@]}" || exit 1
     source_files "${SOURCE_FILES[@]}" || exit 1
@@ -389,28 +406,51 @@ main() {
         NO_BACKUP NO_DEPS \
         LOG_LEVEL NO_LOG
 
-    print_banner
+    # init logger
+    local -a log_cmd=(--log "${DOTFILES_LOG_DIR}/logfile.log" --level "${LOG_LEVEL}" --format "%d %z [%l] %m")
+    if ((NO_LOG)); then
+        log_cmd+=("--quiet")
+    fi
 
-    printf '# TODO: logging, dry run etc'
+    case "${DOTFILES_ENV}" in
+        development)
+            log_cmd+=("--verbose" "--colour")
+            ;;
+        testing)
+            log_cmd+=("--no-colour")
+            ;;
+        production) ;;
+    esac
+
+    if ! init_logger "${log_cmd[@]}"; then
+        die 1 'failed to initialise logger.\nCheck that log directory exists and is writable.'
+    fi
+
+    unset -v log_cmd
+
+    print_banner
 
     case "$MAIN_ACTION" in
         install)
-            printf 'TODO: run_install'
+            log_info "Beginning installation!"
             ;;
         remove)
-            printf 'TODO: run_remove'
+            log_info "Beginning removal!"
             ;;
         uninstall)
-            printf 'TODO: run_uninstall'
+            log_info "Beginning uninstallation!"
             ;;
         update)
-            printf 'TODO: run_update'
+            log_info "Beginning update!"
+            set_dotfiles_ref || exit 1 # DOTFILES_REF
+            do_update
+            # install
             ;;
         repair)
-            printf 'TODO: run_repair'
+            log_info "Beginning repair!"
             ;;
         reset)
-            printf 'TODO: run_reset'
+            log_info "Beginning reset!"
             ;;
     esac
 

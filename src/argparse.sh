@@ -206,7 +206,7 @@ argparse() {
                 ;;
 
                 # logging
-            -v | --verbose)
+            -d | --debug)
                 assert_log_level_unset "$1"
                 LOG_LEVEL="debug"
                 shift
@@ -219,24 +219,27 @@ argparse() {
             --log-level)
                 assert_log_level_unset "$1"
                 require_arg     "$1" "${2:-}"
-                case "$2" in
-                    debug | info | warn | error)
-                        LOG_LEVEL="$2"
+                local level="${2^^}"
+                case "${level}" in
+                    debug | info | notice | warn | error)
+                        LOG_LEVEL="${level}"
                         shift 2
                         ;;
                     *)
-                        die 2 'invalid log level "%s". Use: debug, info, warn, or error' "$2"
+                        die 2 'invalid log level "%s". Use: debug, info, notice, warn, or error' "$2"
                         ;;
                 esac
                 ;;
             --log-level=*)
                 assert_log_level_unset "${1%%=*}"
-                case "${1#*=}" in
-                    debug | info | warn | error)
-                        LOG_LEVEL="${1#*=}"
+                local level="${1#*=}"
+                level="${level^^}"
+                case "${level}" in
+                    debug | info | notice | warn | error)
+                        LOG_LEVEL="${level}"
                         ;;
                     *)
-                        die 2 'invalid log level "%s". Use: debug, info, warn, or error' "${1#*=}"
+                        die 2 'invalid log level "%s". Use: debug, info, notice, warn, or error' "${1#*=}"
                         ;;
                 esac
                 shift
@@ -257,7 +260,14 @@ argparse() {
 
     # default values
     if [[ -z $LOG_LEVEL ]]; then
-        LOG_LEVEL="info"
+        case "${DOTFILES_ENV}" in
+            development | testing)
+                LOG_LEVEL="DEBUG"
+                ;;
+            production)
+                LOG_LEVEL="INFO"
+                ;;
+        esac
     fi
 
     # validation
