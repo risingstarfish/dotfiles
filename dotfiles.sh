@@ -307,6 +307,8 @@ set_available_modules() {
 }
 
 set_dotfiles_ref() {
+    [[ -n ${DOTFILES_REF:-} ]] && return 0
+
     if ! git -C "${SRC_PATH}" rev-parse --git-dir > /dev/null 2>&1; then
         printf 'Error: unable to determine git ref. Make sure this is a git repo.' >&2
         return 1
@@ -432,7 +434,7 @@ main() {
 
     case "$MAIN_ACTION" in
         install)
-            log_info "Beginning installation!"
+            do_install
             ;;
         remove)
             log_info "Beginning removal!"
@@ -441,10 +443,8 @@ main() {
             log_info "Beginning uninstallation!"
             ;;
         update)
-            log_info "Beginning update!"
-            set_dotfiles_ref || exit 1 # DOTFILES_REF
             do_update
-            # install
+            do_install
             ;;
         repair)
             log_info "Beginning repair!"

@@ -6,7 +6,25 @@ if [[ -n ${__ACTION_SH_INCLUDED__:-}     ]]; then
 fi
 readonly __ACTION_SH_INCLUDED__=1
 
+do_install() {
+    log_info "Beginning installation!"
+
+    local rc=0
+    #symlink_all || rc=1
+    #copy_all || rc=1
+    #generate_all || rc=1
+
+    if ((rc)); then
+        log_error 'Install finished with errors!'
+        return 1
+    fi
+    log_info "Installation complete!"
+}
+
 do_update() {
+    set_dotfiles_ref || exit 1 # DOTFILES_REF
+    log_info "Beginning update!"
+
     if [[ ! -d "${SRC_PATH}/.git" ]]; then
         die 1 '%s is not a git clone. Run with --install first.' "${SRC_PATH}"
     fi
