@@ -51,30 +51,32 @@ do_update() {
             return 1
         fi
     else
-        if ((NOCONFIRM)); then
-            :
-        else
-            log_info "About to run: git reset --hard FETCH_HEAD"
-            printf '\n' >&2
-            printf '  This discards ALL local changes in %s.\n' "${SRC_PATH}" >&2
-            printf '  Continue? [Y/n] ' >&2
-            local reply
-            read -r reply
-            case "${reply,,}" in
-                y | yes | '')
-                    :
-                    ;;
-                *)
-                    log_warn "Reset cancelled by user."
-                    return 1
-                    ;;
-            esac
-            printf '\n' >&2
-        fi
-        
-        if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2> /dev/null; then
-            log_error "Reset to ${DOTFILES_REF} failed in ${SRC_PATH}."
-            return 1
+        if [[ has_local_mods -eq 1 ]]; then
+            if ((NOCONFIRM)); then
+                :
+            else
+                log_info "About to run: git reset --hard FETCH_HEAD"
+                printf '\n' >&2
+                printf '  This discards ALL local changes in %s.\n' "${SRC_PATH}" >&2
+                printf '  Continue? [Y/n] ' >&2
+                local reply
+                read -r reply
+                case "${reply,,}" in
+                    y | yes | '')
+                        :
+                        ;;
+                    *)
+                        log_warn "Reset cancelled by user."
+                        return 1
+                        ;;
+                esac
+                printf '\n' >&2
+            fi
+
+            if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2> /dev/null; then
+                log_error "Reset to ${DOTFILES_REF} failed in ${SRC_PATH}."
+                return 1
+            fi
         fi
         if command git -C "${SRC_PATH}" show-ref --verify --quiet "refs/heads/${DOTFILES_REF}" 2> /dev/null; then
             command git -C "${SRC_PATH}" branch -f "${DOTFILES_REF}" FETCH_HEAD 2> /dev/null || true
