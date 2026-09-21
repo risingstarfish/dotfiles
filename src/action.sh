@@ -7,7 +7,7 @@ fi
 readonly __ACTION_SH_INCLUDED__=1
 
 set_user_modules() {
-    log_trace "${FUNCNAME[0]}: Entering (USER_MODULES count: ${#USER_MODULES[@]})"
+    _enter
 
     if [[ -n ${USER_MODULES:-}  ]]; then
         log_debug "${FUNCNAME[0]}: USER_MODULES is already populated. Skipping."
@@ -78,13 +78,13 @@ set_user_modules() {
     done
 
     log_info "${FUNCNAME[0]}: Selected ${#USER_MODULES[@]} total modules for processing."
-    log_trace "${FUNCNAME[0]}: Setting USER_MODULES as readonly and exiting successfully"
+
+    _exit
     readonly USER_MODULES
 }
 
 set_file_types() {
-    log_trace "${FUNCNAME[0]}: Entering (SYMLINK_FILES=${#SYMLINK_FILES[@]}, COPY_FILES=${#COPY_FILES[@]}, GENERATE_FILES=${#GENERATE_FILES[@]})"
-
+    _enter
     if [[ -n ${SYMLINK_FILES:-} || -n ${COPY_FILES:-} || -n ${GENERATE_FILES:-} ]]; then
         log_debug "${FUNCNAME[0]}: SYMLINK_FILES, COPY_FILES, and GENERATE_FILES are already populated. Skipping categorisation."
         log_trace "${FUNCNAME[0]}: Exiting (already populated)"
@@ -114,12 +114,12 @@ set_file_types() {
 
     log_info "${FUNCNAME[0]}: Categorised ${#SYMLINK_FILES[@]} symlinks, ${#COPY_FILES[@]} copies, \
 ${#GENERATE_FILES[@]} generated."
-    log_trace "${FUNCNAME[0]}: Marking file type arrays as readonly and exiting successfully"
     readonly SYMLINK_FILES COPY_FILES GENERATE_FILES
+    _exit
 }
 
 set_dotfiles_ref() {
-    log_trace "${FUNCNAME[0]}: Entering (DOTFILES_REF='${DOTFILES_REF:-}', SRC_PATH='${SRC_PATH:-}')"
+    _enter
 
     if [[ -n ${DOTFILES_REF:-} ]]; then
         log_debug "${FUNCNAME[0]}: DOTFILES_REF already set to '${DOTFILES_REF}'. Skipping."
@@ -152,12 +152,12 @@ set_dotfiles_ref() {
         log_trace "${FUNCNAME[0]}: Assigned DOTFILES_REF='main' (default fallback)"
     fi
 
-    log_trace "${FUNCNAME[0]}: Marking DOTFILES_REF as readonly and exiting successfully"
+    _exit
     readonly DOTFILES_REF
 }
 
 do_install() {
-    log_trace "${FUNCNAME[0]}: Entering"
+    _enter
 
     local USER_MODULES=()
     local SYMLINK_FILES=()
@@ -193,13 +193,13 @@ do_install() {
     fi
 
     log_info 'Installation complete!'
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    _exit
 }
 
 do_update() {
-    local DOTFILES_REF
+    _enter
 
-    log_trace "Entering ${FUNCNAME[0]}() [SRC_PATH='${SRC_PATH}', DOTFILES_LOCAL_MODS='${DOTFILES_LOCAL_MODS}', NOCONFIRM='${NOCONFIRM}']"
+    local DOTFILES_REF
 
     set_dotfiles_ref || { # DOTFILES_REF
         log_trace "set_dotfiles_ref failed with exit status $?, exiting ${FUNCNAME[0]}()"
@@ -315,6 +315,6 @@ do_update() {
         fi
     fi
 
-    log_trace "Exiting ${FUNCNAME[0]}() successfully with status 0"
+    _exit
     return 0
 }
