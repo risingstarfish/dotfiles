@@ -7,6 +7,7 @@ fi
 readonly __PRINT_SH_INCLUDED__=1
 
 print_help() {
+    _enter
     cat << EOF
 OVERVIEW: Installs and synchronizes dotfiles and shell configuration.
 
@@ -65,10 +66,12 @@ ENVIRONMENT VARIABLES
     DOTFILES_IGNORE_HANDOFF  Set to 1 or true to ignore the Windows Powershell notice. (default 0)
 
 EOF
+    _exit
 }
 
 # utility
 git_or_unknown() {
+    _enter
     local default="$1"
     shift
 
@@ -78,9 +81,11 @@ git_or_unknown() {
     else
         printf '%s' "$default"
     fi
+    _exit
 }
 
 print_version() {
+    _enter
     local dotfiles_install_dir
     local dotfiles_branch
     local dotfiles_remote
@@ -103,9 +108,12 @@ Repository: ${dotfiles_install_dir}
 Remote: ${dotfiles_remote}
 
 EOF
+    _exit
 }
 
 list_modules() {
+    _enter
+
     set_available_modules
 
     local -a manifest_sources=()
@@ -210,10 +218,12 @@ list_modules() {
         printf '  (%s) %s\n' "${status}" "${filename}"
     done
 
-    echo
+    printf '\n'
+    _exit
 }
 
 print_verification()   {
+    _enter
     if [[ ! -f ${MANIFEST}   ]]; then
         printf 'No manifest found. Nothing to verify.\n'
         return 0
@@ -313,24 +323,28 @@ print_verification()   {
         printf "\n" >&2
         return 1
     fi
+    _exit
 }
 
 print_banner() {
-    cat << 'EOF'
-
-  ____        _    __ _ _
- |  _ \  ___ | |_ / _(_) | ___  ___
- | | | |/ _ \| __| |_| | |/ _ \/ __|
- | |_| | (_) | |_|  _| | |  __/\__ \
- |____/ \___/ \__|_| |_|_|\___||___/
- -----------------------------------
-     Automated Environment Setup
- -----------------------------------
-
+    _enter
+    printf '%b\n' "$(
+                 cat << 'EOF'
+\e[1;96m  ____        _    __ _ _             \e[0m
+\e[1;96m |  _ \  ___ | |_ / _(_) | ___  ___   \e[0m
+\e[1;96m | | | |/ _ \| __| |_| | |/ _ \/ __|  \e[0m
+\e[1;96m | |_| | (_) | |_|  _| | |  __/\__ \  \e[0m
+\e[1;96m |____/ \___/ \__|_| |_|_|\___||___/  \e[0m
+\e[1;90m -----------------------------------\e[0m
+\e[1;97m     Automated Environment Setup    \e[0m
+\e[1;90m -----------------------------------\e[0m
 EOF
+    )"
+    _exit
 }
 
 print_end() {
+    _enter
     if ((DOTFILES_AUTORESTART)); then
         if is_windows_bash; then
             cat << 'EOF'
@@ -370,4 +384,5 @@ EOF
 
 EOF
     fi
+    _exit
 }
