@@ -269,37 +269,41 @@ do_update() {
     else
         if [[ ${has_local_mods} -eq 1 ]]; then
             log_trace "Local mods present without override; checking user confirmation prompt"
-            if ((NOCONFIRM)); then
-                log_trace "NOCONFIRM is set (${NOCONFIRM}); bypassing interactive prompt"
-            else
-                log_info "About to run: git reset --hard FETCH_HEAD"
-                printf '\n' >&2
-                printf '  This discards ALL local changes in %s.\n' "${SRC_PATH}" >&2
-                printf '  Continue? [Y/n] ' >&2
-                local reply
-                read -r reply
-                log_trace "User prompt reply: '${reply}'"
-                case "${reply,,}" in
-                    y | yes | '')
-                        log_trace "User confirmed reset"
-                        ;;
-                    *)
-                        log_trace "User rejected reset prompt"
-                        log_warn "Reset cancelled by user."
-                        log_trace "Exiting ${FUNCNAME[0]}() with status 1 (user cancelled)"
-                        return 1
-                        ;;
-                esac
-                printf '\n' >&2
-            fi
+            _attempt_cmd "git -C '\"${SRC_PATH}\"' reset --hard FETCH_HEAD" \
+                "This discards ALL local changes in '${SRC_PATH}'" \
+                "Reset to ${DOTFILES_REF} failed in '${SRC_PATH}'." \
+                "Reset local repository." || return 1
+            # if ((NOCONFIRM)); then
+            #     log_trace "NOCONFIRM is set (${NOCONFIRM}); bypassing interactive prompt"
+            # else
+            #     log_info "About to run: git reset --hard FETCH_HEAD"
+            #     printf '\n' >&2
+            #     printf '  This discards ALL local changes in %s.\n' "${SRC_PATH}" >&2
+            #     printf '  Continue? [Y/n] ' >&2
+            #     local reply
+            #     read -r reply
+            #     log_trace "User prompt reply: '${reply}'"
+            #     case "${reply,,}" in
+            #         y | yes | '')
+            #             log_trace "User confirmed reset"
+            #             ;;
+            #         *)
+            #             log_trace "User rejected reset prompt"
+            #             log_warn "Reset cancelled by user."
+            #             log_trace "Exiting ${FUNCNAME[0]}() with status 1 (user cancelled)"
+            #             return 1
+            #             ;;
+            #     esac
+            #     printf '\n' >&2
+            # fi
 
-            log_trace "Executing: git -C '${SRC_PATH}' reset --hard FETCH_HEAD"
-            if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2> /dev/null; then
-                log_trace "git reset failed"
-                log_error "Reset to ${DOTFILES_REF} failed in ${SRC_PATH}."
-                log_trace "Exiting ${FUNCNAME[0]}() with status 1 (reset failed)"
-                return 1
-            fi
+            # log_trace "Executing: git -C '${SRC_PATH}' reset --hard FETCH_HEAD"
+            # if ! command git -C "${SRC_PATH}" reset --hard FETCH_HEAD 2> /dev/null; then
+            #     log_trace "git reset failed"
+            #     log_error "Reset to ${DOTFILES_REF} failed in ${SRC_PATH}."
+            #     log_trace "Exiting ${FUNCNAME[0]}() with status 1 (reset failed)"
+            #     return 1
+            # fi
         fi
 
         log_trace "Checking branch existence: refs/heads/${DOTFILES_REF}"

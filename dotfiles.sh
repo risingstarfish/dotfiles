@@ -34,8 +34,6 @@ readonly RUNTIME_UNKNOWN='unknown'
 readonly WINDOWS_SUDO_REG_LOCATION='HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Sudo'
 
 # user env vars
-# DOTFILES_LOG_DIR
-# DOTFILES_CACHE_DIR
 readonly DOTFILES_PROMPT_WINDOWS_HANDOFF="${DOTFILES_PROMPT_WINDOWS_HANDOFF:-1}"
 
 # src files
@@ -469,19 +467,19 @@ source_files() {
 
         if [[ -z ${file} ]]; then
             log_error "${FUNCNAME[0]}: Called without a file path argument."
-            printf 'Error: source_file called without a file path argument.\n' >&2
+            # printf 'Error: source_file called without a file path argument.\n' >&2
             return 1
         fi
 
         if [[ ! -f ${file} ]]; then
             log_error "${FUNCNAME[0]}: File '${file}' does not exist or is a directory."
-            printf 'Error: cannot source "%s": File does not exist or is a directory.\n' "${file}" >&2
+            # printf 'Error: cannot source "%s": File does not exist or is a directory.\n' "${file}" >&2
             return 1
         fi
 
         if [[ ! -r ${file} ]]; then
             log_error "${FUNCNAME[0]}: Read permission denied for '${file}'."
-            printf 'Error: cannot source "%s": Read permission denied.\n' "${file}" >&2
+            # printf 'Error: cannot source "%s": Read permission denied.\n' "${file}" >&2
             return 1
         fi
 
@@ -489,7 +487,7 @@ source_files() {
         source "${file}" || {
             local ec=$?
             log_error "${FUNCNAME[0]}: Failed to source '${file}' (exit code: ${ec})."
-            printf 'Error: file "%s" was read, but execution failed with exit code %d.\n' "${file}" "${ec}" >&2
+            # printf 'Error: file "%s" was read, but execution failed with exit code %d.\n' "${file}" "${ec}" >&2
             return 1
         }
     done
@@ -551,7 +549,7 @@ main() {
     # NOTE: no DOTFILES_AUTORESTART
     local MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
-        DRY_RUN INTERACTIVE NOCONFIRM FORCE \
+        DRY_RUN NOCONFIRM FORCE \
         NO_BACKUP  NO_DEPS \
         LOG_LEVEL NO_LOG
     argparse "$@"
@@ -587,20 +585,20 @@ main() {
             do_install
             ;;
         remove)
-            log_info "Beginning removal!"
+            printf "\n\n--> TODO: Beginning removal! <--\n"
             ;;
         uninstall)
-            log_info "Beginning uninstallation!"
+            printf "\n\n--> TODO: Beginning uninstallation! <--\n"
             ;;
         update)
             do_update
             do_install
             ;;
         repair)
-            log_info "Beginning repair!"
+            printf "\n\n--> TODO: Beginning repair! <--\n"
             ;;
         reset)
-            log_info "Beginning reset!"
+            printf "\n\n--> TODO: Beginning reset! <--\n"
             ;;
     esac
     print_end

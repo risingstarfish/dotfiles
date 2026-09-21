@@ -1896,6 +1896,14 @@ log_trace() {
     fi
 }
 
+_enter() {
+    log_trace "${FUNCNAME[1]}: Entering..."
+}
+
+_exit() {
+    log_trace "${FUNCNAME[1]}: Exiting..."
+}
+
 log_debug() {
     if [[ $CURRENT_LOG_LEVEL -ge $LOG_LEVEL_DEBUG ]]; then
         _log_message "DEBUG" "$LOG_LEVEL_DEBUG" "$1"

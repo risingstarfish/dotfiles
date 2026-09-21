@@ -6,17 +6,54 @@ if [[ -n ${__FILESYSTEM_SH_INCLUDED__:-}     ]]; then
 fi
 readonly __FILESYSTEM_SH_INCLUDED__=1
 
-symlink_all() {
-    local -n err_ref="${1}"
+_prepare_file() {
+    _enter
 
+    local -r source="${1:-}"
+    local -r dest="${2:-}"
+    local -r caller="${FUNCNAME[1]}"
+
+    if [[ -z ${source} || -z ${dest}     ]]; then
+        log_error "${caller}: requires both source and destination paths."
+        return 1
+    fi
+
+    if [[ ! -f ${source}   ]]; then
+        log_error "${caller_name}: source file does not exist: '${source}'"
+        return 1
+    fi
+
+    local dest_dir
+    dest_dir="$(dirname "${dest}")"
+    if [[ ! -d ${dest_dir}   ]]; then
+        log_trace "${caller}: Destination directory does not exist."
+        local -r cmd='mkdir -p %s' "${dest_dir}"
+
+        _attempt_cmd \
+            "mkdir -p \"${dest_dir}\"" \
+            "This will recursively create missing directories if they do not exist." \
+            "Cannot create target directory '${dest_dir}'" \
+            "Created directory '${dest_dir}'" || return 1
+    fi
+
+    _exit
+}
+
+symlink_all() {
+    _enter
+
+    _exit
 }
 
 copy_all() {
-    local -n err_ref="${1}"
+    _enter
+
+    _exit
 
 }
 
 generate_all() {
-    local -n err_ref="${1}"
+    _enter
 
+    _exit
 }

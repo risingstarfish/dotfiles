@@ -24,6 +24,8 @@ die() {
 #   $1 (format) : (Optional) The warning message, or a printf-style format string.
 #   $@ (args)   : (Optional) Arguments to populate the format string.
 prompt_continue() {
+    log_trace "${FUNCNAME[0]}: Entering"
+
     local msg
     if [[ $# -eq 0 ]]; then
         msg=""
@@ -58,6 +60,7 @@ prompt_continue() {
                 ;;
         esac
     done
+    log_trace "${FUNCNAME[0]}: Exiting"
 }
 
 is_windows_bash() {
@@ -65,6 +68,8 @@ is_windows_bash() {
 }
 
 parse_module_list()  {
+    log_trace "${FUNCNAME[0]}: Entering"
+
     local -n arr="$2"
     local mod
     local valid
@@ -100,6 +105,60 @@ parse_module_list()  {
         fi
         arr+=("$m")
     done
+    log_trace "${FUNCNAME[0]}: Exiting"
+}
+
+_attempt_cmd() {
+    log_trace "${FUNCNAME[0]}: Entering"
+
+    local -r cmd="${1}"
+    local -r msg="${2}"
+    local -r err_msg="${3}"
+    local -r suc_msg="${4:-}"
+
+    if ((DRY_RUN)); then
+        log_trace "${FUNCNAME[0]}: DRY_RUN is set (${DRY_RUN}); bypassing operation"
+        log_info "[dry-run] ${cmd}"
+        return 0
+    fi
+
+    if ((NOCONFIRM)); then
+        log_trace "${FUNCNAME[0]}: NOCONFIRM is set (${NOCONFIRM}); bypassing interactive prompt"
+    else
+        log_info "About to run: ${cmd}"
+        printf '\n  %s\n' "${msg}" >&2
+
+        local reply
+        read -r '  Continue? [Y/n] ' reply >&2
+        log_trace "${FUNCNAME[0]}: User prompt reply: '${reply}'"
+        case "${reply,,}" in
+            y | yes | '')
+                log_trace "${FUNCNAME[0]}: User confirmed"
+                ;;
+            *)
+                log_trace "${FUNCNAME[0]}: User rejected prompt"
+                log_warn "Operation cancelled by user."
+                log_trace "${FUNCNAME[0]}: Exiting with status 130 (user cancelled)"
+                return 130
+                ;;
+        esac
+        printf '\n' >&2
+    fi
+
+    log_trace "${FUNCNAME[0]}: Executing: ${cmd}"
+    local err_output
+    if ! err_output=$(eval "${cmd}" 2>&1); then
+        log_trace "${FUNCNAME[0]}: Operation failed"
+        log_error "${err_msg}"
+        log_debug "System error: ${err_output}"
+        return 1
+    fi
+
+    if [[ -n ${suc_msg} ]]; then
+        log_debug "${suc_msg}"
+    fi
+
+    log_trace "${FUNCNAME[0]}: Exiting"
 }
 
 timer_start() {

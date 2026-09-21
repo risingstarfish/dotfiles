@@ -10,71 +10,88 @@ readonly __ARGPARSE_SH_INCLUDED__=1
 # $2 = full message
 # $3 = new flag
 _assert_string_unset() {
+    _enter
     if [[ -n ${1}   ]]; then
         die 2 '%s. Conflicting flag: "%s"' "${2}" "${3}"
     fi
+    _exit
 }
 
 # $1 = sentinel value (0 = unset, 1 = set)
 # $2 = message
 # $3 = flag name
 _assert_flag_unset() {
+    _enter
     if [[ $1 -eq 1     ]]; then
         die 2 '%s. Conflicting flag: "%s"' "${2}" "${3}"
     fi
+    _exit
 }
 
 assert_main_action_unset() {
+    _enter
     _assert_string_unset "${MAIN_ACTION}" "action already set to \"${MAIN_ACTION}\"" "${1}"
+    _exit
 }
 
 assert_log_level_unset() {
+    _enter
     _assert_string_unset "${LOG_LEVEL}" "log level already set to \"${LOG_LEVEL}\"" "${1}"
     _assert_flag_unset "${NO_LOG}" "logging is disabled via --no-log" "${1}"
+    _exit
 }
 
 assert_exclude_modules_unset() {
+    _enter
     _assert_flag_unset "${EXCLUDE_SET}" "excluded modules is already set" "${1}"
+    _exit
 }
 assert_include_modules_unset() {
+    _enter
     _assert_flag_unset "${INCLUDE_SET}" "included modules is already set" "${1}"
+    _exit
 }
 
 assert_interactive_unset() {
+    _enter
     _assert_flag_unset "${INTERACTIVE}" "interactive mode is already set" "$1"
+    _exit
 }
 assert_noconfirm_unset() {
+    _enter
     _assert_flag_unset "${NOCONFIRM}" "noconfirm is already set" "$1"
+    _exit
 }
 assert_force_unset() {
+    _enter
     _assert_flag_unset "${FORCE}" "force mode is already set" "$1"
+    _exit
 }
 
 # $1 = flag name (for error message)
 # $2 = value to validate
 require_arg() {
+    _enter
     if [[ -z ${2:-} || ${2} == -* ]]; then
         die 2 'missing argument for %s.' "$1"
     fi
 }
 
 argparse() {
+    _enter
+
     MAIN_ACTION=""
-
     REMOVE_SET=()
-
     INCLUDE_SET=()
     EXCLUDE_SET=()
-
     DRY_RUN=0
-    INTERACTIVE=0
     NOCONFIRM=0
+    local interactive_flag
     FORCE=0
-    DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0}
-    local autorestart_cli_flag=0
+    DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0} # env
+    local autorestart_flag
     NO_BACKUP=0
     NO_DEPS=0
-
     LOG_LEVEL=""
     NO_LOG=0
 
@@ -178,7 +195,8 @@ argparse() {
             -I | --interactive)
                 assert_force_unset "${1}"
                 assert_noconfirm_unset "${1}"
-                INTERACTIVE=1
+                NOCONFIRM=0
+                interactive_flag=1
                 shift
                 ;;
             --noconfirm | -y | --yes)
@@ -193,7 +211,7 @@ argparse() {
                 ;;
             -K | --autorestart)
                 DOTFILES_AUTORESTART=1
-                autorestart_cli_flag=1
+                autorestart_flag=1
                 shift
                 ;;
             --no-backup)
@@ -305,13 +323,13 @@ argparse() {
 
     if [[ ${DRY_RUN} -eq 1 ]]; then
         if [[ ${DOTFILES_AUTORESTART} -eq 1 ]]; then
-            if [[ ${autorestart_cli_flag} -eq 1 ]]; then
+            if [[ ${autorestart_flag} -eq 1 ]]; then
                 die 2 '--autorestart is not meaningful with --dry-run'
             fi
             DOTFILES_AUTORESTART=0
         fi
 
-        if [[ ${INTERACTIVE} -eq 1 ]]; then
+        if [[ ${interactive_flag} -eq 1 ]]; then
             die 2 '--interactive is meaningless with --dry-run'
         fi
         if [[ ${FORCE} -eq 1 ]]; then
@@ -327,7 +345,9 @@ argparse() {
 
     readonly MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
-        DRY_RUN INTERACTIVE NOCONFIRM FORCE DOTFILES_AUTORESTART \
+        DRY_RUN NOCONFIRM FORCE DOTFILES_AUTORESTART \
         NO_BACKUP NO_DEPS \
         LOG_LEVEL NO_LOG
+
+    _exit
 }
