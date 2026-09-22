@@ -54,7 +54,7 @@ assert_include_modules_unset() {
 
 assert_interactive_unset() {
     _enter
-    _assert_flag_unset "${INTERACTIVE}" "interactive mode is already set" "$1"
+    _assert_flag_unset "${interactive_flag}" "interactive mode is already set" "$1"
     _exit
 }
 assert_noconfirm_unset() {

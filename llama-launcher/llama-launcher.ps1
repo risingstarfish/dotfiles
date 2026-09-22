@@ -8,9 +8,9 @@ param (
 
     [ValidateRange(0, 999)]
     [int]$NgL = 999,
-    
+
     [ValidateRange(4096, 262144)]
-    [int]$CtxSize = 131072,
+    [int]$CtxSize = 150000,
 
     [ValidateSet("xhigh", "medium", "low")]
     [string]$Reasoning = "xhigh",
@@ -25,7 +25,7 @@ param (
 )
 
 Set-StrictMode -Version Latest
-$defaultModel = "Qwen3.8-27B-UD-Q2_K_XL.mtp.gguf"
+$defaultModel = "Qwen3.8-27B-UD-Q6_K_XL.mtp.gguf" #"Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf"
 
 # env check
 $RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")

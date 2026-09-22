@@ -26,7 +26,7 @@ _prepare_file() {
     local dest_dir
     dest_dir="$(dirname "${dest}")"
     if [[ ! -d ${dest_dir}   ]]; then
-        log_trace "${caller}: Destination directory does not exist."
+        log_debug "${caller}: Destination directory does not exist."
         local -r cmd='mkdir -p %s' "${dest_dir}"
 
         _attempt_cmd \

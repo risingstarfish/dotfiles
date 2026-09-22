@@ -1,4 +1,4 @@
-. $env:USERPROFILE\Documents\Powershell\Scripts\Set-MSVC-Environment.ps1
+#. $env:USERPROFILE\Documents\Powershell\Scripts\Set-MSVC-Environment.ps1
 . $env:USERPROFILE\Documents\Powershell\Scripts\Update-Modules.ps1
 ##. $env:USERPROFILE\oh-my-posh\scripts\AutoCd.ps1
 . $env:USERPROFILE\Documents\Powershell\Scripts\Print-Env.ps1
