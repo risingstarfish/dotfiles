@@ -544,7 +544,7 @@ main() {
         IS_ELEVATED
     local -a MODULE_MAP AVAILABLE_MODULES
 
-    initialise  #TODO: separate logger for init
+    initialise
 
     # NOTE: no DOTFILES_AUTORESTART
     local MAIN_ACTION \

@@ -42,11 +42,18 @@ _prepare_file() {
 symlink_all() {
     _enter
 
+    log_info "Symlinking ${#SYMLINK_FILES[@]} files..."
+    for file in "${SYMLINK_FILES[@]}"; do
+        :
+    done
+
     _exit
 }
 
 copy_all() {
     _enter
+
+    log_info "Copying ${#COPY_FILES[@]} files..."
 
     _exit
 
@@ -54,6 +61,7 @@ copy_all() {
 
 generate_all() {
     _enter
+    log_info "Generating ${#GENERATE_FILES[@]} files..."
 
     _exit
 }

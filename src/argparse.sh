@@ -239,7 +239,7 @@ argparse() {
                 require_arg     "$1" "${2:-}"
                 local level="${2^^}"
                 case "${level}" in
-                    debug | info | notice | warn | error)
+                    DEBUG | INFO | NOTICE | WARN | ERROR)
                         LOG_LEVEL="${level}"
                         shift 2
                         ;;
@@ -253,7 +253,7 @@ argparse() {
                 local level="${1#*=}"
                 level="${level^^}"
                 case "${level}" in
-                    debug | info | notice | warn | error)
+                    DEBUG | INFO | NOTICE | WARN | ERROR)
                         LOG_LEVEL="${level}"
                         ;;
                     *)

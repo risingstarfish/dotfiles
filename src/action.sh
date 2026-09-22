@@ -77,7 +77,7 @@ set_user_modules() {
         USER_MODULES+=("${mod}")
     done
 
-    log_info "${FUNCNAME[0]}: Selected ${#USER_MODULES[@]} total modules for processing."
+    log_info "Selected ${#USER_MODULES[@]} total modules for processing."
 
     _exit
     readonly USER_MODULES
@@ -112,7 +112,7 @@ set_file_types() {
         fi
     done
 
-    log_info "${FUNCNAME[0]}: Categorised ${#SYMLINK_FILES[@]} symlinks, ${#COPY_FILES[@]} copies, \
+    log_info "Categorised ${#SYMLINK_FILES[@]} symlinks, ${#COPY_FILES[@]} copies, \
 ${#GENERATE_FILES[@]} generated."
     readonly SYMLINK_FILES COPY_FILES GENERATE_FILES
     _exit
