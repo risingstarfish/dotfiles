@@ -770,12 +770,15 @@ do_uninstall() {
 #   130  user declined
 _maintenance_confirm() {
     _enter
+    log_trace "Entering (DF_DRY_RUN=${DF_DRY_RUN}, DF_NOCONFIRM=${DF_NOCONFIRM})"
     if ((DF_DRY_RUN)) || ((DF_NOCONFIRM)); then
+        log_trace "Skipping prompt (dry-run or noconfirm)"
         _exit
         return 0
     fi
 
     local reply
+    log_debug "Prompting user for maintenance confirmation."
     printf '\n  %b\n  Continue? [Y/n] ' "$1" >&2
     read -r reply || reply=""
     log_trace "User prompt reply: '${reply}'"
@@ -802,7 +805,10 @@ _clean_backups() {
     _enter
     local ec=0
 
+    log_debug "Backup dir: '${DOTFILES_BACKUP_DIR}' (mode: $([[ -n ${DF_CLEAN_DAYS} ]] && printf 'days=%s' "${DF_CLEAN_DAYS}" || printf 'keep=%s' "${DF_CLEAN_KEEP}"))"
+
     if [[ ! -d ${DOTFILES_BACKUP_DIR} ]]; then
+        log_debug "Backup directory does not exist."
         log_info "No backup directory at '${DOTFILES_BACKUP_DIR}'. Nothing to clean."
         _exit
         return 0
@@ -814,12 +820,14 @@ _clean_backups() {
     while IFS= read -r d; do
         [[ -n $d ]] && all+=("$d")
     done < <(ls -1t -- "${DOTFILES_BACKUP_DIR}" 2> /dev/null)
+    log_trace "Enumerated ${#all[@]} backup dir(s) (newest first)."
 
     if [[ -n ${DF_CLEAN_DAYS} ]]; then
         local t
         while IFS= read -r -d '' t; do
             targets+=("$t")
         done < <(find "${DOTFILES_BACKUP_DIR}" -mindepth 1 -maxdepth 1 -mtime +"${DF_CLEAN_DAYS}" -print0 2> /dev/null)
+        log_trace "Days mode: ${#targets[@]} dir(s) older than ${DF_CLEAN_DAYS} day(s)."
         if [[ ${#targets[@]} -eq 0 ]]; then
             log_info "No backups older than ${DF_CLEAN_DAYS} day(s). Nothing to clean."
             _exit
@@ -832,7 +840,9 @@ _clean_backups() {
     else
         # count mode: keep the latest DF_CLEAN_KEEP
         local total=${#all[@]}
+        log_trace "Count mode: total=${total}, keep=${DF_CLEAN_KEEP}"
         if ((DF_CLEAN_KEEP <= 0)) || ((total <= DF_CLEAN_KEEP)); then
+            log_debug "Within keep limit; nothing to remove."
             log_info "Keeping all ${total} backup dir(s) (max: ${DF_CLEAN_KEEP}). Nothing to clean."
             _exit
             return 0
@@ -840,6 +850,7 @@ _clean_backups() {
         local i
         for ((i = DF_CLEAN_KEEP; i < total; i++)); do
             targets+=("${all[$i]}")
+            log_trace "Marking for removal: '${all[$i]}'"
         done
         local msg="This will remove ${#targets[@]} backup dir(s), keeping the latest ${DF_CLEAN_KEEP}:"
         for t in "${targets[@]}"; do
@@ -862,6 +873,7 @@ _clean_backups() {
     local dest
     for t in "${targets[@]}"; do
         dest="${DOTFILES_BACKUP_DIR}/${t}"
+        log_debug "Removing: '${dest}'"
         if ! rm -rf -- "${dest}"; then
             log_error "Failed to remove '${dest}'"
             ((++ec))
@@ -870,6 +882,7 @@ _clean_backups() {
         fi
     done
 
+    log_debug "Backup cleanup done: ${#targets[@]} targeted, ${ec} failure(s)."
     _exit "${ec}"
     return "${ec}"
 }
@@ -880,13 +893,20 @@ _clean_logs() {
     _enter
     local ec=0
 
+    log_debug "Log dir: '${DOTFILES_LOG_DIR}'"
     local -a log_files=()
     local f
     for f in "${INIT_LOG_FILE}" "${DOTFILES_LOG_DIR}/main.log"; do
-        [[ -f $f ]] && log_files+=("$f")
+        if [[ -f $f ]]; then
+            log_files+=("$f")
+            log_trace "Found log file: '${f}'"
+        else
+            log_trace "Log file not found (skipping): '${f}'"
+        fi
     done
 
     if [[ ${#log_files[@]} -eq 0 ]]; then
+        log_debug "No log files present."
         log_info "No log files found. Nothing to reset."
         _exit
         return 0
@@ -911,6 +931,7 @@ _clean_logs() {
     fi
 
     for f in "${log_files[@]}"; do
+        log_debug "Truncating: '${f}'"
         if ! : > "${f}"; then
             log_error "Failed to reset '${f}'"
             ((++ec))
@@ -919,6 +940,7 @@ _clean_logs() {
         fi
     done
 
+    log_debug "Log reset done: ${#log_files[@]} targeted, ${ec} failure(s)."
     _exit "${ec}"
     return "${ec}"
 }
