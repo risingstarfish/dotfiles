@@ -100,7 +100,6 @@ argparse() {
     FORCE=0
     DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0} # env
     local autorestart_flag
-    NO_BACKUP=0
     NO_DEPS=0
     LOG_LEVEL=""
     NO_LOG=0
@@ -222,10 +221,6 @@ argparse() {
                 autorestart_flag=1
                 shift
                 ;;
-            --no-backup)
-                NO_BACKUP=1
-                shift
-                ;;
             --no-deps)
                 NO_DEPS=1
                 shift
@@ -318,10 +313,6 @@ argparse() {
         _exit 2
         die 2 "no modules for --remove"
     fi
-    if [[ $MAIN_ACTION == reset && $NO_BACKUP -eq 1 ]]; then
-        _exit 2
-        die 2 "--no-backup not allowed with --reset"
-    fi
 
     case "${MAIN_ACTION}" in
         reset | uninstall | remove)
@@ -330,11 +321,6 @@ argparse() {
             fi
             ;;
     esac
-
-    if [[ ${MAIN_ACTION} == uninstall && ${NO_BACKUP} -eq 1 ]]; then
-        _exit 2
-        die 2 '--no-backup is redundant with --uninstall (it deletes backups itself)'
-    fi
 
     if [[ ${DRY_RUN} -eq 1 ]]; then
         if [[ ${DOTFILES_AUTORESTART} -eq 1 ]]; then
@@ -353,10 +339,6 @@ argparse() {
             _exit 2
             die 2 '--force is meaningless with --dry-run'
         fi
-        if [[ ${NO_BACKUP} -eq 1 ]]; then
-            _exit 2
-            die 2 '--no-backup is meaningless with --dry-run'
-        fi
         if [[ ${NO_DEPS} -eq 1 ]]; then
             _exit 2
             die 2 '--no-deps is meaningless with --dry-run'
@@ -366,7 +348,7 @@ argparse() {
     readonly MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
         DRY_RUN NOCONFIRM INTERACTIVE FORCE DOTFILES_AUTORESTART \
-        NO_BACKUP NO_DEPS \
+        NO_DEPS \
         LOG_LEVEL NO_LOG \
         PRINT_TIME
 

@@ -42,7 +42,6 @@ BEHAVIOUR
   -y, --yes                  Auto-accept yes to prompts. Alias to --noconfirm.
   -f, --force                Overwrite existing files/links.
   -K, --autorestart          Automatically restart shell at script end.
-      --no-backup            Delete existing conflicting files instead of backing up.
       --no-deps              Skip dotfiles dependency post installation.
 
 LOGGING
@@ -61,9 +60,6 @@ ENVIRONMENT VARIABLES
     DOTFILES_LOCAL_MODS      Set to 1 or true to install with uncommitted local changes.
                              (default: 0)
     DOTFILES_AUTORESTART     Set to 1 or true to restart shell at script finish. (default: 0)
-
-  ###Windows Specific:
-    ###DOTFILES_IGNORE_HANDOFF  Set to 1 or true to ignore the Windows Powershell notice. (default 0)
 
 EOF
     _exit

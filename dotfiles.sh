@@ -354,7 +354,7 @@ _set_dotfiles_manifest() {
     readonly DOTFILES_MANIFEST=(
         "symlink|zsh/zshrc|${HOME}/.zshrc"
         "symlink|zsh/zsh_options|${HOME}/.zsh_options"
-        "symlink|sh/zstyles|${HOME}/.zstyles"
+        "symlink|zsh/zstyles|${HOME}/.zstyles"
         "symlink|zsh/zimrc|${HOME}/.zimrc"
         "symlink|zsh/p10k.zsh|${HOME}/.p10k.zsh"
         "symlink|zsh/exports|${HOME}/.exports"
@@ -407,6 +407,8 @@ _set_dotfiles_manifest() {
         "symlink|claude/settings.json|${HOME}/.claude/settings.json"
         "symlink|claude/plugin.json|${HOME}/.claude/plugin.json"
     )
+
+    # verification
     _exit
 }
 
@@ -639,7 +641,7 @@ main() {
     local MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
         DRY_RUN NOCONFIRM INTERACTIVE FORCE \
-        NO_BACKUP  NO_DEPS \
+        NO_DEPS \
         LOG_LEVEL NO_LOG \
         PRINT_TIME
 
@@ -674,15 +676,18 @@ main() {
     unset -v log_cmd
 
     print_banner
+
+    local ec=0
     case "$MAIN_ACTION" in
         install)
             do_install
+            do_install_deps
             ;;
         remove)
             local REMOVE_ERRORS=0
              do_remove || {
                 printf 'Error: remove finished with %d failure(s).\n' "${REMOVE_ERRORS}" >&2
-                exit 1
+                ec=1
             }
             ;;
         uninstall)
@@ -694,24 +699,28 @@ main() {
                 printf '    %s\n'  "${DOTFILES_CACHE_DIR}"  >&2
                 printf '    %s\n'  "${SRC_PATH}"            >&2
                 printf '\n' >&2
-                exit 1
+                ec=1
+
             }
             ;;
 
         update)
-            do_update
-            do_install
+            do_update || ec=1
+            do_install || ec=1
+            do_install_deps || ec=1
             ;;
         repair)
             local REPAIR_ERRORS=0
             do_repair || {
-                die 1 'Error: repair finished with %d failure(s).\n' "${REPAIR_ERRORS}"
+                printf 'Error: repair finished with %d failure(s).\n' "${REPAIR_ERRORS}" >&2
+                ec=1
             }
             ;;
         reset)
             local RESET_ERRORS=0
             do_reset || {
-                die 1 'Error: reset finished with %d failure(s).\n' "${RESET_ERRORS}"
+                printf 'Error: reset finished with %d failure(s).\n' "${RESET_ERRORS}" >&2
+                ec=1
             }
             ;;
     esac
@@ -732,7 +741,7 @@ main() {
         fi
     fi
 
-    exit 0
+    exit "${ec}"
 }
 
 main "$@"

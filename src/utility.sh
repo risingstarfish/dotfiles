@@ -131,23 +131,60 @@ parse_module_list() {
     _exit
 }
 
-_attempt_cmd() {
-    _enter
+# Executes a command and handles success/failure logging.
+# No prompting, no dry-run — call one of the _attempt_* wrappers instead.
+#
+# $1 = shell command string (eval'd)
+# $2 = error message (printf format)
+# $3 = success message (printf format)
+_exec_cmd() {
+    local -r cmd="${1}"
+    local -r err_msg="${2}"
+    local -r suc_msg="${3}"
 
+    log_trace "Executing: ${cmd}"
+    local err_output
+    if ! err_output=$(eval "${cmd}" 2>&1); then
+        log_trace "Operation failed"
+        log_error "${err_msg}"
+        log_debug "System error: ${err_output}"
+        _exit 1
+        return 1
+    fi
+
+    log_debug "${suc_msg}"
+    _exit
+    return 0
+}
+
+# Use for irreversible operations (rm, reset, uninstall, …).
+# Prompts the user unless NOCONFIRM=1.
+#
+# $1 = shell command string
+# $2 = human-readable description (shown in prompt)
+# $3 = error message
+# $4 = success message
+#
+# Returns:
+#   0    success (or dry-run)
+#   1    command failed
+#   130  user declined
+attempt_cmd() {
+    _enter
     local -r cmd="${1}"
     local -r msg="${2}"
     local -r err_msg="${3}"
-    local -r suc_msg="${4:-}"
+    local -r suc_msg="${4}"
 
     if ((DRY_RUN)); then
-        log_trace "DRY_RUN is set (${DRY_RUN}); bypassing operation"
+        log_trace "DRY_RUN set; bypassing destructive operation"
         log_info "[dry-run] ${cmd}"
         _exit
         return 0
     fi
 
     if ((NOCONFIRM)); then
-        log_trace "NOCONFIRM is set (${NOCONFIRM}); bypassing interactive prompt"
+        log_trace "NOCONFIRM set; skipping prompt"
     else
         log_info "About to run: ${cmd}"
         printf '\n  %s\n' "${msg}" >&2
@@ -163,26 +200,65 @@ _attempt_cmd() {
             *)
                 log_trace "User rejected prompt"
                 log_warn "Operation cancelled by user."
-                log_trace "Exiting with status 130 (user cancelled)"
+                _exit 130
                 return 130
                 ;;
         esac
         printf '\n' >&2
     fi
 
-    log_trace "Executing: ${cmd}"
-    local err_output
-    if ! err_output=$(eval "${cmd}" 2>&1); then
-        log_trace "Operation failed"
-        log_error "${err_msg}"
-        log_debug "System error: ${err_output}"
-        _exit 1
-        return 1
+    _exec_cmd "${cmd}" "${err_msg}" "${suc_msg}"
+}
+
+# Use for idempotent operations (symlink, copy, generate, …).
+# Does NOT prompt by default. Prompts only when INTERACTIVE=1 (--interactive).
+#
+# $1 = shell command string
+# $2 = human-readable description (shown in prompt, if interactive)
+# $3 = error message
+# $4 = success message
+#
+# Returns:
+#   0    success (or dry-run)
+#   1    command failed
+#   130  user declined (interactive mode)
+attempt_cmd_quiet() {
+    _enter
+    local -r cmd="${1}"
+    local -r msg="${2}"
+    local -r err_msg="${3}"
+    local -r suc_msg="${4}"
+
+    if ((DRY_RUN)); then
+        log_trace "DRY_RUN set; bypassing operation"
+        log_info "[dry-run] ${cmd}"
+        _exit
+        return 0
     fi
 
-    if [[ -n ${suc_msg} ]]; then
-        log_debug "${suc_msg}"
+    if ((INTERACTIVE)); then
+        log_info "About to run: ${cmd}"
+        printf '\n  %s\n' "${msg}" >&2
+
+        local reply
+        printf '  Continue? [Y/n] ' >&2
+        read -r reply || reply=""
+        log_trace "User prompt reply: '${reply}'"
+        case "${reply,,}" in
+            y | yes | '')
+                log_trace "User confirmed"
+                ;;
+            *)
+                log_trace "User rejected prompt"
+                log_warn "Operation cancelled by user."
+                _exit 130
+                return 130
+                ;;
+        esac
+        printf '\n' >&2
+    else
+        log_trace "Non-interactive mode; executing without prompt"
     fi
 
-    _exit
+    _exec_cmd "${cmd}" "${err_msg}" "${suc_msg}"
 }

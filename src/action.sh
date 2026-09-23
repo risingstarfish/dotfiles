@@ -181,7 +181,7 @@ _prepare_file() {
     dest_dir="$(dirname "${dest}")"
     if [[ ! -d ${dest_dir} ]]; then
         log_debug "Creating parent directory: '${dest_dir}'"
-        _attempt_cmd \
+        attempt_cmd \
             "mkdir -p \"${dest_dir}\"" \
             "Creating parent directory for ${dest}" \
             "Cannot create target directory '${dest_dir}'" \
@@ -252,7 +252,7 @@ _guard_dest() {
         return 0
     fi
 
-    if ! ((NOCONFIRM)); then
+    if ((INTERACTIVE)); then
         local reply
         printf '\n  Existing file found: %s\n' "${dest}" >&2
         printf '  Back up and replace? [Y/n] ' >&2
@@ -293,7 +293,7 @@ _guard_dest() {
         return 1
     fi
 
-    log_warn "Backing up ${dest} → ${backup_path}"
+    log_notice "Backing up ${dest} → ${backup_path}"
     if ! mv "${dest}" "${backup_path}"; then
         log_error "Failed to back up '${dest}'"
         _exit 1
@@ -446,7 +446,7 @@ install_all() {
         case "${action}" in
             symlink)
                 log_debug "[symlink] ${label}"
-                _attempt_cmd \
+                attempt_cmd_quiet \
                     "ln -sfn \"${full_src}\" \"${dest}\"" \
                     "Symlinking ${label}" \
                     "Symlink failed: ${label}" \
@@ -455,7 +455,7 @@ install_all() {
                 ;;
             copy)
                 log_debug "[copy] ${label}"
-                _attempt_cmd \
+                attempt_cmd_quiet \
                     "cp -f \"${full_src}\" \"${dest}\"" \
                     "Copying ${label}" \
                     "Copy failed: ${label}" \
@@ -470,7 +470,7 @@ install_all() {
                     continue
                 fi
                 log_debug "[generate] ${label}"
-                _attempt_cmd \
+                attempt_cmd_quiet \
                     "\"${full_src}\" \"${dest}\"" \
                     "Generating ${label}" \
                     "Generate failed: ${label}" \
@@ -486,7 +486,7 @@ install_all() {
 
         if ((ok == 0)) && [[ -n ${cmd} ]]; then
             log_debug "Post-install: '${cmd}'"
-            _attempt_cmd "${cmd}" \
+            attempt_cmd_quiet "${cmd}" \
                 "Post-install for ${label}" \
                 "Post-install failed: ${label}" \
                 "Post-install done: ${label}"
@@ -627,7 +627,7 @@ do_update() {
     else
         if ((has_local_mods)); then
             log_trace "Local mods present without override; checking user confirmation prompt"
-            _attempt_cmd "git -C '\"${SRC_PATH}\"' reset --hard FETCH_HEAD" \
+            attempt_cmd "git -C '\"${SRC_PATH}\"' reset --hard FETCH_HEAD" \
                 "This discards ALL local changes in '${SRC_PATH}'" \
                 "Reset to ${DOTFILES_REF} failed in '${SRC_PATH}'." \
                 "Reset local repository." || return 1
@@ -733,15 +733,15 @@ do_uninstall() {
     fi
 
     # NOTE: redundant with cache dir
-    _attempt_cmd "rm -rf \"${DOTFILES_BACKUP_DIR}\"" \
+    attempt_cmd "rm -rf \"${DOTFILES_BACKUP_DIR}\"" \
         "Are you sure you want to completely remove dotfiles backup directory?" \
         "Failed to removed \"${DOTFILES_BACKUP_DIR}\"" \
         "Successfully removed backup directory!" || ((++ec))
-    _attempt_cmd "rm -rf \"${DOTFILES_CACHE_DIR}\"" \
+    attempt_cmd "rm -rf \"${DOTFILES_CACHE_DIR}\"" \
         "Are you sure you want to completely remove dotfiles cache directory?" \
         "Failed to removed \"${DOTFILES_CACHE_DIR}\"" \
         "Successfully removed cache directory!" || ((++ec))
-    _attempt_cmd "rm -rf \"${SRC_PATH}\"" \
+    attempt_cmd "rm -rf \"${SRC_PATH}\"" \
         "Are you sure you want to completely remove dotfiles?" \
         "Failed to removed \"${SRC_PATH}\"" \
         "Successfully removed repository!" || ((++ec))
@@ -1024,7 +1024,7 @@ do_repair() {
         case "${ftype}" in
             symlink)
                 log_debug "[repair:relink] ${label}"
-                _attempt_cmd \
+                attempt_cmd_quiet \
                     "ln -sfn \"${src}\" \"${dest}\"" \
                     "Re-linking ${label}" \
                     "Re-link failed: ${label}" \
@@ -1042,7 +1042,7 @@ do_repair() {
 
             generate)
                 log_debug "[repair:regenerate] ${label}"
-                _attempt_cmd \
+                attempt_cmd_quiet \
                     "\"${src}\" \"${dest}\"" \
                     "Regenerating ${label}" \
                     "Regenerate failed: ${label}" \
