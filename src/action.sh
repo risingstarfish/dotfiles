@@ -413,7 +413,7 @@ install_all() {
     local installed=0 skipped=0 failed=0
 
     log_info "Installing ${#USER_MODULES[@]} manifest entries (stamp: ${DOTFILES_START_TIME})"
-    log_debug "Flags -> DRY_RUN=${DRY_RUN}, FORCE=${FORCE}, NOCONFIRM=${NOCONFIRM}, NO_BACKUP=${NO_BACKUP}"
+    log_debug "Flags -> DRY_RUN=${DRY_RUN}, FORCE=${FORCE}, NOCONFIRM=${NOCONFIRM}"
 
     for src in "${USER_MODULES[@]}"; do
         log_trace "Processing: '${src}'"
@@ -1081,7 +1081,7 @@ do_remove() {
     local -a failed=()
     local removed=0
 
-    log_info "Beginning remove."
+    log_info "Beginning removal."
 
     local -a target_modules=()
     local mod entry
@@ -1156,7 +1156,7 @@ do_remove() {
     done
 
     if ((ec > 0)); then
-        log_error "Remove finished with ${ec} error(s): ${removed} removed, ${#failed[@]} failed."
+        log_error "Removal finished with ${ec} error(s): ${removed} removed, ${#failed[@]} failed."
         if [[ ${#failed[@]} -gt 0 ]]; then
             printf '\n  Failed to remove:\n' >&2
             local f
@@ -1166,7 +1166,7 @@ do_remove() {
             printf '\n' >&2
         fi
     else
-        log_info "Remove complete: ${removed} file(s) removed."
+        log_info "Removal complete: ${removed} file(s) removed."
     fi
 
     REMOVE_ERRORS="${ec}"

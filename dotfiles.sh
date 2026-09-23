@@ -47,7 +47,6 @@ readonly SOURCE_FILES=(
     "src/argparse.sh"
     # "src/logging.sh" see initialise
     "src/action.sh"
-    "src/dependencies.sh"
 )
 
 # functions
@@ -581,6 +580,114 @@ is_true() {
     esac
 }
 
+set_pwsh_cmd() {
+    [[ -n ${PWSH_CMD:-}  ]] && return 0
+
+    if [[ ${TARGET_OS} == "${OS_WINDOWS}"  ]]; then
+        if PWSH_CMD=$(command -v pwsh.exe 2> /dev/null); then
+            :
+        elif PWSH_CMD=$(command -v powershell.exe 2> /dev/null); then
+            :
+        fi
+    else # linux
+        if PWSH_CMD=$(command -v pwsh 2> /dev/null); then
+            :
+        fi
+    fi
+
+    readonly PWSH_CMD
+}
+
+prompt_windows_handoff() {
+    _enter
+    printf '\n' >&2
+    if [[ ${TARGET_RUNTIME} == "${RUNTIME_GITBASH}"  ]]; then
+        printf 'Windows Git Bash runtime detected\n' >&2
+        printf 'If you are not actually running Git Bash, something went wrong.\n' >&2
+    else # unknown
+        printf 'Unknown Windows Bash runtime detected.\n' >&2
+        printf 'Bash scripts may fail to configure native Windows settings properly.\n' >&2
+    fi
+
+    printf 'Certain functionality may be missing or altered (e.g. instead of symlinking, files get copied).\n' >&2
+    if is_true "${WINDOWS_SUDO}"; then
+        printf '   Tip: Re-run this script using `sudo` to enable native symlinks.\n' >&2
+    else
+        printf '   Tip: Enable Windows Developer Mode or Windows Sudo to allow native symlinks.\n' >&2
+    fi
+
+    printf '\n' >&2
+
+    local choice
+    while true; do
+        if ! read -r -p $'Switch to the native PowerShell installer (install.ps1)? [Y/n/(q)]: ' choice; then
+            printf 'Error: No input available for prompt.\n' >&2
+            exit 1
+        fi
+
+        case "$choice" in
+            [yY])
+                set_pwsh_cmd  # verify powershell available
+                if [[ -z ${PWSH_CMD} ]]; then
+                    printf 'Error: Cannot locate pwsh.exe or powershell.exe.\n' >&2
+                    _exit 1
+                    exit 1
+                fi
+                return 0
+                ;;
+            [nN])
+                printf 'Continuing with Bash installer on Windows...\n' >&2
+                _exit 1
+                return 1
+                ;;
+            [qQ])
+                printf 'Aborting installation!\n' >&2
+                _exit 130
+                exit 130
+                ;;
+            *)
+                printf 'Error: Invalid input. Please enter y, n, or q.\n' >&2
+                ;;
+        esac
+    done
+
+    _exit
+}
+
+windows_handoff() {
+    local ps_script="${SRC_PATH}/dotfiles.ps1"
+    if [[ ! -f ${ps_script}  ]]; then
+        printf 'Error: unable to find "dotfiles.ps1".\n' >&2
+        exit 1
+    fi
+
+    # convert unix paths to windows
+    if [[ ${TARGET_RUNTIME} == "${RUNTIME_WSL}"  ]]; then
+        ps_script=$(wslpath -w "$ps_script")
+    fi
+
+    local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script")
+
+    #if [[ ${IS_ELEVATED} -eq 1 ]]; then
+    #	ps_args+=("-IsElevated")
+    #fi
+
+    local pwsh_name="${PWSH_CMD##*/}"
+    pwsh_name="${pwsh_name%.exe}"
+
+    echo
+    printf 'Handing off execution to %s...\n' "${pwsh_name}"
+    echo
+
+    # NOTE: adding exec makes it auto close
+    local ec=0
+    "${PWSH_CMD}" "${ps_args[@]}" || ec=$?
+
+    echo
+    read -rn 1 -p "Press any key to exit..."
+    exit "${ec}"
+}
+
 initialise() {
     source "src/logging.sh" || {
         exit 1
@@ -603,8 +710,14 @@ initialise() {
     fi
 
     # check src/
-    check_exists "${SOURCE_FILES[@]}" || die 1 "One or more required source files are missing."
-    source_files "${SOURCE_FILES[@]}" || die 1 "Failed to source framework files."
+    check_exists "${SOURCE_FILES[@]}" || {
+         printf "One or more required source files are missing." >&2
+         exit 1
+    }
+    source_files "${SOURCE_FILES[@]}" || {
+        printf "Failed to source framework files." >&2
+        exit 1
+    }
 
     _set_date_cmd # DATE_CMD DATE_FMT
     _set_module_dir || die 1 "Failed to establish module directory."
@@ -637,11 +750,23 @@ main() {
 
     initialise
 
+    if ! is_true "${DOTFILES_IGNORE_HANDOFF:-}"; then
+        if [[ ${IS_ELEVATED} -eq 0 && ${TARGET_OS} == "${OS_WINDOWS}"    ]]; then
+            case "${TARGET_RUNTIME}" in
+                "${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
+                    if prompt_windows_handoff; then
+                        windows_handoff
+                    fi
+                    ;;
+                *) ;;
+            esac
+        fi
+    fi
+
     # NOTE: no DOTFILES_AUTORESTART
     local MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
         DRY_RUN NOCONFIRM INTERACTIVE FORCE \
-        NO_DEPS \
         LOG_LEVEL NO_LOG \
         PRINT_TIME
 
@@ -680,8 +805,7 @@ main() {
     local ec=0
     case "$MAIN_ACTION" in
         install)
-            do_install
-            do_install_deps
+            do_install || ec=1
             ;;
         remove)
             local REMOVE_ERRORS=0
@@ -707,7 +831,6 @@ main() {
         update)
             do_update || ec=1
             do_install || ec=1
-            do_install_deps || ec=1
             ;;
         repair)
             local REPAIR_ERRORS=0

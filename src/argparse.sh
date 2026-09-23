@@ -100,7 +100,6 @@ argparse() {
     FORCE=0
     DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0} # env
     local autorestart_flag
-    NO_DEPS=0
     LOG_LEVEL=""
     NO_LOG=0
     PRINT_TIME=0
@@ -221,10 +220,6 @@ argparse() {
                 autorestart_flag=1
                 shift
                 ;;
-            --no-deps)
-                NO_DEPS=1
-                shift
-                ;;
 
                 # logging
             -d | --debug)
@@ -314,14 +309,6 @@ argparse() {
         die 2 "no modules for --remove"
     fi
 
-    case "${MAIN_ACTION}" in
-        reset | uninstall | remove)
-            if [[ ${NO_DEPS} -eq 1 ]]; then
-                die 2 '--no-deps has no effect with --%s' "${MAIN_ACTION}"
-            fi
-            ;;
-    esac
-
     if [[ ${DRY_RUN} -eq 1 ]]; then
         if [[ ${DOTFILES_AUTORESTART} -eq 1 ]]; then
             if [[ ${autorestart_flag} -eq 1 ]]; then
@@ -339,16 +326,11 @@ argparse() {
             _exit 2
             die 2 '--force is meaningless with --dry-run'
         fi
-        if [[ ${NO_DEPS} -eq 1 ]]; then
-            _exit 2
-            die 2 '--no-deps is meaningless with --dry-run'
-        fi
     fi
 
     readonly MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
         DRY_RUN NOCONFIRM INTERACTIVE FORCE DOTFILES_AUTORESTART \
-        NO_DEPS \
         LOG_LEVEL NO_LOG \
         PRINT_TIME
 
