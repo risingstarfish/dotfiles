@@ -16,7 +16,7 @@ USAGE: bash $(basename "$0") <action> [options]
 ALL ACTIONS:
 
 INSTALL
-      --install              Install (or reinstall) all available dotfiles.
+      --install              Install (or reinstall) available dotfiles.
   -u, --update               Update from Git before installing.
   -r, --remove <module...>   Remove target modules <module>, semicolon-separated.
   -R, --repair               Remove orphaned symlinks and generated files, then re-link/generate.
