@@ -24,6 +24,14 @@ INSTALL
                              (note: copied/merged files will remain)
       --uninstall            Deletes symlinks, logs, and backups, then deletes install directory.
 
+MAINTENANCE
+      --clean [N]            Clean backups and reset both log files.
+      --clean-logs           Reset both log files.
+      --clean-backups [N]    Clean backups.
+                             N: remove backup dirs older than N days.
+                             (default when omitted: keep the latest
+                              DOTFILES_MAX_BACKUPS dirs)
+
 INFORMATION
   -l, --list                 Display all available modules.
       --version              Show the version and git information of this program.
@@ -37,11 +45,13 @@ INSTALL MODULES
 
 BEHAVIOUR
   -n, --dry-run              Print planned actions without modifying the disk.
+  -K, --autorestart          Automatically restart shell at script end.
+  -G, --no-regenerate        Do not regenerate relevant files if they already exist.
+      --no-backup            Do not backup pre-existing copied files.
   -I, --interactive          Prompt for confirmation before every action/modification.
       --noconfirm            Do not prompt for any confirmation.
   -y, --yes                  Auto-accept yes to prompts. Alias to --noconfirm.
   -f, --force                Overwrite existing files/links without backup.
-  -K, --autorestart          Automatically restart shell at script end.
 
 LOGGING
   -d, --debug                Print debug output (useful for diagnosing).
@@ -59,7 +69,7 @@ ENVIRONMENT VARIABLES
     DOTFILES_LOCAL_MODS      Set to 1 or true to install with uncommitted local changes.
                              (default: 0)
     DOTFILES_AUTORESTART     Set to 1 or true to restart shell at script finish. (default: 0)
-
+    DOTFILES_MAX_BACKUPS     Maximum number of backups to keep. Set to 0 to keep all (default: 10)
 Windows Specific:
     DOTFILES_IGNORE_HANDOFF  Set to 1 or true to ignore the Windows Powershell notice. (default 0)
 
@@ -74,7 +84,7 @@ git_or_unknown() {
     shift
 
     local out
-    if out=$(command git -C "${SRC_PATH}" "$@" 2> /dev/null); then
+    if out=$(command git -C "${DF_SRC_PATH}" "$@" 2> /dev/null); then
         printf '%s' "${out:-$default}"
     else
         printf '%s' "$default"
@@ -120,15 +130,15 @@ list_modules() {
     local current_category=""
     local src dest action filename status category raw_cat
 
-    local _env_sfx=".${TARGET_ENV}"
-    local _os_sfx=".${TARGET_OS}"
-    for src in "${AVAILABLE_MODULES[@]}"; do
-        dest="${MODULE_DEST["${src}"]:-}"
-        action="${MODULE_ACTION["${src}"]:-}"
+    local _env_sfx=".${DF_TARGET_ENV}"
+    local _os_sfx=".${DF_TARGET_OS}"
+    for src in "${DF_AVAILABLE_MODULES[@]}"; do
+        dest="${DF_MODULE_DEST["${src}"]:-}"
+        action="${DF_MODULE_ACTION["${src}"]:-}"
         filename="${src##*/}"
         filename="${filename%.gen}"
         raw_cat="${src%%/*}"
-        category="${MODULE_CATEGORY_MAP["${raw_cat}"]:-${raw_cat}}"
+        category="${DF_CATEGORY_MAP["${raw_cat}"]:-${raw_cat}}"
 
         if [[ ${filename} == *"${_env_sfx}" ]]; then
             filename="${filename%${_env_sfx}}"

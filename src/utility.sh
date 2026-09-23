@@ -69,7 +69,7 @@ prompt_continue() {
 
 is_windows_bash() {
     _enter
-    # TARGET_OS
+    # DF_TARGET_OS
     if [[ ${MSYSTEM:-} =~ ^(MINGW|MSYS|UCRT|UCRT64|MSYS2)$ ||
           $(uname) == MINGW* ||
           $(uname) == MSYS* ]]; then
@@ -80,13 +80,24 @@ is_windows_bash() {
     return 1
 }
 
+# Parse a semicolon-separated module list and append canonical selectors
+# to the caller-supplied array.
+#
+# Accepted forms (each resolved to what the include/exclude/remove matchers
+# understand — a category prefix or a full module path):
+#   "cat/file"    exact module path or prefix        (e.g. "zsh/zshrc", "zsh")
+#   "cat"         category prefix                    (e.g. "zsh")
+#   "file"        unique module basename -> full path (e.g. "zshrc" -> "zsh/zshrc")
+#   "display"     display category -> raw category    (e.g. "pwsh" -> "pwsh.windows")
+#
+# $1 = semicolon-separated module list
+# $2 = name of the destination array (nameref)
 parse_module_list() {
     _enter
 
     local -n arr="$2"
-    local mod
-    local valid
-    local -a mods
+    local m mod valid
+    local -a mods matches
 
     IFS=';' read -ra mods <<< "$1"
     for m in "${mods[@]}"; do
@@ -98,27 +109,36 @@ parse_module_list() {
         valid=0
 
         if [[ $m == */* ]]; then
-            for mod in "${AVAILABLE_MODULES[@]}"; do
+            # path: exact module path or category prefix
+            for mod in "${DF_AVAILABLE_MODULES[@]}"; do
                 if [[ $mod == "$m" || $mod == "$m/"* ]]; then
                     valid=1
                     break
                 fi
             done
         else
-            for mod in "${AVAILABLE_MODULES[@]}"; do
-                local modname="${mod##*/}"
-                local modcat="${mod%%/*}"
-                if [[ ${modcat} == "$m" || $modname == "$m" ]]; then
-                    valid=1
-                    break
+            # bare name: resolve to a canonical selector
+            matches=()
+            for mod in "${DF_AVAILABLE_MODULES[@]}"; do
+                if [[ ${mod##*/} == "$m" ]]; then
+                    matches+=("$mod")
+                elif [[ ${mod%%/*} == "$m" ]]; then
+                    valid=1   # category prefix — usable as-is
                 fi
             done
-        fi
 
-        if [[ $valid -eq 0 && -n ${MODULE_CATEGORY_MAP["$m"]:-} ]]; then
-            valid=1
-            m="${MODULE_CATEGORY_MAP["$m"]}"   # resolve to actual prefix
-            log_debug "Resolved display category '$m' from user input"
+            if [[ ${#matches[@]} -eq 1 ]]; then
+                valid=1
+                log_debug "Resolved bare name '$m' to module '${matches[0]}'"
+                m="${matches[0]}"
+            elif [[ ${#matches[@]} -gt 1 ]]; then
+                _exit 2
+                die 2 'ambiguous module name "%s". Matches: %s' "$m" "${matches[*]}"
+            elif [[ -n ${DF_CATEGORY_MAP["$m"]:-} ]]; then
+                valid=1
+                log_debug "Resolved display category '$m' to '${DF_CATEGORY_MAP["$m"]}'"
+                m="${DF_CATEGORY_MAP["$m"]}"
+            fi
         fi
 
         if [[ $valid -eq 0 ]]; then
@@ -158,7 +178,7 @@ _exec_cmd() {
 }
 
 # Use for irreversible operations (rm, reset, uninstall, …).
-# Prompts the user unless NOCONFIRM=1.
+# Prompts the user unless DF_NOCONFIRM=1.
 #
 # $1 = shell command string
 # $2 = human-readable description (shown in prompt)
@@ -176,15 +196,15 @@ attempt_cmd() {
     local -r err_msg="${3}"
     local -r suc_msg="${4}"
 
-    if ((DRY_RUN)); then
-        log_trace "DRY_RUN set; bypassing destructive operation"
+    if ((DF_DRY_RUN)); then
+        log_trace "DF_DRY_RUN set; bypassing destructive operation"
         log_info "[dry-run] ${cmd}"
         _exit
         return 0
     fi
 
-    if ((NOCONFIRM)); then
-        log_trace "NOCONFIRM set; skipping prompt"
+    if ((DF_NOCONFIRM)); then
+        log_trace "DF_NOCONFIRM set; skipping prompt"
     else
         log_info "About to run: ${cmd}"
         printf '\n  %s\n' "${msg}" >&2
@@ -211,7 +231,7 @@ attempt_cmd() {
 }
 
 # Use for idempotent operations (symlink, copy, generate, …).
-# Does NOT prompt by default. Prompts only when INTERACTIVE=1 (--interactive).
+# Does NOT prompt by default. Prompts only when DF_INTERACTIVE=1 (--interactive).
 #
 # $1 = shell command string
 # $2 = human-readable description (shown in prompt, if interactive)
@@ -229,14 +249,14 @@ attempt_cmd_quiet() {
     local -r err_msg="${3}"
     local -r suc_msg="${4}"
 
-    if ((DRY_RUN)); then
-        log_trace "DRY_RUN set; bypassing operation"
+    if ((DF_DRY_RUN)); then
+        log_trace "DF_DRY_RUN set; bypassing operation"
         log_info "[dry-run] ${cmd}"
         _exit
         return 0
     fi
 
-    if ((INTERACTIVE)); then
+    if ((DF_INTERACTIVE)); then
         log_info "About to run: ${cmd}"
         printf '\n  %s\n' "${msg}" >&2
 

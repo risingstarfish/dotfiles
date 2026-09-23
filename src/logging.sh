@@ -1131,8 +1131,8 @@ _format_log_message() {
     # Get timestamp in appropriate timezone
     local current_date
     local timezone_str
-    local date_cmd="${DATE_CMD:-date}"
-    local date_fmt="${DATE_FMT:-%Y-%m-%d %H:%M:%S}"
+    local date_cmd="${DF_DATE_CMD:-date}"
+    local date_fmt="${DF_DATE_FMT:-%Y-%m-%d %H:%M:%S}"
 
     if [[ ${USE_UTC:-false} == "true" ]]; then
         current_date=$("${date_cmd}" -u +"${date_fmt}")

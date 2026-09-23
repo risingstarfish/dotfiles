@@ -9,16 +9,16 @@ readonly __ACTION_SH_INCLUDED__=1
 set_user_modules() {
     _enter
 
-    if [[ -n ${USER_MODULES:-}  ]]; then
-        log_debug "USER_MODULES is already populated. Skipping."
+    if [[ -n ${DF_USER_MODULES:-}  ]]; then
+        log_debug "DF_USER_MODULES is already populated. Skipping."
         log_trace "Exiting (already populated)"
         _exit
         return 0
     fi
 
-    local num_inc=${#INCLUDE_SET[@]}
-    local num_exc=${#EXCLUDE_SET[@]}
-    local num_total=${#AVAILABLE_MODULES[@]}
+    local num_inc=${#DF_INCLUDE_SET[@]}
+    local num_exc=${#DF_EXCLUDE_SET[@]}
+    local num_total=${#DF_AVAILABLE_MODULES[@]}
     local num_target
 
     log_trace "Set counts -> num_inc=${num_inc}, num_exc=${num_exc}, num_total=${num_total}"
@@ -36,13 +36,13 @@ set_user_modules() {
     local mod inc exc included excluded
     local mod_slash
 
-    for mod in "${AVAILABLE_MODULES[@]}"; do
+    for mod in "${DF_AVAILABLE_MODULES[@]}"; do
         mod_slash="${mod}/"
         log_trace "Evaluating module '${mod}' (mod_slash='${mod_slash}')"
 
         if ((num_inc > 0)); then
             included=0
-            for inc in "${INCLUDE_SET[@]}"; do
+            for inc in "${DF_INCLUDE_SET[@]}"; do
                 log_trace "Testing include filter '${inc}/'* against '${mod_slash}'"
                 if [[ ${mod_slash} == "${inc}/"*     ]]; then
                     included=1
@@ -51,15 +51,15 @@ set_user_modules() {
                 fi
             done
             if ! ((included)); then
-                log_debug "Skipped '${mod}' (not in INCLUDE_SET)"
-                log_trace "Module '${mod}' skipped because it did not match INCLUDE_SET"
+                log_debug "Skipped '${mod}' (not in DF_INCLUDE_SET)"
+                log_trace "Module '${mod}' skipped because it did not match DF_INCLUDE_SET"
                 continue
             fi
         fi
 
         if ((num_exc > 0)); then
             excluded=0
-            for exc in "${EXCLUDE_SET[@]}"; do
+            for exc in "${DF_EXCLUDE_SET[@]}"; do
                 log_trace "Testing exclude filter '${exc}/'* against '${mod_slash}'"
                 if [[ ${mod_slash} == "${exc}/"* ]]; then
                     excluded=1
@@ -68,96 +68,58 @@ set_user_modules() {
                 fi
             done
             if ((excluded)); then
-                log_debug "Skipped '${mod}' (matched EXCLUDE_SET)"
-                log_trace "Module '${mod}' skipped because it matched EXCLUDE_SET"
+                log_debug "Skipped '${mod}' (matched DF_EXCLUDE_SET)"
+                log_trace "Module '${mod}' skipped because it matched DF_EXCLUDE_SET"
                 continue
             fi
         fi
         log_debug "Added '${mod}'"
-        log_trace "Appending '${mod}' to USER_MODULES"
-        USER_MODULES+=("${mod}")
+        log_trace "Appending '${mod}' to DF_USER_MODULES"
+        DF_USER_MODULES+=("${mod}")
     done
 
-    log_info "Selected ${#USER_MODULES[@]} total modules for processing."
+    log_info "Selected ${#DF_USER_MODULES[@]} total modules for processing."
 
-    _exit
-    readonly USER_MODULES
-}
-
-set_file_types() {
-    _enter
-    if [[ -n ${SYMLINK_FILES:-} || -n ${COPY_FILES:-} || -n ${GENERATE_FILES:-} ]]; then
-        log_debug "SYMLINK_FILES, COPY_FILES, and GENERATE_FILES are already populated. Skipping categorisation."
-        log_trace "Exiting (already populated)"
-        _exit
-        return 0
-    fi
-
-    log_debug "Categorising ${#USER_MODULES[@]} files..."
-
-    local file
-    local base
-    for file in "${USER_MODULES[@]}"; do
-        base="${file##*/}"
-        if [[ ${base} == *.local || ${base} == *.local.* ]]; then
-            log_debug "[COPY] ${base}"
-            log_trace "Matched COPY pattern (*.local / *.local.*) -> adding to COPY_FILES"
-            COPY_FILES+=("${file}")
-        elif [[ ${base} == *.gen ]]; then
-            log_debug "[GENERATE] ${base}"
-            log_trace "Matched GENERATE pattern (*.gen) -> adding to GENERATE_FILES"
-            GENERATE_FILES+=("${file}")
-        else
-            log_debug "[SYMLINK] ${base}"
-            log_trace "Default match -> adding to SYMLINK_FILES"
-            SYMLINK_FILES+=("${file}")
-        fi
-    done
-
-    log_info "Categorised ${#SYMLINK_FILES[@]} symlinks, ${#COPY_FILES[@]} copies, \
-${#GENERATE_FILES[@]} generated."
-    readonly SYMLINK_FILES COPY_FILES GENERATE_FILES
     _exit
 }
 
 set_dotfiles_ref() {
     _enter
 
-    if [[ -n ${DOTFILES_REF:-} ]]; then
-        log_debug "DOTFILES_REF already set to '${DOTFILES_REF}'. Skipping."
-        log_trace "Exiting (DOTFILES_REF already set)"
+    if [[ -n ${DF_DOTFILES_REF:-} ]]; then
+        log_debug "DF_DOTFILES_REF already set to '${DF_DOTFILES_REF}'. Skipping."
+        log_trace "Exiting (DF_DOTFILES_REF already set)"
         _exit
         return 0
     fi
 
-    log_debug "Determining git ref for '${SRC_PATH}'..."
+    log_debug "Determining git ref for '${DF_SRC_PATH}'..."
 
-    log_trace "Executing: git -C '${SRC_PATH}' rev-parse --git-dir"
-    if ! git -C "${SRC_PATH}" rev-parse --git-dir > /dev/null 2>&1; then
+    log_trace "Executing: git -C '${DF_SRC_PATH}' rev-parse --git-dir"
+    if ! git -C "${DF_SRC_PATH}" rev-parse --git-dir > /dev/null 2>&1; then
         log_trace "git rev-parse failed (not a git repository)"
-        log_error "Unable to determine git ref. Make sure '${SRC_PATH}' is a git repo."
+        log_error "Unable to determine git ref. Make sure '${DF_SRC_PATH}' is a git repo."
         log_trace "Exiting with status 1"
         _exit 1
         return 1
     fi
 
     local config_ref
-    log_trace "Executing: git -C '${SRC_PATH}' config --local dotfiles.ref"
-    config_ref="$(git -C "${SRC_PATH}" config --local dotfiles.ref 2> /dev/null || true)"
+    log_trace "Executing: git -C '${DF_SRC_PATH}' config --local dotfiles.ref"
+    config_ref="$(git -C "${DF_SRC_PATH}" config --local dotfiles.ref 2> /dev/null || true)"
     log_trace "Retrieved config_ref='${config_ref}'"
 
     if [[ -n ${config_ref} ]]; then
-        DOTFILES_REF="${config_ref}"
+        DF_DOTFILES_REF="${config_ref}"
         log_debug "Found custom ref in git config."
-        log_trace "Assigned DOTFILES_REF='${DOTFILES_REF}' from git config"
+        log_trace "Assigned DF_DOTFILES_REF='${DF_DOTFILES_REF}' from git config"
     else
-        DOTFILES_REF="main"
+        DF_DOTFILES_REF="main"
         log_debug "No custom git config found. Falling back to default."
-        log_trace "Assigned DOTFILES_REF='main' (default fallback)"
+        log_trace "Assigned DF_DOTFILES_REF='main' (default fallback)"
     fi
 
     _exit
-    readonly DOTFILES_REF
 }
 
 _prepare_file() {
@@ -181,7 +143,7 @@ _prepare_file() {
     dest_dir="$(dirname "${dest}")"
     if [[ ! -d ${dest_dir} ]]; then
         log_debug "Creating parent directory: '${dest_dir}'"
-        attempt_cmd \
+        attempt_cmd_quiet \
             "mkdir -p \"${dest_dir}\"" \
             "Creating parent directory for ${dest}" \
             "Cannot create target directory '${dest_dir}'" \
@@ -198,14 +160,13 @@ _prepare_file() {
 #   ${DOTFILES_BACKUP_DIR}/${DOTFILES_START_TIME}/<basename>.bak
 #
 # Flag behaviour:
-#   DRY_RUN=1   – log the intended backup, skip the mv
-#   FORCE=1     – skip backup entirely, remove dest so the new file lands cleanly
-#   NOCONFIRM=1 – skip the interactive prompt before backing up
+#   DF_DRY_RUN=1   – log the intended backup, skip the mv
+#   DF_FORCE=1     – skip backup entirely, remove dest so the new file lands cleanly
+#   DF_NOCONFIRM=1 – skip the interactive prompt before backing up
 #
 # Collision detection: if <basename>.bak already exists, appends
 #   .1.bak, .2.bak, …
 #
-# Returns 1 only if the mv (or rm, for FORCE) itself fails.
 _guard_dest() {
     _enter
 
@@ -228,15 +189,17 @@ _guard_dest() {
         log_debug "'${dest}' is a symlink pointing to '${target}' (not our repo). Will back up."
     fi
 
-    if ((FORCE)); then
-        log_warn "FORCE set. Removing '${dest}' without backup."
-        if ((DRY_RUN)); then
+    if ((DF_FORCE)); then
+        log_warn "DF_FORCE set. Removing '${dest}' without backup."
+        if ((DF_DRY_RUN)); then
             log_info "[dry-run] Would remove: ${dest}"
             _exit
             return 0
         fi
-        rm -f "${dest}" || {
-            log_error "Failed to remove '${dest}' (FORCE)"
+        attempt_cmd_quiet "rm -f \"${dest}\"" \
+            "Attempting to remove destination" \
+            "Failed to remove ${dest}" \
+            "Successfully removed dest" || {
             _exit 1
             return 1
         }
@@ -244,7 +207,7 @@ _guard_dest() {
         return 0
     fi
 
-    if ((DRY_RUN)); then
+    if ((DF_DRY_RUN)); then
         local dry_base
         dry_base="$(basename "${dest}")"
         log_info "[dry-run] mv ${dest} ${DOTFILES_BACKUP_DIR}/${DOTFILES_START_TIME}/${dry_base}.bak"
@@ -252,7 +215,7 @@ _guard_dest() {
         return 0
     fi
 
-    if ((INTERACTIVE)); then
+    if ((DF_INTERACTIVE)); then
         local reply
         printf '\n  Existing file found: %s\n' "${dest}" >&2
         printf '  Back up and replace? [Y/n] ' >&2
@@ -275,7 +238,8 @@ _guard_dest() {
     fi
 
     local backup_dir="${DOTFILES_BACKUP_DIR}/${DOTFILES_START_TIME}"
-    local base="$(basename "${dest}")"
+    local base
+    base="$(basename "${dest}")"
     local backup_path="${backup_dir}/${base}.bak"
 
     local n=1
@@ -287,20 +251,26 @@ _guard_dest() {
 
     log_debug "Resolved backup path: '${backup_path}'"
 
-    if ! mkdir -p "${backup_dir}"; then
-        log_error "Cannot create backup dir '${backup_dir}'"
-        _exit 1
-        return 1
-    fi
+    attempt_cmd_quiet "mkdir -p \"${backup_dir}\"" \
+        "Making backup directory" \
+        "Cannot create backup directory '${backup_dir}'" \
+        "Successfully created backup directory." || {
+            _exit 1
+            return 1
+    }
 
     log_notice "Backing up ${dest} → ${backup_path}"
-    if ! mv "${dest}" "${backup_path}"; then
-        log_error "Failed to back up '${dest}'"
+
+    attempt_cmd_quiet "mv \"${dest}\" \"${backup_path}\"" \
+        "Attempting to create backup" \
+        "Failed to back up '${dest}'" \
+        "Successfully backed up destination" || {
         _exit 1
         return 1
-    fi
+    }
 
     log_debug "Backup complete."
+
     _exit
     return 0
 }
@@ -412,15 +382,15 @@ install_all() {
     local action src dest cmd full_src label
     local installed=0 skipped=0 failed=0
 
-    log_info "Installing ${#USER_MODULES[@]} manifest entries (stamp: ${DOTFILES_START_TIME})"
-    log_debug "Flags -> DRY_RUN=${DRY_RUN}, FORCE=${FORCE}, NOCONFIRM=${NOCONFIRM}"
+    log_info "Installing ${#DF_USER_MODULES[@]} manifest entries (stamp: ${DOTFILES_START_TIME})"
+    log_debug "Flags -> DF_DRY_RUN=${DF_DRY_RUN}, DF_FORCE=${DF_FORCE}, DF_NOCONFIRM=${DF_NOCONFIRM}"
 
-    for src in "${USER_MODULES[@]}"; do
+    for src in "${DF_USER_MODULES[@]}"; do
         log_trace "Processing: '${src}'"
 
-        local action="${MODULE_ACTION["${src}"]:-}"
-        local dest="${MODULE_DEST["${src}"]:-}"
-        local cmd="${MODULE_CMD["${src}"]:-}"
+        local action="${DF_MODULE_ACTION["${src}"]:-}"
+        local dest="${DF_MODULE_DEST["${src}"]:-}"
+        local cmd="${DF_MODULE_CMD["${src}"]:-}"
 
         if [[ -z ${action} || -z ${dest} ]]; then
             log_warn "No manifest data for module '${src}'. Skipping."
@@ -428,7 +398,7 @@ install_all() {
             continue
         fi
 
-        full_src="${MODULE_DIR}/${src}"
+        full_src="${DF_MODULE_DIR}/${src}"
         label="${src} → ${dest}"
 
         if ! _prepare_file "${full_src}" "${dest}"; then
@@ -437,9 +407,13 @@ install_all() {
             continue
         fi
 
-        if ! _guard_dest "${dest}" "${full_src}"; then
-            ((++failed))
-            continue
+        if ! ((DF_NO_BACKUP)); then
+            if ! _guard_dest "${dest}" "${full_src}"; then
+                ((++failed))
+                continue
+            fi
+        else
+            log_trace "Backups are explicitly disabled via DF_NO_BACKUP."
         fi
 
         local ok=0
@@ -463,13 +437,15 @@ install_all() {
                 ok=$?
                 ;;
             generate)
-                if [[ -f ${dest} && -s ${dest} ]]; then
+                if [[ -f ${dest} && -s ${dest} ]] && ((DF_NO_REGENERATE)); then
                     log_debug "[generate] '${dest}' already exists. Skipping."
                     ((++installed))
                     manifest_write "${full_src}" "${dest}" "generate"
                     continue
                 fi
-                log_debug "[generate] ${label}"
+                if ! ((DF_NO_REGENERATE)); then
+                    log_debug "[generate] regenerating '${dest}'."
+                fi
                 attempt_cmd_quiet \
                     "\"${full_src}\" \"${dest}\"" \
                     "Generating ${label}" \
@@ -504,28 +480,18 @@ install_all() {
     done
 
     log_info "Done: ${installed} installed, ${skipped} skipped, ${failed} failed."
+    DF_ERROR_COUNT=${failed}
     _exit
 }
 
 do_install() {
     _enter
 
-    local USER_MODULES=()
-    local SYMLINK_FILES=()
-    local COPY_FILES=()
-    local GENERATE_FILES=()
-
     log_info "Beginning installation!"
 
     log_trace "Calling set_user_modules()"
-    set_user_modules # USER_MODULES
-    log_trace "Returned from set_user_modules() (USER_MODULES count: ${#USER_MODULES[@]})"
-
-    log_trace "Calling set_file_types()"
-    set_file_types   # SYMLINK_FILES COPY_FILES GENERATE_FILES
-    log_trace "Returned from set_file_types() (SYMLINK: ${#SYMLINK_FILES[@]}, COPY: ${#COPY_FILES[@]}, GENERATE: ${#GENERATE_FILES[@]})"
-
-    log_debug "Initialized local module and file arrays"
+    set_user_modules # DF_USER_MODULES
+    log_trace "Returned from set_user_modules() (DF_USER_MODULES count: ${#DF_USER_MODULES[@]})"
 
     local rc=0
     log_trace "Initialized status tracer rc=${rc}"
@@ -535,7 +501,7 @@ do_install() {
     log_trace "Evaluating final status code rc=${rc}"
     if ((rc)); then
         log_trace "Error state detected!"
-        log_error 'Install finished with errors!' # TODO: print total number
+        log_error 'Install finished with %d failure(s)!' "${DF_ERROR_COUNT}"
         log_trace "Exiting with status 1"
         _exit 1
         return 1
@@ -548,35 +514,33 @@ do_install() {
 do_update() {
     _enter
 
-    local DOTFILES_REF
-
-    set_dotfiles_ref || { # DOTFILES_REF
+    set_dotfiles_ref || { # DF_DOTFILES_REF
         log_trace "set_dotfiles_ref failed with exit status $?, exiting"
         _exit 1
         exit 1
     }
-    log_trace "Resolved DOTFILES_REF='${DOTFILES_REF}'"
+    log_trace "Resolved DF_DOTFILES_REF='${DF_DOTFILES_REF}'"
 
     log_info "Beginning update!"
 
-    log_trace "Checking for repository at '${SRC_PATH}/.git'"
-    if [[ ! -d "${SRC_PATH}/.git" ]]; then
-        log_trace "Directory '${SRC_PATH}/.git' does not exist"
-        die 1 '%s is not a git clone. Run with --install first.' "${SRC_PATH}"
+    log_trace "Checking for repository at '${DF_SRC_PATH}/.git'"
+    if [[ ! -d "${DF_SRC_PATH}/.git" ]]; then
+        log_trace "Directory '${DF_SRC_PATH}/.git' does not exist"
+        die 1 '%s is not a git clone. Run with --install first.' "${DF_SRC_PATH}"
     fi
 
     local has_local_mods=0
-    log_trace "Executing: git -C '${SRC_PATH}' diff --quiet HEAD"
-    if ! command git -C "${SRC_PATH}" diff --quiet HEAD 2> /dev/null; then
+    log_trace "Executing: git -C '${DF_SRC_PATH}' diff --quiet HEAD"
+    if ! command git -C "${DF_SRC_PATH}" diff --quiet HEAD 2> /dev/null; then
         has_local_mods=1
     fi
     log_trace "Local modifications status: has_local_mods=${has_local_mods}"
 
-    log_info "Updating dotfiles in ${SRC_PATH} (ref: ${DOTFILES_REF})"
+    log_info "Updating dotfiles in ${DF_SRC_PATH} (ref: ${DF_DOTFILES_REF})"
 
     if  ((has_local_mods))  && ! is_true "${DOTFILES_LOCAL_MODS}"; then
         log_trace "Update blocked: has_local_mods=${has_local_mods}, DOTFILES_LOCAL_MODS=${DOTFILES_LOCAL_MODS}"
-        log_warn "Uncommitted changes in ${SRC_PATH}. Update blocked."
+        log_warn "Uncommitted changes in ${DF_SRC_PATH}. Update blocked."
         {
             printf '\n'
             printf '  This repo is publicly maintained. Do not edit tracked files directly.\n'
@@ -587,16 +551,16 @@ do_update() {
             printf '  (dev: set DOTFILES_LOCAL_MODS=1 to bypass this check)\n'
             printf '\n'
         } >&2
-        log_trace "Executing: git -C '${SRC_PATH}' diff --stat HEAD"
-        command git -C "${SRC_PATH}" diff --stat HEAD 2> /dev/null >&2
+        log_trace "Executing: git -C '${DF_SRC_PATH}' diff --stat HEAD"
+        command git -C "${DF_SRC_PATH}" diff --stat HEAD 2> /dev/null >&2
         _exit 1
         return 1
     fi
 
-    log_trace "Executing: git -C '${SRC_PATH}' fetch origin --depth=1 '${DOTFILES_REF}'"
-    if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "${DOTFILES_REF}" 2> /dev/null; then
+    log_trace "Executing: git -C '${DF_SRC_PATH}' fetch origin --depth=2 '${DF_DOTFILES_REF}'"
+    if ! command git -C "${DF_SRC_PATH}" fetch origin --depth=2 "${DF_DOTFILES_REF}" 2> /dev/null; then
         log_trace "git fetch command failed"
-        log_error "Fetch failed (ref: ${DOTFILES_REF}). Check network or repo URL."
+        log_error "Fetch failed (ref: ${DF_DOTFILES_REF}). Check network or repo URL."
         _exit 1
         return 1
     fi
@@ -604,7 +568,7 @@ do_update() {
     if [[ -f ${DOTFILES_MANIFEST_FILE} ]]; then
         local tmp
         tmp="$(mktemp)"
-        printf '# ref=%s timestamp=%s\n' "${DOTFILES_REF}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${tmp}"
+        printf '# ref=%s timestamp=%s\n' "${DF_DOTFILES_REF}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${tmp}"
         cat "${DOTFILES_MANIFEST_FILE}" >> "${tmp}"
         mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
     fi
@@ -612,33 +576,31 @@ do_update() {
     if  ((has_local_mods))  && is_true "${DOTFILES_LOCAL_MODS}"; then
         log_trace "Attempting rebase branch: has_local_mods=${has_local_mods}, DOTFILES_LOCAL_MODS=${DOTFILES_LOCAL_MODS}"
         log_warn "Local modifications present. Rebasing onto FETCH_HEAD."
-        log_trace "Executing: git -C '${SRC_PATH}' rebase FETCH_HEAD"
-        if ! command git -C "${SRC_PATH}" rebase FETCH_HEAD 2> /dev/null; then
+        log_trace "Executing: git -C '${DF_SRC_PATH}' rebase FETCH_HEAD"
+        if ! command git -C "${DF_SRC_PATH}" rebase FETCH_HEAD 2> /dev/null; then
             log_trace "git rebase failed"
             log_error "Rebase failed."
             printf '\n' >&2
             printf '  Resolve conflicts, then:\n' >&2
-            printf '    git -C "%s" rebase --continue\n' "${SRC_PATH}" >&2
+            printf '    git -C "%s" rebase --continue\n' "${DF_SRC_PATH}" >&2
             printf '  Or abort with:\n' >&2
-            printf '    git -C "%s" rebase --abort\n' "${SRC_PATH}" >&2
+            printf '    git -C "%s" rebase --abort\n' "${DF_SRC_PATH}" >&2
             _exit 1
             return 1
         fi
     else
-        if ((has_local_mods)); then
-            log_trace "Local mods present without override; checking user confirmation prompt"
-            attempt_cmd "git -C '\"${SRC_PATH}\"' reset --hard FETCH_HEAD" \
-                "This discards ALL local changes in '${SRC_PATH}'" \
-                "Reset to ${DOTFILES_REF} failed in '${SRC_PATH}'." \
-                "Reset local repository." || return 1
-        fi
+        log_trace "Hard resetting git repo; checking user confirmation prompt"
+        attempt_cmd "git -C '\"${DF_SRC_PATH}\"' reset --hard FETCH_HEAD" \
+            "This discards ALL local changes in '${DF_SRC_PATH}'" \
+            "Reset to ${DF_DOTFILES_REF} failed in '${DF_SRC_PATH}'." \
+            "Reset local repository." || return 1
 
-        log_trace "Checking branch existence: refs/heads/${DOTFILES_REF}"
-        if command git -C "${SRC_PATH}" show-ref --verify --quiet "refs/heads/${DOTFILES_REF}" 2> /dev/null; then
-            log_trace "Updating branch pointer: git -C '${SRC_PATH}' branch -f '${DOTFILES_REF}' FETCH_HEAD"
-            command git -C "${SRC_PATH}" branch -f "${DOTFILES_REF}" FETCH_HEAD 2> /dev/null || true
+        log_trace "Checking branch existence: refs/heads/${DF_DOTFILES_REF}"
+        if command git -C "${DF_SRC_PATH}" show-ref --verify --quiet "refs/heads/${DF_DOTFILES_REF}" 2> /dev/null; then
+            log_trace "Updating branch pointer: git -C '${DF_SRC_PATH}' branch -f '${DF_DOTFILES_REF}' FETCH_HEAD"
+            command git -C "${DF_SRC_PATH}" branch -f "${DF_DOTFILES_REF}" FETCH_HEAD 2> /dev/null || true
         else
-            log_trace "Branch 'refs/heads/${DOTFILES_REF}' not found locally; skipping branch update"
+            log_trace "Branch 'refs/heads/${DF_DOTFILES_REF}' not found locally; skipping branch update"
         fi
     fi
 
@@ -662,7 +624,7 @@ remove_file() {
         return 0
     fi
 
-    if ((DRY_RUN)); then
+    if ((DF_DRY_RUN)); then
         log_info "[dry-run] rm -f ${dest}"
         _exit
         return 0
@@ -727,7 +689,7 @@ do_uninstall() {
         done
     else
         log_warn "No modules found to uninstall."
-        if ! ((NOCONFIRM)); then
+        if ! ((DF_NOCONFIRM)); then
             prompt_continue
         fi
     fi
@@ -741,10 +703,14 @@ do_uninstall() {
         "Are you sure you want to completely remove dotfiles cache directory?" \
         "Failed to removed \"${DOTFILES_CACHE_DIR}\"" \
         "Successfully removed cache directory!" || ((++ec))
-    attempt_cmd "rm -rf \"${SRC_PATH}\"" \
-        "Are you sure you want to completely remove dotfiles?" \
-        "Failed to removed \"${SRC_PATH}\"" \
-        "Successfully removed repository!" || ((++ec))
+    if [[ ${DF_TARGET_OS} != "${OS_WINDOWS}"   ]]; then
+        attempt_cmd "rm -rf \"${DF_SRC_PATH}\"" \
+            "Are you sure you want to completely remove dotfiles?" \
+            "Failed to removed \"${DF_SRC_PATH}\"" \
+            "Successfully removed repository!" || ((++ec))
+    else
+        printf 'Warning: on windows, you will have to manually delete %s' "${DF_SRC_PATH}" >&2
+    fi
 
     if [[ ${ec} -gt 0 ]]; then
         log_error "Uninstall finished with ${ec} error(s)!"
@@ -760,20 +726,22 @@ do_uninstall() {
         log_info "Uninstall finished successfully!"
     fi
 
-    local reply
-    printf '\n  Remove log directory: %s ? [Y/n] ' "${DOTFILES_LOG_DIR}" >&2
-    read -r reply || reply=""
-    case "${reply,,}" in
-        y | yes | '') ;;
-        *)
-            log_warn "Log directory removal cancelled by user."
-            _exit
-            return "${ec}"
-            ;;
-    esac
+    if ! ((DF_NOCONFIRM)); then
+        local reply
+        printf '\n  Remove log directory: %s ? [Y/n] ' "${DOTFILES_LOG_DIR}" >&2
+        read -r reply || reply=""
+        case "${reply,,}" in
+            y | yes | '') ;;
+            *)
+                log_warn "Log directory removal cancelled by user."
+                _exit
+                return "${ec}"
+                ;;
+        esac
+    fi
 
     LOG_FILE=""  # stop writing to file; console still works
-    if ! ((DRY_RUN)); then
+    if ! ((DF_DRY_RUN)); then
         if ! rm -rf "${DOTFILES_LOG_DIR}" 2> /dev/null; then
             log_info "Failed to remove ${DOTFILES_LOG_DIR}"
             ((++ec))
@@ -784,9 +752,205 @@ do_uninstall() {
         log_info "[dry-run] rm -rf ${DOTFILES_LOG_DIR}"
     fi
 
-    UNINSTALL_ERRORS="${ec}"
+    DF_UNINSTALL_ERRORS="${ec}"
     _exit "${ec}"
     return "${ec}"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Maintenance: --clean / --clean-logs / --clean-backups
+# ─────────────────────────────────────────────────────────────
+
+# Prompt [Y/n] before a destructive maintenance step.
+# Skipped for --dry-run and --noconfirm.
+#
+# $1 = multi-line message describing what will be removed
+# Returns:
+#   0    proceed (confirmed, noconfirm, or dry-run)
+#   130  user declined
+_maintenance_confirm() {
+    _enter
+    if ((DF_DRY_RUN)) || ((DF_NOCONFIRM)); then
+        _exit
+        return 0
+    fi
+
+    local reply
+    printf '\n  %b\n  Continue? [Y/n] ' "$1" >&2
+    read -r reply || reply=""
+    log_trace "User prompt reply: '${reply}'"
+    case "${reply,,}" in
+        y | yes | '')
+            log_trace "User confirmed"
+            ;;
+        *)
+            log_warn "Clean cancelled by user."
+            _exit 130
+            return 130
+            ;;
+    esac
+    printf '\n' >&2
+    _exit
+    return 0
+}
+
+# Remove old top-level backup dirs from DOTFILES_BACKUP_DIR.
+# Mode (set by argparse, mutually exclusive):
+#   DF_CLEAN_DAYS set  – remove dirs older than N days
+#   DF_CLEAN_KEEP set  – keep the latest N dirs (by mtime), remove the rest
+_clean_backups() {
+    _enter
+    local ec=0
+
+    if [[ ! -d ${DOTFILES_BACKUP_DIR} ]]; then
+        log_info "No backup directory at '${DOTFILES_BACKUP_DIR}'. Nothing to clean."
+        _exit
+        return 0
+    fi
+
+    local -a all=() targets=()
+    local d
+    # newest first
+    while IFS= read -r d; do
+        [[ -n $d ]] && all+=("$d")
+    done < <(ls -1t -- "${DOTFILES_BACKUP_DIR}" 2> /dev/null)
+
+    if [[ -n ${DF_CLEAN_DAYS} ]]; then
+        local t
+        while IFS= read -r -d '' t; do
+            targets+=("$t")
+        done < <(find "${DOTFILES_BACKUP_DIR}" -mindepth 1 -maxdepth 1 -mtime +"${DF_CLEAN_DAYS}" -print0 2> /dev/null)
+        if [[ ${#targets[@]} -eq 0 ]]; then
+            log_info "No backups older than ${DF_CLEAN_DAYS} day(s). Nothing to clean."
+            _exit
+            return 0
+        fi
+        local msg="This will remove ${#targets[@]} backup dir(s) older than ${DF_CLEAN_DAYS} day(s):"
+        for t in "${targets[@]}"; do
+            msg+=$'\n'"    - ${t}"
+        done
+    else
+        # count mode: keep the latest DF_CLEAN_KEEP
+        local total=${#all[@]}
+        if ((DF_CLEAN_KEEP <= 0)) || ((total <= DF_CLEAN_KEEP)); then
+            log_info "Keeping all ${total} backup dir(s) (max: ${DF_CLEAN_KEEP}). Nothing to clean."
+            _exit
+            return 0
+        fi
+        local i
+        for ((i = DF_CLEAN_KEEP; i < total; i++)); do
+            targets+=("${all[$i]}")
+        done
+        local msg="This will remove ${#targets[@]} backup dir(s), keeping the latest ${DF_CLEAN_KEEP}:"
+        for t in "${targets[@]}"; do
+            msg+=$'\n'"    - ${t}"
+        done
+    fi
+    if ! _maintenance_confirm "${msg}"; then
+        _exit 130
+        return 130
+    fi
+
+    if ((DF_DRY_RUN)); then
+        for t in "${targets[@]}"; do
+            log_info "[dry-run] rm -rf ${t}"
+        done
+        _exit
+        return 0
+    fi
+
+    local dest
+    for t in "${targets[@]}"; do
+        dest="${DOTFILES_BACKUP_DIR}/${t}"
+        if ! rm -rf -- "${dest}"; then
+            log_error "Failed to remove '${dest}'"
+            ((++ec))
+        else
+            log_notice "Removed backup: ${dest}"
+        fi
+    done
+
+    _exit "${ec}"
+    return "${ec}"
+}
+
+# Truncate the two dotfiles log files (initialise.log, main.log).
+# Safe to run mid-run: the logger reopens the file on every write.
+_clean_logs() {
+    _enter
+    local ec=0
+
+    local -a log_files=()
+    local f
+    for f in "${INIT_LOG_FILE}" "${DOTFILES_LOG_DIR}/main.log"; do
+        [[ -f $f ]] && log_files+=("$f")
+    done
+
+    if [[ ${#log_files[@]} -eq 0 ]]; then
+        log_info "No log files found. Nothing to reset."
+        _exit
+        return 0
+    fi
+
+    local msg="This will reset (truncate) ${#log_files[@]} log file(s):"
+    for f in "${log_files[@]}"; do
+        msg+=$'\n'"    - ${f}"
+    done
+
+    if ! _maintenance_confirm "${msg}"; then
+        _exit 130
+        return 130
+    fi
+
+    if ((DF_DRY_RUN)); then
+        for f in "${log_files[@]}"; do
+            log_info "[dry-run] : > ${f}"
+        done
+        _exit
+        return 0
+    fi
+
+    for f in "${log_files[@]}"; do
+        if ! : > "${f}"; then
+            log_error "Failed to reset '${f}'"
+            ((++ec))
+        else
+            log_notice "Reset log: ${f}"
+        fi
+    done
+
+    _exit "${ec}"
+    return "${ec}"
+}
+
+do_clean_backups() {
+    _enter
+    log_info "Beginning backup cleanup."
+    local ec=0
+    _clean_backups || ec=$?
+    DF_CLEAN_ERRORS="${ec}"
+    if ((ec)); then
+        _exit "${ec}"
+        return "${ec}"
+    fi
+    log_info "Backup cleanup complete."
+    _exit
+    return 0
+}
+
+do_clean_logs() {
+    _enter
+    log_info "Beginning log reset."
+    local ec=0
+    _clean_logs || ec=$?
+    DF_CLEAN_ERRORS="${ec}"
+    if ((ec)); then
+        _exit "${ec}"
+        return "${ec}"
+    fi
+    log_info "Log reset complete."
+    _exit
+    return 0
 }
 
 # Populates three caller-supplied parallel arrays from the manifest.
@@ -865,7 +1029,7 @@ do_reset() {
 
     log_debug "Reset will affect ${affected} of ${total} manifest entries."
 
-    if ((INTERACTIVE)); then
+    if ((DF_INTERACTIVE)); then
         local reply
         printf '\n  This will remove %d symlink/generated file(s).\n' "${affected}" >&2
         printf '  Copied files will NOT be affected.\n' >&2
@@ -912,7 +1076,7 @@ do_reset() {
         log_info "Reset complete: ${removed} file(s) removed."
     fi
 
-    RESET_ERRORS="${ec}"
+    DF_RESET_ERRORS="${ec}"
     _exit "${ec}"
     return "${ec}"
 }
@@ -1070,7 +1234,7 @@ do_repair() {
         printf '\n' >&2
     fi
 
-    REPAIR_ERRORS="${ec}"
+    DF_REPAIR_ERRORS="${ec}"
     _exit "${ec}"
     return "${ec}"
 }
@@ -1086,8 +1250,8 @@ do_remove() {
     local -a target_modules=()
     local mod entry
 
-    for entry in "${REMOVE_SET[@]}"; do
-        for mod in "${AVAILABLE_MODULES[@]}"; do
+    for entry in "${DF_REMOVE_SET[@]}"; do
+        for mod in "${DF_AVAILABLE_MODULES[@]}"; do
             if [[ ${mod} == "${entry}" || ${mod} == "${entry}/"* ]]; then
                 target_modules+=("${mod}")
             fi
@@ -1095,7 +1259,7 @@ do_remove() {
     done
 
     if [[ ${#target_modules[@]} -eq 0 ]]; then
-        log_warn "No modules matched REMOVE_SET. Nothing to remove."
+        log_warn "No modules matched DF_REMOVE_SET. Nothing to remove."
         _exit
         return 0
     fi
@@ -1104,7 +1268,7 @@ do_remove() {
     local action dest
 
     for mod in "${target_modules[@]}"; do
-        action="${MODULE_ACTION["${mod}"]:-}"
+        action="${DF_MODULE_ACTION["${mod}"]:-}"
         case "${action}" in
             symlink | generate)
                 to_remove+=("${mod}")
@@ -1121,11 +1285,11 @@ do_remove() {
         return 0
     fi
 
-    if ((INTERACTIVE)); then
+    if ((DF_INTERACTIVE)); then
         local reply
         printf '\n  This will remove %d file(s):\n' "${#to_remove[@]}" >&2
         for mod in "${to_remove[@]}"; do
-            dest="${MODULE_DEST["${mod}"]:-}"
+            dest="${DF_MODULE_DEST["${mod}"]:-}"
             printf '    - %s\n' "${dest}" >&2
         done
         printf '\n  Continue? [Y/n] ' >&2
@@ -1145,7 +1309,7 @@ do_remove() {
     fi
 
     for mod in "${to_remove[@]}"; do
-        dest="${MODULE_DEST["${mod}"]:-}"
+        dest="${DF_MODULE_DEST["${mod}"]:-}"
         log_trace "Removing: '${mod}' → '${dest}'"
         if ! remove_file "${dest}"; then
             ((++ec))
@@ -1169,7 +1333,7 @@ do_remove() {
         log_info "Removal complete: ${removed} file(s) removed."
     fi
 
-    REMOVE_ERRORS="${ec}"
+    DF_REMOVE_ERRORS="${ec}"
     _exit "${ec}"
     return "${ec}"
 }

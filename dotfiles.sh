@@ -16,11 +16,8 @@ readonly DOTFILES_BACKUP_DIR="${DOTFILES_CACHE_DIR}/backups"
 readonly DOTFILES_MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
 readonly DOTFILES_LOG="${DOTFILES_LOG:-1}"
 SILENCE_INIT_LOG_MSG="true" # logging.sh
-
-readonly MERGE_TOP_SENTINEL='# --- Local Configuration (managed by dotfiles) ---'
-readonly MERGE_BOTTOM_SENTINEL='# --- Do not edit this line or above ---'
-
 readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"
+readonly DOTFILES_MAX_BACKUPS="${DOTFILES_MAX_BACKUPS:-10}"
 
 # OS
 readonly OS_CACHYOS='cachyos'
@@ -39,6 +36,32 @@ readonly WINDOWS_SUDO_REG_LOCATION='HKLM\SOFTWARE\Microsoft\Windows\CurrentVersi
 
 # user env vars
 readonly DOTFILES_PROMPT_WINDOWS_HANDOFF="${DOTFILES_PROMPT_WINDOWS_HANDOFF:-1}"
+
+# Runtime state: single global namespace (DF_*).
+# Functions read/write these directly — no local shadows, no readonly —
+# so the state is always unambiguous to follow.
+DF_MAIN_ACTION=""
+DF_LOG_LEVEL=""
+DF_DRY_RUN=0
+DF_NOCONFIRM=0
+DF_INTERACTIVE=0
+DF_FORCE=0
+DF_NO_LOG=0
+DF_PRINT_TIME=0
+DF_NO_REGENERATE=0
+DF_NO_BACKUP=0
+DF_REMOVE_ERRORS=0
+DF_UNINSTALL_ERRORS=0
+DF_REPAIR_ERRORS=0
+DF_RESET_ERRORS=0
+DF_CLEAN_ERRORS=0
+DF_CLEAN_DAYS=""
+DF_CLEAN_KEEP=""
+DF_ERROR_COUNT=0
+DF_CLEAN_LOGS=0
+DF_CLEAN_BACKUPS=0
+
+declare -A DF_MODULE_ACTION DF_MODULE_DEST DF_MODULE_CMD DF_CATEGORY_MAP
 
 # src files
 readonly SOURCE_FILES=(
@@ -87,10 +110,10 @@ bash_version_check() {
 # set the absolute directory path of this script
 # Source - https://stackoverflow.com/a/246128
 _set_src_path() {
-    log_trace "Entering (SRC_PATH='${SRC_PATH:-}')"
+    log_trace "Entering (DF_SRC_PATH='${DF_SRC_PATH:-}')"
 
-    if [[ -n ${SRC_PATH:-} ]]; then
-        log_debug "SRC_PATH is already set to '${SRC_PATH}'. Skipping."
+    if [[ -n ${DF_SRC_PATH:-} ]]; then
+        log_debug "DF_SRC_PATH is already set to '${DF_SRC_PATH}'. Skipping."
         log_trace "Exiting (already set)"
         return 0
     fi
@@ -117,47 +140,45 @@ _set_src_path() {
         log_trace "Resolved symlink target to '${source_path}'"
     done
 
-    SRC_PATH="$(cd -P "$(dirname "$source_path")" > /dev/null 2>&1 && pwd)"
-    log_debug "Resolved SRC_PATH='${SRC_PATH}'"
-    log_trace "Setting SRC_PATH as readonly and exiting successfully"
-    readonly SRC_PATH
+    DF_SRC_PATH="$(cd -P "$(dirname "$source_path")" > /dev/null 2>&1 && pwd)"
+    log_debug "Resolved DF_SRC_PATH='${DF_SRC_PATH}'"
+    log_trace "Exiting successfully with DF_SRC_PATH set"
 }
 
 _set_module_dir() {
-    log_trace "Entering (MODULE_DIR='${MODULE_DIR:-}', SRC_PATH='${SRC_PATH:-}')"
+    log_trace "Entering (DF_MODULE_DIR='${DF_MODULE_DIR:-}', DF_SRC_PATH='${DF_SRC_PATH:-}')"
 
-    if [[ -n ${MODULE_DIR:-} ]]; then
-        log_debug "MODULE_DIR is already set to '${MODULE_DIR}'. Skipping."
+    if [[ -n ${DF_MODULE_DIR:-} ]]; then
+        log_debug "DF_MODULE_DIR is already set to '${DF_MODULE_DIR}'. Skipping."
         log_trace "Exiting (already set)"
         return 0
     fi
 
-    MODULE_DIR="${SRC_PATH}/modules"
-    log_trace "Set MODULE_DIR='${MODULE_DIR}'"
+    DF_MODULE_DIR="${DF_SRC_PATH}/modules"
+    log_trace "Set DF_MODULE_DIR='${DF_MODULE_DIR}'"
 
-    if [[ ! -d ${MODULE_DIR} ]]; then
-        log_error "Unable to locate module directory at '${MODULE_DIR}'"
+    if [[ ! -d ${DF_MODULE_DIR} ]]; then
+        log_error "Unable to locate module directory at '${DF_MODULE_DIR}'"
         printf 'Error: unable to locate modules/.\n' >&2
         log_trace "Exiting with status 1"
         return 1
     fi
 
-    log_debug "Verified module directory exists at '${MODULE_DIR}'"
+    log_debug "Verified module directory exists at '${DF_MODULE_DIR}'"
     log_trace "Exiting successfully with status 0"
-    readonly MODULE_DIR
 }
 
-# Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
+# Detects and sets DF_TARGET_OS and DF_TARGET_RUNTIME. Validates by comparing
 # against OS_UNKNOWN and RUNTIME_UNKNOWN
 # Usage: _set_env
 #
 # Returns:
-#   0 if TARGET_OS and TARGET_RUNTIME are set
-#   1 if TARGET_OS and TARGET_RUNTIME remain 'unknown'
+#   0 if DF_TARGET_OS and DF_TARGET_RUNTIME are set
+#   1 if DF_TARGET_OS and DF_TARGET_RUNTIME remain 'unknown'
 _set_target_env() {
-    log_trace "Entering (TARGET_OS='${TARGET_OS:-}', TARGET_RUNTIME='${TARGET_RUNTIME:-}', TARGET_ENV='${TARGET_ENV:-}')"
+    log_trace "Entering (DF_TARGET_OS='${DF_TARGET_OS:-}', DF_TARGET_RUNTIME='${DF_TARGET_RUNTIME:-}', DF_TARGET_ENV='${DF_TARGET_ENV:-}')"
 
-    if [[ -n ${TARGET_OS:-} || -n ${TARGET_RUNTIME:-} || -n ${TARGET_ENV:-} ]]; then
+    if [[ -n ${DF_TARGET_OS:-} || -n ${DF_TARGET_RUNTIME:-} || -n ${DF_TARGET_ENV:-} ]]; then
         log_debug "Environment variables already set. Skipping environment detection."
         log_trace "Exiting (already set)"
         return 0
@@ -173,64 +194,64 @@ _set_target_env() {
             # wsl vs native
             if uname -r | grep -qi "microsoft"; then
                 log_trace "WSL runtime detected."
-                readonly TARGET_RUNTIME="${RUNTIME_WSL}"
+                DF_TARGET_RUNTIME="${RUNTIME_WSL}"
             else
                 log_trace "Native Linux runtime detected."
-                readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
+                DF_TARGET_RUNTIME="${RUNTIME_NATIVE}"
             fi
 
             # distro
             if [[ -f "/etc/os-release" ]]; then
                 if grep -qiE '^ID=.*cachyos' /etc/os-release; then
                     log_trace "CachyOS detected in /etc/os-release."
-                    readonly TARGET_OS="${OS_CACHYOS}"
+                    DF_TARGET_OS="${OS_CACHYOS}"
                 elif grep -qiE '^ID(_LIKE)?=.*debian' /etc/os-release || [[ -f "/etc/debian_version" ]]; then
                     log_trace "Debian-based OS detected in /etc/os-release."
-                    readonly TARGET_OS="${OS_DEBIAN}"
+                    DF_TARGET_OS="${OS_DEBIAN}"
                 else
                     log_warn "Unsupported Linux distribution."
-                    readonly TARGET_OS="${OS_UNKNOWN}"
+                    DF_TARGET_OS="${OS_UNKNOWN}"
                 fi
             else
                 log_warn "/etc/os-release not found. Unable to identify Linux distribution."
-                readonly TARGET_OS="${OS_UNKNOWN}"
+                DF_TARGET_OS="${OS_UNKNOWN}"
             fi
             ;;
 
         Darwin*)
             log_debug "macOS (Darwin) environment detected."
-            readonly TARGET_OS="${OS_MACOS}"
-            readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
+            DF_TARGET_OS="${OS_MACOS}"
+            DF_TARGET_RUNTIME="${RUNTIME_NATIVE}"
             ;;
 
         MINGW*)
             log_debug "Windows MINGW environment detected."
-            readonly TARGET_OS="${OS_WINDOWS}"
+            DF_TARGET_OS="${OS_WINDOWS}"
             if [[ -f "/git-bash.exe" || -n ${EXEPATH:-} ]]; then
                 log_trace "Git Bash runtime detected."
-                readonly TARGET_RUNTIME="${RUNTIME_GITBASH}"
+                DF_TARGET_RUNTIME="${RUNTIME_GITBASH}"
             else
                 log_trace "Unknown MinGW environment detected."
-                readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
+                DF_TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
             fi
             ;;
 
         *)
             log_debug "Fallback environment detection for kernel '${kernel_name}'."
             if [[ ${OS:-} == "Windows_NT" ]]; then
-                readonly TARGET_OS="${OS_WINDOWS}"
-                readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
+                DF_TARGET_OS="${OS_WINDOWS}"
+                DF_TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
             else
-                readonly TARGET_OS="${OS_UNKNOWN}"
-                readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
+                DF_TARGET_OS="${OS_UNKNOWN}"
+                DF_TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
             fi
             ;;
     esac
 
-    readonly TARGET_ENV="${TARGET_OS}-${TARGET_RUNTIME}"
-    log_debug "Detected environment: TARGET_OS='${TARGET_OS}', TARGET_RUNTIME='${TARGET_RUNTIME}', TARGET_ENV='${TARGET_ENV}'"
+    DF_TARGET_ENV="${DF_TARGET_OS}-${DF_TARGET_RUNTIME}"
+    log_debug "Detected environment: DF_TARGET_OS='${DF_TARGET_OS}', DF_TARGET_RUNTIME='${DF_TARGET_RUNTIME}', DF_TARGET_ENV='${DF_TARGET_ENV}'"
 
-    if [[ ${TARGET_OS} == "${OS_UNKNOWN}" || ${TARGET_RUNTIME} == "${RUNTIME_UNKNOWN}" ]]; then
+    if [[ ${DF_TARGET_OS} == "${OS_UNKNOWN}" || ${DF_TARGET_RUNTIME} == "${RUNTIME_UNKNOWN}" ]]; then
         log_error "Failed to fully detect target environment."
         log_trace "Exiting with status 1"
         return 1
@@ -285,64 +306,63 @@ _set_windows_sudo() {
 
 _set_date_cmd() {
     _enter
-    DATE_CMD="date"
-    DATE_FMT="%Y-%m-%d %H:%M:%S.%3N"
+    DF_DATE_CMD="date"
+    DF_DATE_FMT="%Y-%m-%d %H:%M:%S.%3N"
 
     if ! [[ $(date +%3N 2> /dev/null) =~ ^[0-9]+$ ]]; then
         # Standard 'date' is BSD (macOS). Look for GNU date (gdate)
         if command -v gdate > /dev/null 2>&1; then
-            DATE_CMD="gdate"
+            DF_DATE_CMD="gdate"
         elif [[ -x "/opt/homebrew/bin/gdate" ]]; then
-            DATE_CMD="/opt/homebrew/bin/gdate"
+            DF_DATE_CMD="/opt/homebrew/bin/gdate"
         elif [[ -x "/usr/local/bin/gdate" ]]; then
-            DATE_CMD="/usr/local/bin/gdate"
+            DF_DATE_CMD="/usr/local/bin/gdate"
         else
             # No GNU date capability found; fall back without subseconds to avoid literal '.3N'
-            DATE_FMT='%Y-%m-%d %H:%M:%S'
+            DF_DATE_FMT='%Y-%m-%d %H:%M:%S'
         fi
     fi
-    log_debug "DATE_CMD set to '${DATE_CMD}'. DATE_FMT set to ${DATE_FMT}"
+    log_debug "DF_DATE_CMD set to '${DF_DATE_CMD}'. DF_DATE_FMT set to ${DF_DATE_FMT}"
 
-    readonly DATE_CMD DATE_FMT
     _exit
 }
 
 # Detect if script was run as sudo or root.
 _set_is_elevated() {
     _enter
-    if [[ -n ${IS_ELEVATED:-} ]]; then
-        log_debug "IS_ELEVATED is already set to '${IS_ELEVATED}'. Skipping."
+    if [[ -n ${DF_IS_ELEVATED:-} ]]; then
+        log_debug "DF_IS_ELEVATED is already set to '${DF_IS_ELEVATED}'. Skipping."
         log_trace "Exiting (already set)"
         return 0
     fi
 
-    IS_ELEVATED=0
+    DF_IS_ELEVATED=0
     if [[ ${EUID} -eq 0 || -n ${SUDO_USER:-} ]]; then
         log_debug "Running as root/sudo user."
-        readonly IS_ELEVATED=1
-    elif [[ ${TARGET_OS} == "${OS_WINDOWS}" ]] && net session > /dev/null 2>&1; then
+        DF_IS_ELEVATED=1
+    elif [[ ${DF_TARGET_OS} == "${OS_WINDOWS}" ]] && net session > /dev/null 2>&1; then
         log_debug "Windows administrative session detected."
-        readonly IS_ELEVATED=1
+        DF_IS_ELEVATED=1
     else
         log_debug "Non-elevated execution context."
-        readonly IS_ELEVATED=0
+        DF_IS_ELEVATED=0
     fi
 
-    log_debug "Privilege level IS_ELEVATED=${IS_ELEVATED}"
+    log_debug "Privilege level DF_IS_ELEVATED=${DF_IS_ELEVATED}"
     _exit
 }
 
 _set_dotfiles_manifest() {
     _enter
 
-    if [[ -n ${DOTFILES_MANIFEST+x} ]] && ((${#DOTFILES_MANIFEST[@]} > 0)); then
-        log_debug "DOTFILES_MANIFEST already populated (${#DOTFILES_MANIFEST[@]} items). Skipping."
+    if [[ -n ${DF_MANIFEST+x} ]] && ((${#DF_MANIFEST[@]} > 0)); then
+        log_debug "DF_MANIFEST already populated (${#DF_MANIFEST[@]} items). Skipping."
         log_trace "Exiting (already populated)"
         return 0
     fi
 
     local topgrade_dest
-    if [[ ${TARGET_OS} == "${OS_WINDOWS}" ]]; then
+    if [[ ${DF_TARGET_OS} == "${OS_WINDOWS}" ]]; then
         topgrade_dest="${APPDATA}/topgrade/topgrade.toml"
     else
         topgrade_dest="${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
@@ -350,7 +370,7 @@ _set_dotfiles_manifest() {
     log_trace "Resolved topgrade_dest='${topgrade_dest}'"
 
     # tag | src | dest | (post-install cmd)
-    readonly DOTFILES_MANIFEST=(
+    DF_MANIFEST=(
         "symlink|zsh/zshrc|${HOME}/.zshrc"
         "symlink|zsh/zsh_options|${HOME}/.zsh_options"
         "symlink|zsh/zstyles|${HOME}/.zstyles"
@@ -365,7 +385,7 @@ _set_dotfiles_manifest() {
         "symlink|.bashrc|bash/bashrc|${HOME}/.bashrc"
 
         "symlink|git/gitconfig|${HOME}/.gitconfig"
-        "copy|git/gitconfig.local.${TARGET_OS}|${HOME}/.gitconfig.local"
+        "copy|git/gitconfig.local.${DF_TARGET_OS}|${HOME}/.gitconfig.local"
         "symlink|git/gitignore|${HOME}/.gitignore"
         "symlink|git/gitattributes|${HOME}/.gitattributes"
         "symlink|git/diff-so-fancy|${HOME}/.local/bin/diff-so-fancy|chmod +x ${HOME}/.local/bin/diff-so-fancy"
@@ -380,31 +400,32 @@ _set_dotfiles_manifest() {
         "symlink|dev/clang-tidy|${HOME}/dev/.clang-tidy"
         "symlink|dev/editorconfig|${HOME}/dev/.editorconfig"
 
-        "copy|pwsh.${TARGET_OS}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
-        "copy|pwsh.${TARGET_OS}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
-        "copy|pwsh.${TARGET_OS}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
-        "copy|pwsh.${TARGET_OS}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
-        "copy|pwsh.${TARGET_OS}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
-        "copy|pwsh.${TARGET_OS}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
-        "copy|pwsh.${TARGET_OS}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
-        "copy|pwsh.${TARGET_OS}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
-
-        "symlink|oh-my-posh.${TARGET_OS}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
-        "symlink|oh-my-posh.${TARGET_OS}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
-        "symlink|oh-my-posh.${TARGET_OS}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
-        "symlink|oh-my-posh.${TARGET_OS}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
-        "symlink|oh-my-posh.${TARGET_OS}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
-        "symlink|oh-my-posh.${TARGET_OS}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
-
         "symlink|topgrade/topgrade.toml|${topgrade_dest}"
-        "symlink|fastfetch/config.jsonc.${TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
-        "symlink|tmux/tmux.conf.${TARGET_OS}|${HOME}/.tmux.conf"
+        "symlink|fastfetch/config.jsonc.${DF_TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
+        "symlink|tmux/tmux.conf.${DF_TARGET_OS}|${HOME}/.tmux.conf"
         "symlink|curl/curlrc|${HOME}/.curlrc"
         "symlink|wget/wgetrc|${HOME}/.wgetrc"
         "symlink|shellcheck/shellcheckrc|${HOME}/.shellcheckrc"
 
         "symlink|claude/settings.json|${HOME}/.claude/settings.json"
         "symlink|claude/plugin.json|${HOME}/.claude/plugin.json"
+
+        "copy|pwsh.${DF_TARGET_OS}/Profile|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Set-MSVC-Environment|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Update-Modules|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Print-Env|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/nproc|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/sha256|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/sha1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/md5|${HOME}/Documents/Powershell/Scripts/md5.ps1"
+
+        "symlink|oh-my-posh.${DF_TARGET_OS}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
+        "symlink|oh-my-posh.${DF_TARGET_OS}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
+        "symlink|oh-my-posh.${DF_TARGET_OS}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
+        "symlink|oh-my-posh.${DF_TARGET_OS}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
+        "symlink|oh-my-posh.${DF_TARGET_OS}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
+        "symlink|oh-my-posh.${DF_TARGET_OS}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
+
     )
 
     # verification
@@ -414,11 +435,11 @@ _set_dotfiles_manifest() {
 _populate_arrays() {
     _enter
 
-    if [[ -n ${AVAILABLE_MODULES+x} ]] && ((${#AVAILABLE_MODULES[@]} > 0)) \
-        && [[ -n ${MODULE_ACTION+x} ]] && ((${#MODULE_ACTION[@]} > 0)) \
-        && [[ -n ${MODULE_DEST+x}  ]] && ((${#MODULE_DEST[@]} > 0)) \
-        && [[ -n ${MODULE_CATEGORY_MAP+x}  ]] && ((${#MODULE_CATEGORY_MAP[@]} > 0)) \
-        && [[ -n ${MODULE_CMD+x}   ]] && ((${#MODULE_CMD[@]} > 0)); then
+    if [[ -n ${DF_AVAILABLE_MODULES+x} ]] && ((${#DF_AVAILABLE_MODULES[@]} > 0)) \
+        && [[ -n ${DF_MODULE_ACTION+x} ]] && ((${#DF_MODULE_ACTION[@]} > 0)) \
+        && [[ -n ${DF_MODULE_DEST+x}  ]] && ((${#DF_MODULE_DEST[@]} > 0)) \
+        && [[ -n ${DF_CATEGORY_MAP+x}  ]] && ((${#DF_CATEGORY_MAP[@]} > 0)) \
+        && [[ -n ${DF_MODULE_CMD+x}   ]] && ((${#DF_MODULE_CMD[@]} > 0)); then
         log_debug "Module arrays are already populated. Skipping."
         log_trace "Exiting (all arrays already set)"
         return 0
@@ -427,42 +448,41 @@ _populate_arrays() {
     local -a active_modules=()
     local item action src dest post_cmd
 
-    for item in "${DOTFILES_MANIFEST[@]}"; do
+    for item in "${DF_MANIFEST[@]}"; do
         IFS='|' read -r action src dest post_cmd <<< "${item}"
 
         # skip if not available on os/runtime
-        if [[ ! -e "${MODULE_DIR}/${src}" ]]; then
-            log_trace "Skipping module '${src}': source does not exist at '${MODULE_DIR}/${src}'"
+        if [[ ! -e "${DF_MODULE_DIR}/${src}" ]]; then
+            log_trace "Skipping module '${src}': source does not exist at '${DF_MODULE_DIR}/${src}'"
             continue
         fi
 
         # skip specific combos
-        if [[ ${src} == "topgrade/topgrade.toml" && ${TARGET_OS} == "${OS_WINDOWS}" ]]; then
-            log_trace "Skipping '${src}' for OS '${TARGET_OS}'"
+        if [[ ${src} == "topgrade/topgrade.toml" && ${DF_TARGET_OS} == "${OS_WINDOWS}" ]]; then
+            log_trace "Skipping '${src}' for OS '${DF_TARGET_OS}'"
             continue
         fi
 
         log_debug "Module available: '${src}'"
         active_modules+=("${src}")
 
-        MODULE_ACTION["${src}"]="${action}"
-        MODULE_DEST["${src}"]="${dest}"
-        MODULE_CMD["${src}"]="${post_cmd:-}"
+        DF_MODULE_ACTION["${src}"]="${action}"
+        DF_MODULE_DEST["${src}"]="${dest}"
+        DF_MODULE_CMD["${src}"]="${post_cmd:-}"
 
         local raw_cat="${src%%/*}"
         local display_cat="${raw_cat}"
-        if [[ ${display_cat} == *".${TARGET_ENV}" ]]; then
-            display_cat="${display_cat%".${TARGET_ENV}"}"
-        elif [[ ${display_cat} == *".${TARGET_OS}" ]]; then
-            display_cat="${display_cat%".${TARGET_OS}"}"
+        if [[ ${display_cat} == *".${DF_TARGET_ENV}" ]]; then
+            display_cat="${display_cat%".${DF_TARGET_ENV}"}"
+        elif [[ ${display_cat} == *".${DF_TARGET_OS}" ]]; then
+            display_cat="${display_cat%".${DF_TARGET_OS}"}"
         fi
-        MODULE_CATEGORY_MAP["${display_cat}"]="${raw_cat}"
+        DF_CATEGORY_MAP["${display_cat}"]="${raw_cat}"
     done
 
-    AVAILABLE_MODULES=("${active_modules[@]}")
-    log_debug "Resolved ${#AVAILABLE_MODULES[@]} available modules."
+    DF_AVAILABLE_MODULES=("${active_modules[@]}")
+    log_debug "Resolved ${#DF_AVAILABLE_MODULES[@]} available modules."
     _exit
-    readonly AVAILABLE_MODULES MODULE_ACTION MODULE_DEST MODULE_CMD MODULE_CATEGORY_MAP
 }
 
 check_exists() {
@@ -470,7 +490,7 @@ check_exists() {
 
     local -r -a paths=("$@")
     local -a missing_paths=()
-    local -r prefix="${SRC_PATH}/"
+    local -r prefix="${DF_SRC_PATH}/"
 
     for path in "${paths[@]}"; do
         local target_path="$path"
@@ -583,7 +603,7 @@ is_true() {
 set_pwsh_cmd() {
     [[ -n ${PWSH_CMD:-}  ]] && return 0
 
-    if [[ ${TARGET_OS} == "${OS_WINDOWS}"  ]]; then
+    if [[ ${DF_TARGET_OS} == "${OS_WINDOWS}"  ]]; then
         if PWSH_CMD=$(command -v pwsh.exe 2> /dev/null); then
             :
         elif PWSH_CMD=$(command -v powershell.exe 2> /dev/null); then
@@ -601,7 +621,7 @@ set_pwsh_cmd() {
 prompt_windows_handoff() {
     _enter
     printf '\n' >&2
-    if [[ ${TARGET_RUNTIME} == "${RUNTIME_GITBASH}"  ]]; then
+    if [[ ${DF_TARGET_RUNTIME} == "${RUNTIME_GITBASH}"  ]]; then
         printf 'Windows Git Bash runtime detected\n' >&2
         printf 'If you are not actually running Git Bash, something went wrong.\n' >&2
     else # unknown
@@ -620,7 +640,7 @@ prompt_windows_handoff() {
 
     local choice
     while true; do
-        if ! read -r -p $'Switch to the native PowerShell installer (install.ps1)? [Y/n/(q)]: ' choice; then
+        if ! read -r -p $'Switch to the native PowerShell installer (dotfiles.ps1)? [Y/n/(q)]: ' choice; then
             printf 'Error: No input available for prompt.\n' >&2
             exit 1
         fi
@@ -655,20 +675,20 @@ prompt_windows_handoff() {
 }
 
 windows_handoff() {
-    local ps_script="${SRC_PATH}/dotfiles.ps1"
+    local ps_script="${DF_SRC_PATH}/dotfiles.ps1"
     if [[ ! -f ${ps_script}  ]]; then
         printf 'Error: unable to find "dotfiles.ps1".\n' >&2
         exit 1
     fi
 
     # convert unix paths to windows
-    if [[ ${TARGET_RUNTIME} == "${RUNTIME_WSL}"  ]]; then
+    if [[ ${DF_TARGET_RUNTIME} == "${RUNTIME_WSL}"  ]]; then
         ps_script=$(wslpath -w "$ps_script")
     fi
 
     local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script")
 
-    #if [[ ${IS_ELEVATED} -eq 1 ]]; then
+    #if [[ ${DF_IS_ELEVATED} -eq 1 ]]; then
     #	ps_args+=("-IsElevated")
     #fi
 
@@ -701,7 +721,7 @@ initialise() {
 
     bash_version_check || die 1 'Bash version validation failed.'
 
-    # SRC_PATH
+    # DF_SRC_PATH
     _set_src_path || die 1 'Failed to determine script source path.'
 
     if [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
@@ -719,40 +739,34 @@ initialise() {
         exit 1
     }
 
-    _set_date_cmd # DATE_CMD DATE_FMT
+    _set_date_cmd # DF_DATE_CMD DF_DATE_FMT
     _set_module_dir || die 1 "Failed to establish module directory."
-    _set_target_env || {      # TARGET_ENV TARGET_OS TARGET_RUNTIME
+    _set_target_env || {      # DF_TARGET_ENV DF_TARGET_OS DF_TARGET_RUNTIME
         log_warn "Target environment detection failed. Prompting user to proceed."
-        printf 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.\n' >&2
+        printf 'Warning: unable to determine $DF_TARGET_OS or $DF_TARGET_RUNTIME.\n' >&2
         prompt_continue 'Some functionality may be limited.'
     }
 
-    _set_is_elevated      # IS_ELEVATED
-    if [[ ${TARGET_OS} == "${OS_WINDOWS}"   ]]; then
+    _set_is_elevated      # DF_IS_ELEVATED
+    if [[ ${DF_TARGET_OS} == "${OS_WINDOWS}"   ]]; then
         _set_windows_sudo # WINDOWS_SUDO
     fi
 
-    _set_dotfiles_manifest # DOTFILES_MANIFEST
-    _populate_arrays # AVAILABLE_MODULES MODULE_ACTION MODULE_DEST MODULE_CMD
-    # TODO: unset DOTFILES_MANIFEST SOURCE_FILES
+    _set_dotfiles_manifest # DF_MANIFEST
+    _populate_arrays # DF_AVAILABLE_MODULES DF_MODULE_ACTION DF_MODULE_DEST DF_MODULE_CMD
+    # TODO: unset DF_MANIFEST SOURCE_FILES
 
     log_trace "Initialisation complete."
 }
 
 main() {
     timer_start
-    local SRC_PATH MODULE_DIR \
-        TARGET_OS TARGET_RUNTIME TARGET_ENV \
-        IS_ELEVATED \
-        DATE_CMD DATE_FMT
-    local -a DOTFILES_MANIFEST AVAILABLE_MODULES
-    local -A MODULE_ACTION MODULE_DEST MODULE_CMD MODULE_CATEGORY_MAP
 
     initialise
 
     if ! is_true "${DOTFILES_IGNORE_HANDOFF:-}"; then
-        if [[ ${IS_ELEVATED} -eq 0 && ${TARGET_OS} == "${OS_WINDOWS}"    ]]; then
-            case "${TARGET_RUNTIME}" in
+        if [[ ${DF_IS_ELEVATED} -eq 0 && ${DF_TARGET_OS} == "${OS_WINDOWS}"    ]]; then
+            case "${DF_TARGET_RUNTIME}" in
                 "${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
                     if prompt_windows_handoff; then
                         windows_handoff
@@ -763,24 +777,17 @@ main() {
         fi
     fi
 
-    # NOTE: no DOTFILES_AUTORESTART
-    local MAIN_ACTION \
-        REMOVE_SET INCLUDE_SET EXCLUDE_SET \
-        DRY_RUN NOCONFIRM INTERACTIVE FORCE \
-        LOG_LEVEL NO_LOG \
-        PRINT_TIME
-
     argparse "$@"
 
     # init logger
     local log_cmd=(
-        "--level" "${LOG_LEVEL}"
+        "--level" "${DF_LOG_LEVEL}"
         "--format" "[%l] %d %z [%s] %m"
     )
     if is_true "${DOTFILES_LOG}"; then
         log_cmd+=("--log" "${DOTFILES_LOG_DIR}/main.log")
     fi
-    if ((NO_LOG)); then
+    if ((DF_NO_LOG)); then
         log_cmd+=("--quiet")
     fi
 
@@ -803,25 +810,23 @@ main() {
     print_banner
 
     local ec=0
-    case "$MAIN_ACTION" in
+    case "$DF_MAIN_ACTION" in
         install)
             do_install || ec=1
             ;;
         remove)
-            local REMOVE_ERRORS=0
-             do_remove || {
-                printf 'Error: remove finished with %d failure(s).\n' "${REMOVE_ERRORS}" >&2
+            do_remove || {
+                printf 'Error: remove finished with %d failure(s).\n' "${DF_REMOVE_ERRORS}" >&2
                 ec=1
             }
             ;;
         uninstall)
-            local UNINSTALL_ERRORS=0
             do_uninstall || {
-                printf 'Error: uninstall finished with %d failure(s).\n' "${UNINSTALL_ERRORS}" >&2
+                printf 'Error: uninstall finished with %d failure(s).\n' "${DF_UNINSTALL_ERRORS}" >&2
                 printf '\n  You may need to manually remove:\n' >&2
                 printf '    %s\n'  "${DOTFILES_LOG_DIR}"    >&2
                 printf '    %s\n'  "${DOTFILES_CACHE_DIR}"  >&2
-                printf '    %s\n'  "${SRC_PATH}"            >&2
+                printf '    %s\n'  "${DF_SRC_PATH}"            >&2
                 printf '\n' >&2
                 ec=1
 
@@ -833,18 +838,33 @@ main() {
             do_install || ec=1
             ;;
         repair)
-            local REPAIR_ERRORS=0
             do_repair || {
-                printf 'Error: repair finished with %d failure(s).\n' "${REPAIR_ERRORS}" >&2
+                printf 'Error: repair finished with %d failure(s).\n' "${DF_REPAIR_ERRORS}" >&2
                 ec=1
             }
             ;;
         reset)
-            local RESET_ERRORS=0
             do_reset || {
-                printf 'Error: reset finished with %d failure(s).\n' "${RESET_ERRORS}" >&2
+                printf 'Error: reset finished with %d failure(s).\n' "${DF_RESET_ERRORS}" >&2
                 ec=1
             }
+            ;;
+        clean)
+            if ((DF_DRY_RUN)); then
+                LOG_FILE=""
+            fi
+            if ((DF_CLEAN_LOGS)); then
+                do_clean_logs || {
+                    printf 'Error: clean finished with %d failure(s).\n' "${DF_CLEAN_ERRORS}" >&2
+                    ec=1
+                }
+            fi
+            if ((DF_CLEAN_BACKUPS)); then
+                do_clean_backups || {
+                    printf 'Error: clean-backups finished with %d failure(s).\n' "${DF_CLEAN_ERRORS}" >&2
+                    ec=1
+                }
+            fi
             ;;
     esac
 
@@ -852,13 +872,13 @@ main() {
 
     local elapsed
     elapsed="$(    timer_elapsed)"
-    if ((PRINT_TIME)); then
+    if ((DF_PRINT_TIME)); then
         printf '\n  ⏱  Total: %s\n\n' "${elapsed}"
     fi
 
     log_trace "Total execution time: ${elapsed}"
 
-    if ! ((DRY_RUN)) && is_true "${DOTFILES_AUTORESTART}"; then
+    if ! ((DF_DRY_RUN)) && is_true "${DOTFILES_AUTORESTART}"; then
         if ! is_windows_bash; then
             exec "${SHELL:-/bin/zsh}" -l
         fi
