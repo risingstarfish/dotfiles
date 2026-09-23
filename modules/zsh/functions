@@ -2,106 +2,106 @@
 
 # util
 {
-	# NOTE: zsh index start at 1 !!!???
-	function _func_err() {
-		local stack="${2:-${funcstack[2]}}"
-		printf "%s: %s\n" "${stack}" "${1:-}" >&2
-	}
+    # NOTE: zsh index start at 1 !!!???
+    function _func_err() {
+        local stack="${2:-${funcstack[2]}}"
+        printf "%s: %s\n" "${stack}" "${1:-}" >&2
+    }
 
-	function _err() {
-		printf "Error: %s\n" "${1:-}" >&2
-	}
+    function _err() {
+        printf "Error: %s\n" "${1:-}" >&2
+    }
 }
 
 # directory navigation
 {
-	function _rs_cd() {
-		cd -- "${1}" 2>/dev/null
-	}
+    function _rs_cd() {
+        cd -- "${1}" 2> /dev/null
+    }
 
-	function _rs_mkdir() {
-		mkdir "${@}" 2>/dev/null
-	}
+    function _rs_mkdir() {
+        mkdir "${@}" 2> /dev/null
+    }
 
-	# Create a new directory and enter it
-	function mkcd() {
-		local -a opts=()
-		local -r msg="USAGE: mkcd [-pv] [-m mode] directory_name..."
-		local target_dir=""
+    # Create a new directory and enter it
+    function mkcd() {
+        local -a opts=()
+        local -r msg="USAGE: mkcd [-pv] [-m mode] directory_name..."
+        local target_dir=""
 
-		function mkcd::fail() {
-			_func_err "${1}" "${funcstack[2]}"
-			printf '%s\n' "${msg:-}" >&2
-			return 1
-		}
+        function mkcd::fail() {
+            _func_err "${1}" "${funcstack[2]}"
+            printf '%s\n' "${msg:-}" >&2
+            return 1
+        }
 
-		while [[ $# -gt 0 ]]; do
-			case "$1" in
-			-p)
-				opts+=(-p)
-				shift
-				;;
-			-v)
-				opts+=(-v)
-				shift
-				;;
-			-m)
-				(($# < 2)) && {
-					mkcd::fail "option ${1} requires an argument (e.g. 755)"
-					return 1
-				}
-				opts+=(-m "${2}")
-				shift 2
-				;;
-			-h | --help)
-				printf '%s\n' "${msg}"
-				return 0
-				;;
-			-?*)
-				mkcd::fail "illegal option ${1}"
-				return 1
-				;;
-			*)
-				if [[ -n "${target_dir}" ]]; then
-					mkcd::fail 'expected only one directory name'
-					return 1
-				fi
-				target_dir="$1"
-				shift
-				;;
-			esac
-		done
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                -p)
+                    opts+=(-p)
+                    shift
+                    ;;
+                -v)
+                    opts+=(-v)
+                    shift
+                    ;;
+                -m)
+                    (($# < 2)) && {
+                        mkcd::fail "option ${1} requires an argument (e.g. 755)"
+                        return 1
+                    }
+                    opts+=(-m "${2}")
+                    shift 2
+                    ;;
+                -h | --help)
+                    printf '%s\n' "${msg}"
+                    return 0
+                    ;;
+                -?*)
+                    mkcd::fail "illegal option ${1}"
+                    return 1
+                    ;;
+                *)
+                    if [[ -n ${target_dir} ]]; then
+                        mkcd::fail 'expected only one directory name'
+                        return 1
+                    fi
+                    target_dir="$1"
+                    shift
+                    ;;
+            esac
+        done
 
-		# validate
-		if [[ -z "${target_dir}" ]]; then
-			_func_err 'no directory name provided'
-			printf '%s\n' "${msg}" >&2
-			return 1
-		fi
+        # validate
+        if [[ -z ${target_dir} ]]; then
+            _func_err 'no directory name provided'
+            printf '%s\n' "${msg}" >&2
+            return 1
+        fi
 
-		# check if directory exists
-		if [[ -d "${target_dir}" ]]; then
-			if _rs_cd "${target_dir}"; then
-				return 0
-			fi
+        # check if directory exists
+        if [[ -d ${target_dir} ]]; then
+            if _rs_cd "${target_dir}"; then
+                return 0
+            fi
 
-			_err "could not change to directory ${target_dir}"
-			return 1
-		fi
+            _err "could not change to directory ${target_dir}"
+            return 1
+        fi
 
-		# create
-		if ! _rs_mkdir "${opts[@]}" -- "${target_dir}"; then
-			_err "could not create directory ${target_dir}"
-			return 1
-		fi
-		# enter
-		if ! _rs_cd "${target_dir}"; then
-			_err "could not change to directory ${target_dir}"
-			return 1
-		fi
+        # create
+        if ! _rs_mkdir "${opts[@]}" -- "${target_dir}"; then
+            _err "could not create directory ${target_dir}"
+            return 1
+        fi
+        # enter
+        if ! _rs_cd "${target_dir}"; then
+            _err "could not change to directory ${target_dir}"
+            return 1
+        fi
 
-		return 0
-	}
+        return 0
+    }
 }
 # https://github.com/ohmyzsh/ohmyzsh/tree/master/plugins/cp
 # cp function that uses rsync
@@ -116,259 +116,259 @@
 #     -e /dev/null: only work on local files (disable remote shells).
 #     --progress: display progress.
 function cpv() {
-	rsync -pogbr -hhh --backup-dir="/tmp/rsync-${USERNAME}" -e /dev/null --progress "$@"
+    rsync -pogbr -hhh --backup-dir="/tmp/rsync-${USERNAME}" -e /dev/null --progress "$@"
 }
 compdef _files cpv
 
 # Determine size of a file or total size of a directory
 function fs() {
-	if du -b /dev/null >/dev/null 2>&1; then
-		local arg=-sbh
-	else
-		local arg=-sh
-	fi
-	if [[ -n "$@" ]]; then
-		du $arg -- "$@"
-	else
-		du $arg .[^.]* ./*
-	fi
+    if du -b /dev/null > /dev/null 2>&1; then
+        local arg=-sbh
+    else
+        local arg=-sh
+    fi
+    if [[ -n $@ ]]; then
+        du $arg -- "$@"
+    else
+        du $arg .[^.]* ./*
+    fi
 }
 
 # github
 {
-	# SSH
-	# Internal helper function to prompt for email and generate the key
-	function _generate_github_ssh_key() {
-		local key_type="$1"
-		local email="${GITHUB_PUBLIC_EMAIL:-}"
+    # SSH
+    # Internal helper function to prompt for email and generate the key
+    function _generate_github_ssh_key() {
+        local key_type="$1"
+        local email="${GITHUB_PUBLIC_EMAIL:-}"
 
-		if [[ -z "$email" ]]; then
-			printf '$GITHUB_PUBLIC_EMAIL is unset. Enter GitHub email: '
-			read -r email
-		else
-			printf 'Using $GITHUB_PUBLIC_EMAIL: %s\n' "${GITHUB_PUBLIC_EMAIL}"
-		fi
+        if [[ -z $email ]]; then
+            printf '$GITHUB_PUBLIC_EMAIL is unset. Enter GitHub email: '
+            read -r email
+        else
+            printf 'Using $GITHUB_PUBLIC_EMAIL: %s\n' "${GITHUB_PUBLIC_EMAIL}"
+        fi
 
-		ssh-keygen -t "$key_type" -C "\"$email\""
-	}
+        ssh-keygen -t "$key_type" -C "\"$email\""
+    }
 
-	function _git_add() {
-		if [[ $# -eq 0 ]]; then
-			if ! command git add -A 2>/dev/null; then
-				_func_err 'failed to stage changes' "${funcstack[3]}"
-				return 1
-			fi
-		else
-			if ! command git add -- "$@" 2>/dev/null; then
-				_func_err 'failed to stage paths' "${funcstack[3]}"
-				return 1
-			fi
-		fi
-	}
+    function _git_add() {
+        if [[ $# -eq 0 ]]; then
+            if ! command git add -A 2> /dev/null; then
+                _func_err 'failed to stage changes' "${funcstack[3]}"
+                return 1
+            fi
+        else
+            if ! command git add -- "$@" 2> /dev/null; then
+                _func_err 'failed to stage paths' "${funcstack[3]}"
+                return 1
+            fi
+        fi
+    }
 
-	function _git_commit() {
-		if ! command git commit -S -m "${1}" 2>/dev/null; then
-			_func_err 'failed to commit changes' "${funcstack[3]}"
-			return 1
-		fi
-	}
+    function _git_commit() {
+        if ! command git commit -S -m "${1}" 2> /dev/null; then
+            _func_err 'failed to commit changes' "${funcstack[3]}"
+            return 1
+        fi
+    }
 
-	function _git_push() {
-		if ! command git push origin "${1}" 2>/dev/null; then
-			_func_err "failed to push to origin/${1}." "${funcstack[3]}"
-			return 1
-		fi
-	}
+    function _git_push() {
+        if ! command git push origin "${1}" 2> /dev/null; then
+            _func_err "failed to push to origin/${1}." "${funcstack[3]}"
+            return 1
+        fi
+    }
 
-	function _git_current_branch() {
-		command git symbolic-ref --short -q HEAD
-	}
+    function _git_current_branch() {
+        command git symbolic-ref --short -q HEAD
+    }
 
-	function _git_flow() {
-		local -r do_push="${1:-0}"
-		local -r commit_msg="${2:-}"
-		shift 2
+    function _git_flow() {
+        local -r do_push="${1:-0}"
+        local -r commit_msg="${2:-}"
+        shift 2
 
-		_git_add "${@}" || return 1
-		_git_commit "${commit_msg}" || return 1
+        _git_add "${@}" || return 1
+        _git_commit "${commit_msg}" || return 1
 
-		# return if not pushing
-		[[ "${do_push}" -eq 1 ]] || return 0
+        # return if not pushing
+        [[ ${do_push} -eq 1 ]] || return 0
 
-		local branch
-		branch="$(_git_current_branch)"
-		if [[ -z "${branch}" ]]; then
-			_func_err 'not on a branch (detached HEAD or not a repo)'
-			return 1
-		fi
+        local branch
+        branch="$(_git_current_branch)"
+        if [[ -z ${branch} ]]; then
+            _func_err 'not on a branch (detached HEAD or not a repo)'
+            return 1
+        fi
 
-		_git_push "${branch}" || return 1
-	}
+        _git_push "${branch}" || return 1
+    }
 
-	# Create a standard ed25519 SSH key for GitHub
-	function github_ssh_key() {
-		_generate_github_ssh_key "ed25519"
-	}
+    # Create a standard ed25519 SSH key for GitHub
+    function github_ssh_key() {
+        _generate_github_ssh_key "ed25519"
+    }
 
-	# Create an ed25519-sk hardware security key for GitHub
-	function github_ssh_sk() {
-		_generate_github_ssh_key "ed25519-sk"
-	}
+    # Create an ed25519-sk hardware security key for GitHub
+    function github_ssh_sk() {
+        _generate_github_ssh_key "ed25519-sk"
+    }
 
-	# git add <paths>, commit
-	function gac() {
-		[[ $# -ge 2 && -n "${1}" ]] || {
-			printf 'Usage: gac <commit_msg> <paths...>\n' >&2
-			return 1
-		}
-		_git_flow 0 "${1}" "${@:2}"
-	}
+    # git add <paths>, commit
+    function gac() {
+        [[ $# -ge 2 && -n ${1} ]] || {
+            printf 'Usage: gac <commit_msg> <paths...>\n' >&2
+            return 1
+        }
+        _git_flow 0 "${1}" "${@:2}"
+    }
 
-	# git add <paths>, commit, push
-	function gacp() {
-		[[ $# -ge 2 && -n "${1}" ]] || {
-			printf 'Usage: gacp <commit_msg> <paths...>\n' >&2
-			return 1
-		}
-		_git_flow 1 "${1}" "${@:2}"
-	}
+    # git add <paths>, commit, push
+    function gacp() {
+        [[ $# -ge 2 && -n ${1} ]] || {
+            printf 'Usage: gacp <commit_msg> <paths...>\n' >&2
+            return 1
+        }
+        _git_flow 1 "${1}" "${@:2}"
+    }
 
-	# git add -A, commit
-	function gaac() {
-		[[ $# -eq 1 && -n "$1" ]] || {
-			printf 'Usage: gaac <commit_msg>\n' >&2
-			return 1
-		}
-		_git_flow 0 "$1"
-	}
+    # git add -A, commit
+    function gaac() {
+        [[ $# -eq 1 && -n $1 ]] || {
+            printf 'Usage: gaac <commit_msg>\n' >&2
+            return 1
+        }
+        _git_flow 0 "$1"
+    }
 
-	# git add -A, commit, push
-	function gaacp() {
-		[[ $# -eq 1 && -n "$1" ]] || {
-			printf 'Usage: gaacp <commit_msg>\n' >&2
-			return 1
-		}
-		_git_flow 1 "$1"
-	}
+    # git add -A, commit, push
+    function gaacp() {
+        [[ $# -eq 1 && -n $1 ]] || {
+            printf 'Usage: gaacp <commit_msg>\n' >&2
+            return 1
+        }
+        _git_flow 1 "$1"
+    }
 
-	# compdef
-	function _compdef_ga() {
-		_arguments -s : \
-			'1:msg:' \
-			'*:paths:_files -/'
-	}
-	compdef _compdef_ga gac
-	compdef _compdef_ga gacp
+    # compdef
+    function _compdef_ga() {
+        _arguments -s : \
+            '1:msg:' \
+            '*:paths:_files -/'
+    }
+    compdef _compdef_ga gac
+    compdef _compdef_ga gacp
 
-	function _compdef_gaa() {
-		_arguments -s : '1:msg:'
-	}
-	compdef _compdef_gaa gaac
-	compdef _compdef_gaa gaacp
+    function _compdef_gaa() {
+        _arguments -s : '1:msg:'
+    }
+    compdef _compdef_gaa gaac
+    compdef _compdef_gaa gaacp
 
-	# initialise git repo (default)
-	# should be used in base repo directory
-	function git_init() {
-		if ! command git init 2>/dev/null; then
-			_func_err 'failed to initialise repository' "${funcstack[1]}"
-			return 1
-		fi
+    # initialise git repo (default)
+    # should be used in base repo directory
+    function git_init() {
+        if ! command git init 2> /dev/null; then
+            _func_err 'failed to initialise repository' "${funcstack[1]}"
+            return 1
+        fi
 
-		# TODO: if file already exists, warn at end and state --force to overwrite
-		local -r -a all_files=("LICENSE"
-			"README.md"
-			"CMakeLists.txt"
-			"CMakeUserPresets.json"
-			".clang-format"
-			".clang-tidy"
-			".cmake-format.py"
-			".editorconfig"
-			".gitignore"
-		)
-		local -r -a all_dirs=(
-			"test"
-			"src/"
-			"include/${project_name}"
-			"doc"
-			"cmake"
-			"example"
-			"module"
-		)
-		local -r -a all_modules=() # all_files + all_dirs
+        # TODO: if file already exists, warn at end and state --force to overwrite
+        local -r -a all_files=("LICENSE"
+            "README.md"
+            "CMakeLists.txt"
+            "CMakeUserPresets.json"
+            ".clang-format"
+            ".clang-tidy"
+            ".cmake-format.py"
+            ".editorconfig"
+            ".gitignore"
+        )
+        local -r -a all_dirs=(
+            "test"
+            "src/"
+            "include/${project_name}"
+            "doc"
+            "cmake"
+            "example"
+            "module"
+        )
+        local -r -a all_modules=() # all_files + all_dirs
 
-		local -a include_modules=()
-		local -a exclude_modules=()
-		local do_force=0
+        local -a include_modules=()
+        local -a exclude_modules=()
+        local do_force=0
 
-		while [[ $# -gt 0 ]]; do
-			case "${1}" in
-			-h | --help)
-				_init_help_msg
-				return 0
-				;;
-			-i | --include)
-				if [[ -z "${2:-}" || "$2" == -* ]]; then
-					printf 'Error: Missing argument for %s.\n' "$1" >&2
-					exit 1
-				fi
-				include_modules+=("${2}")
-				shift 2
-				;;
-			-i=* | --include=*)
-				include_modules+=("${1#*=}")
-				shift
-				;;
-			-x | --exclude)
-				if [[ -z "${2:-}" || "$2" == -* ]]; then
-					printf 'Error: Missing argument for %s.\n' "$1" >&2
-					exit 1
-				fi
-				exclude_modules+=("${2}")
-				shift 2
-				;;
-			-x=* | --exclude=*)
-				exclude_modules+=("${1#*=}")
-				shift
-				;;
-			-l | --list)
-				# TODO: list options
-				return 0
-				;;
-			-f | --force)
-				do_force=1
-				;;
-			*)
-				printf 'Error: Invalid parameter "%s"\n' "{$1}" >&2
-				printf "Run \`%s %s --help\` for valid options.\n" "${funcstack[1]}" "$(basename "$0")" >&2
-				return 1
-				;;
-			esac
-		done
-	}
+        while [[ $# -gt 0 ]]; do
+            case "${1}" in
+                -h | --help)
+                    _init_help_msg
+                    return 0
+                    ;;
+                -i | --include)
+                    if [[ -z ${2:-} || $2 == -* ]]; then
+                        printf 'Error: Missing argument for %s.\n' "$1" >&2
+                        exit 1
+                    fi
+                    include_modules+=("${2}")
+                    shift 2
+                    ;;
+                -i=* | --include=*)
+                    include_modules+=("${1#*=}")
+                    shift
+                    ;;
+                -x | --exclude)
+                    if [[ -z ${2:-} || $2 == -* ]]; then
+                        printf 'Error: Missing argument for %s.\n' "$1" >&2
+                        exit 1
+                    fi
+                    exclude_modules+=("${2}")
+                    shift 2
+                    ;;
+                -x=* | --exclude=*)
+                    exclude_modules+=("${1#*=}")
+                    shift
+                    ;;
+                -l | --list)
+                    # TODO: list options
+                    return 0
+                    ;;
+                -f | --force)
+                    do_force=1
+                    ;;
+                *)
+                    printf 'Error: Invalid parameter "%s"\n' "{$1}" >&2
+                    printf "Run \`%s %s --help\` for valid options.\n" "${funcstack[1]}" "$(basename "$0")" >&2
+                    return 1
+                    ;;
+            esac
+        done
+    }
 }
 
 # docker
 docker() {
-	if ! command docker info >/dev/null 2>&1; then
-		echo "Docker is not running. Starting Docker..."
+    if ! command docker info > /dev/null 2>&1; then
+        echo "Docker is not running. Starting Docker..."
 
-		if [[ "$OSTYPE" == "darwin"* ]]; then
-			open -a Docker
-			echo "Waiting for Docker Desktop to initialize..."
-			while ! command docker info >/dev/null 2>&1; do
-				sleep 2
-			done
-		elif command -v systemctl >/dev/null 2>&1; then
-			# Linux with systemd
-			sudo systemctl start docker
-		elif command -v service >/dev/null 2>&1; then
-			# older Linux with init.d
-			sudo service docker start
-		else
-			echo "Error: Could not determine how to start Docker on this OS."
-			return 1
-		fi
-	fi
+        if [[ $OSTYPE == "darwin"* ]]; then
+            open -a Docker
+            echo "Waiting for Docker Desktop to initialize..."
+            while ! command docker info > /dev/null 2>&1; do
+                sleep 2
+            done
+        elif command -v systemctl > /dev/null 2>&1; then
+            # Linux with systemd
+            sudo systemctl start docker
+        elif command -v service > /dev/null 2>&1; then
+            # older Linux with init.d
+            sudo service docker start
+        else
+            echo "Error: Could not determine how to start Docker on this OS."
+            return 1
+        fi
+    fi
 
-	command docker "$@"
+    command docker "$@"
 }

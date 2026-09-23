@@ -40,7 +40,7 @@ BEHAVIOUR
   -I, --interactive          Prompt for confirmation before every action/modification.
       --noconfirm            Do not prompt for any confirmation.
   -y, --yes                  Auto-accept yes to prompts. Alias to --noconfirm.
-  -f, --force                Overwrite existing files/links.
+  -f, --force                Overwrite existing files/links without backup.
   -K, --autorestart          Automatically restart shell at script end.
 
 LOGGING

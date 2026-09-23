@@ -4,9 +4,9 @@
 
 # prepend a directory to PATH if it exists
 prepend_path() {
-	if [[ -d "$1" ]]; then
-		export PATH="$1:${PATH}"
-	fi
+    if [[ -d $1 ]]; then
+        export PATH="$1:${PATH}"
+    fi
 }
 
 typeset -U PATH # ensure entries are unique

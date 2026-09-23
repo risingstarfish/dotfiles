@@ -16,12 +16,12 @@ zmodule prompt-pwd
 zmodule magic-enter
 
 # --- Platform Specific Modules ---
-if [[ "$OSTYPE" == "darwin"* ]]; then
-	zmodule homebrew
+if [[ $OSTYPE == "darwin"*   ]]; then
+    zmodule homebrew
 fi
 
-if command -v pacman >/dev/null 2>&1; then
-	zmodule pacman
+if command -v pacman > /dev/null 2>&1; then
+    zmodule pacman
 fi
 
 zmodule environment
