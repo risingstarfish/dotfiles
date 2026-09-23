@@ -14,6 +14,8 @@ readonly INIT_LOG_FILE="${DOTFILES_LOG_DIR}/initialise.log"
 readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-$HOME/.cache/dotfiles}"
 readonly DOTFILES_BACKUP_DIR="${DOTFILES_CACHE_DIR}/backups"
 readonly DOTFILES_MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
+readonly DOTFILES_LOG="${DOTFILES_LOG:-1}"
+readonly SILENCE_INIT_LOG_MSG="true" # logging.sh
 
 readonly MERGE_TOP_SENTINEL='# --- Local Configuration (managed by dotfiles) ---'
 readonly MERGE_BOTTOM_SENTINEL='# --- Do not edit this line or above ---'
@@ -373,7 +375,7 @@ _set_dotfiles_manifest() {
         "symlink|ssh/config|${HOME}/.ssh/config|chmod 600 ${HOME}/.ssh/config"
         "generate|ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers|chmod 600 ${HOME}/.ssh/allowed_signers"
 
-        "generate|dev/gen-cmakepreset.py|${HOME}/.local/bin/gen-cmakepreset.py|chmod 600 ${HOME}/.local/bin/gen-cmakepreset.py"
+        "symlink|dev/cmakepreset.py|${HOME}/.local/bin/cmakepreset.py|chmod 600 ${HOME}/.local/bin/cmakepreset.py"
         "symlink|dev/internal-flags.cmake|${HOME}/dev/internal-flags.cmake"
         "symlink|dev/cmake-format.py|${HOME}/dev/.cmake-format.py"
         "symlink|dev/clang-format|${HOME}/dev/.clang-format"
@@ -571,10 +573,18 @@ timer_elapsed() {
     }'
 }
 
+is_true() {
+    case "${1,,}" in
+        1 | true) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 initialise() {
     source "src/logging.sh" || {
         exit 1
     }
+
     if ! init_logger --log "${INIT_LOG_FILE}" --level TRACE --quiet --no-init-message --format "[%l] %d %z [%s] %m"; then
         die 1 'failed to initialise logger.\nCheck that log directory exists and is writable.'
     fi
@@ -638,9 +648,12 @@ main() {
 
     # init logger
     local log_cmd=(
-        "--log" "${DOTFILES_LOG_DIR}/main.log"
         "--level" "${LOG_LEVEL}"
-        "--format" "[%l] %d %z [%s] %m")
+        "--format" "[%l] %d %z [%s] %m"
+    )
+    if is_true "${DOTFILES_LOG}"; then
+        log_cmd+=("--log" "${DOTFILES_LOG_DIR}/main.log")
+    fi
     if ((NO_LOG)); then
         log_cmd+=("--quiet")
     fi
@@ -687,16 +700,22 @@ main() {
             do_install
             ;;
         repair)
-            printf "\n\n--> TODO: Beginning repair! <--\n"
+            local REPAIR_ERRORS=0
+            do_repair || {
+                die 1 'Error: repair finished with %d failure(s).\n' "${REPAIR_ERRORS}"
+            }
             ;;
         reset)
-            printf "\n\n--> TODO: Beginning reset! <--\n"
+            local RESET_ERRORS=0
+            do_reset || {
+                die 1 'Error: reset finished with %d failure(s).\n' "${RESET_ERRORS}"
+            }
             ;;
     esac
 
     print_end
 
-    local     elapsed
+    local elapsed
     elapsed="$(    timer_elapsed)"
     if ((PRINT_TIME)); then
         printf '\n  ⏱  Total: %s\n\n' "${elapsed}"
@@ -704,7 +723,7 @@ main() {
 
     log_trace "Total execution time: ${elapsed}"
 
-    if [[ ${DRY_RUN} -eq 0 && ${DOTFILES_AUTORESTART} -eq 1 ]]; then
+    if ! ((DRY_RUN)) && is_true "${DOTFILES_AUTORESTART}"; then
         if ! is_windows_bash; then
             exec "${SHELL:-/bin/zsh}" -l
         fi

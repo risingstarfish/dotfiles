@@ -119,12 +119,6 @@ argparse() {
                 _exit
                 exit 0
                 ;;
-            --verify)
-                local verify_rc=0
-                print_verification || verify_rc=$?
-                _exit
-                exit "${verify_rc}"
-                ;;
             -l | --list)
                 list_modules
                 _exit

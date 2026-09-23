@@ -227,7 +227,7 @@ do_update() {
 
     log_info "Updating dotfiles in ${SRC_PATH} (ref: ${DOTFILES_REF})"
 
-    if [[ has_local_mods -eq 1 && ${DOTFILES_LOCAL_MODS} -eq 0   ]]; then
+    if  ((has_local_mods))  && ! is_true "${DOTFILES_LOCAL_MODS}"; then
         log_trace "Update blocked: has_local_mods=${has_local_mods}, DOTFILES_LOCAL_MODS=${DOTFILES_LOCAL_MODS}"
         log_warn "Uncommitted changes in ${SRC_PATH}. Update blocked."
         {
@@ -262,7 +262,7 @@ do_update() {
         mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
     fi
 
-    if [[ ${has_local_mods} -eq 1 && ${DOTFILES_LOCAL_MODS} -eq 1 ]]; then
+    if  ((has_local_mods))  && is_true "${DOTFILES_LOCAL_MODS}"; then
         log_trace "Attempting rebase branch: has_local_mods=${has_local_mods}, DOTFILES_LOCAL_MODS=${DOTFILES_LOCAL_MODS}"
         log_warn "Local modifications present. Rebasing onto FETCH_HEAD."
         log_trace "Executing: git -C '${SRC_PATH}' rebase FETCH_HEAD"
@@ -278,7 +278,7 @@ do_update() {
             return 1
         fi
     else
-        if [[ ${has_local_mods} -eq 1 ]]; then
+        if ((has_local_mods)); then
             log_trace "Local mods present without override; checking user confirmation prompt"
             _attempt_cmd "git -C '\"${SRC_PATH}\"' reset --hard FETCH_HEAD" \
                 "This discards ALL local changes in '${SRC_PATH}'" \
@@ -469,6 +469,296 @@ do_uninstall() {
     fi
 
     UNINSTALL_ERRORS="${ec}"
+    _exit "${ec}"
+    return "${ec}"
+}
+
+# Populates three caller-supplied parallel arrays from the manifest.
+#
+# Usage:
+#   local -a m_srcs=() m_dests=() m_types=()
+#   _read_manifest_entries m_srcs m_dests m_types "reset" || return 0
+#
+# $1 = nameref → array of source paths
+# $2 = nameref → array of dest paths
+# $3 = nameref → array of types (symlink|copy|generate)
+# $4 = context string for log messages (e.g. "reset", "repair")
+#
+# Returns:
+#   0  arrays populated, caller may proceed
+#   1  no manifest or empty — caller should return 0
+_read_manifest_entries() {
+    _enter
+    local -n _m_srcs="$1"
+    local -n _m_dests="$2"
+    local -n _m_types="$3"
+    local -r context="${4:-operation}"
+
+    if [[ ! -f ${DOTFILES_MANIFEST_FILE} ]]; then
+        log_warn "No manifest found. Nothing to ${context}."
+        _exit 1
+        return 1
+    fi
+
+    local src dest ftype
+    while IFS=$'\t' read -r src dest ftype; do
+        src="${src%$'\r'}"
+        dest="${dest%$'\r'}"
+        ftype="${ftype%$'\r'}"
+        [[ -z ${src:-} || -z ${dest:-} ]] && continue
+        [[ ${dest} == \#* ]] && continue
+        _m_srcs+=("${src}")
+        _m_dests+=("${dest}")
+        _m_types+=("${ftype}")
+    done < "${DOTFILES_MANIFEST_FILE}"
+
+    if [[ ${#_m_dests[@]} -eq 0 ]]; then
+        log_info "Manifest is empty. Nothing to ${context}."
+        _exit 1
+        return 1
+    fi
+
+    log_debug "Loaded ${#_m_dests[@]} manifest entries."
+    _exit
+    return 0
+}
+
+do_reset() {
+    _enter
+    local ec=0
+    local -a failed=()
+    local removed=0
+
+    log_info "Beginning reset."
+
+    local -a m_srcs=() m_dests=() m_types=()
+    _read_manifest_entries m_srcs m_dests m_types "reset" || {
+        _exit
+        return 0
+    }
+
+    local total=${#m_dests[@]}
+
+    # Count affected entries (symlinks + generated only; copies stay)
+    local affected=0
+    local i
+    for ((i = 0; i < total; i++)); do
+        case "${m_types[$i]}" in
+            symlink | generate) ((++affected)) ;;
+        esac
+    done
+
+    log_debug "Reset will affect ${affected} of ${total} manifest entries."
+
+    # Single batch prompt
+    if ((NOCONFIRM)); then
+        log_trace "NOCONFIRM set; skipping reset prompt"
+    else
+        local reply
+        printf '\n  This will remove %d symlink/generated file(s).\n' "${affected}" >&2
+        printf '  Copied files will NOT be affected.\n' >&2
+        printf '\n  Continue? [Y/n] ' >&2
+        read -r reply || reply=""
+        log_trace "User prompt reply: '${reply}'"
+        case "${reply,,}" in
+            y | yes | '')
+                log_trace "User confirmed reset"
+                ;;
+            *)
+                log_warn "Reset cancelled by user."
+                _exit 130
+                return 130
+                ;;
+        esac
+        printf '\n' >&2
+    fi
+
+    for ((i = 0; i < total; i++)); do
+        case "${m_types[$i]}" in
+            symlink | generate)
+                if ! remove_file "${m_dests[$i]}"; then
+                    ((++ec))
+                    failed+=("${m_dests[$i]}")
+                else
+                    ((++removed))
+                fi
+                ;;
+        esac
+    done
+
+    if ((ec > 0)); then
+        log_error "Reset finished with ${ec} error(s): ${removed} removed, ${#failed[@]} failed."
+        if [[ ${#failed[@]} -gt 0 ]]; then
+            printf '\n  Failed to remove:\n' >&2
+            local f
+            for f in "${failed[@]}"; do
+                printf '    ✗ %s\n' "${f}" >&2
+            done
+            printf '\n' >&2
+        fi
+    else
+        log_info "Reset complete: ${removed} file(s) removed."
+    fi
+
+    RESET_ERRORS="${ec}"
+    _exit "${ec}"
+    return "${ec}"
+}
+
+do_repair() {
+    _enter
+    local ec=0
+    local -a failed=()
+    local removed=0
+    local repaired=0
+
+    log_info "Beginning repair."
+
+    local -a m_srcs=() m_dests=() m_types=()
+    _read_manifest_entries m_srcs m_dests m_types "repair" || {
+        _exit
+        return 0
+    }
+
+    local total=${#m_dests[@]}
+
+    local -a broken_idx=()
+    local i dest src reason
+
+    for ((i = 0; i < total; i++)); do
+        case "${m_types[$i]}" in
+            symlink)
+                dest="${m_dests[$i]}"
+                src="${m_srcs[$i]}"
+                if [[ -L ${dest} && -e ${dest} && "$(readlink "${dest}")" == "${src}" ]]; then
+                    log_trace "Healthy symlink: ${dest}"
+                    continue
+                fi
+                if   [[ ! -e ${dest} && ! -L ${dest} ]]; then
+                                                              reason="missing"
+                elif [[ ! -L ${dest} ]]; then
+                                                            reason="not a symlink"
+                elif [[ ! -e ${dest} ]]; then
+                                                            reason="dangling"
+                else
+                                                             reason="wrong target"
+                fi
+                log_warn "Broken symlink [${reason}]: ${dest} (expected → ${src})"
+                broken_idx+=("${i}")
+                ;;
+
+            generate)
+                dest="${m_dests[$i]}"
+                if [[ -f ${dest} && -s ${dest} ]]; then
+                    log_trace "Healthy generated file: ${dest}"
+                    continue
+                fi
+                if [[ -f ${dest} && ! -s ${dest} ]]; then
+                                                          reason="empty"
+                else
+                                                           reason="missing"
+                fi
+                log_warn "Broken generated file [${reason}]: ${dest}"
+                broken_idx+=("${i}")
+                ;;
+        esac
+    done
+
+    local num_broken=${#broken_idx[@]}
+    if ((num_broken == 0)); then
+        log_info "All entries healthy. Nothing to repair."
+        _exit
+        return 0
+    fi
+
+    log_info "Found ${num_broken} broken entr$( ((num_broken == 1)) && printf 'y' || printf 'ies' ). Removing and re-installing…"
+
+    local idx
+    for idx in "${broken_idx[@]}"; do
+        if ! remove_file "${m_dests[$idx]}"; then
+            ((++ec))
+            failed+=("${m_dests[$idx]}")
+        else
+            ((++removed))
+        fi
+    done
+
+    for idx in "${broken_idx[@]}"; do
+        # skip if removal already failed
+        local skip=0
+        if [[ ${#failed[@]} -gt 0 ]]; then
+            local f
+            for f in "${failed[@]}"; do
+                [[ ${f} == "${m_dests[$idx]}" ]] && {
+                                                      skip=1
+                                                              break
+                }
+            done
+        fi
+        ((skip)) && continue
+
+        src="${m_srcs[$idx]}"
+        dest="${m_dests[$idx]}"
+        local ftype="${m_types[$idx]}"
+        local label="${src} → ${dest}"
+
+        if ! _prepare_file "${src}" "${dest}"; then
+            log_warn "Cannot re-install '${label}': parent directory failed."
+            ((++ec))
+            failed+=("${dest}")
+            continue
+        fi
+
+        case "${ftype}" in
+            symlink)
+                log_debug "[repair:relink] ${label}"
+                _attempt_cmd \
+                    "ln -sfn \"${src}\" \"${dest}\"" \
+                    "Re-linking ${label}" \
+                    "Re-link failed: ${label}" \
+                    "Re-linked ${label}"
+                if (($? == 0)); then
+                    manifest_write "${src}" "${dest}" "symlink"
+                    ((++repaired))
+                    log_debug "✓ ${label}"
+                else
+                    ((++ec))
+                    failed+=("${dest}")
+                    log_error "✗ ${label}"
+                fi
+                ;;
+
+            generate)
+                log_debug "[repair:regenerate] ${label}"
+                _attempt_cmd \
+                    "\"${src}\" \"${dest}\"" \
+                    "Regenerating ${label}" \
+                    "Regenerate failed: ${label}" \
+                    "Regenerated ${label}"
+                if (($? == 0)); then
+                    manifest_write "${src}" "${dest}" "generate"
+                    ((++repaired))
+                    log_debug "✓ ${label}"
+                else
+                    ((++ec))
+                    failed+=("${dest}")
+                    log_error "✗ ${label}"
+                fi
+                ;;
+        esac
+    done
+
+    log_info "Repair complete: ${removed} removed, ${repaired} re-installed, ${ec} error(s)."
+    if ((ec > 0)) && [[ ${#failed[@]} -gt 0 ]]; then
+        printf '\n  Failed:\n' >&2
+        local f
+        for f in "${failed[@]}"; do
+            printf '    ✗ %s\n' "${f}" >&2
+        done
+        printf '\n' >&2
+    fi
+
+    REPAIR_ERRORS="${ec}"
     _exit "${ec}"
     return "${ec}"
 }

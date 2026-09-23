@@ -98,6 +98,7 @@ fi
 
 # Default settings (these can be overridden by init_logger)
 default_values() {
+    SILENCE_INIT_LOG_MSG="${SILENCE_INIT_LOG_MSG:-true}"
     CONSOLE_LOG="true"
     LOG_FILE=""
     VERBOSE="false"
@@ -1405,7 +1406,9 @@ init_logger() {
             }
         fi
 
-        echo "Logger: Successfully initialized with log file enabled" >&2
+        if [[ $SILENCE_INIT_LOG_MSG == "false" ]]; then
+            echo "Logger: Successfully initialized with log file enabled" >&2
+        fi
     fi
 
     # Log initialization success

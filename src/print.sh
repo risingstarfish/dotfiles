@@ -26,7 +26,6 @@ INSTALL
 
 INFORMATION
   -l, --list                 Display all available modules.
-      --verify               Check all managed dotfiles. (exit 0 = healthy, 1 = broken)
       --version              Show the version and git information of this program.
   -h, --help                 Show this help message.
 
@@ -63,8 +62,8 @@ ENVIRONMENT VARIABLES
                              (default: 0)
     DOTFILES_AUTORESTART     Set to 1 or true to restart shell at script finish. (default: 0)
 
-  Windows Specific:
-    DOTFILES_IGNORE_HANDOFF  Set to 1 or true to ignore the Windows Powershell notice. (default 0)
+  ###Windows Specific:
+    ###DOTFILES_IGNORE_HANDOFF  Set to 1 or true to ignore the Windows Powershell notice. (default 0)
 
 EOF
     _exit
@@ -206,112 +205,6 @@ list_modules() {
     printf '  ✗  not installed\n'
     printf '  !  installed but broken / stale\n\n'
 
-    _exit
-}
-
-print_verification()   {
-    _enter
-    printf "FIXME: broken!!"
-    exit 1
-    if [[ ! -f ${MANIFEST}   ]]; then
-        printf 'No manifest found. Nothing to verify.\n'
-        return 0
-    fi
-
-    local -a broken_merged_files=()
-    local -a broken_generated_files=()
-    local -a broken_symlink_files=()
-
-    local broke_merged=0
-    local broke_generated=0
-    local broke_symlink=0
-
-    local ok_merged=0
-    local ok_generated=0
-    local ok_symlink=0
-
-    local src
-    local dest
-
-    while IFS=$'\t' read -r src dest ftype; do
-        ftype="${ftype%$'\r'}"
-        [[ -z ${dest}   ]] && continue
-        case "${ftype}" in
-            merged)
-                # healthy if file exists and has both sentinels
-                if [[ -f ${dest}   ]] \
-                    && grep -qxF "${MERGE_TOP_SENTINEL}" "${dest}" \
-                    && grep -qxF "${MERGE_BOTTOM_SENTINEL}" "${dest}"; then
-                    ok_merged=$((ok_merged + 1))
-                else
-                    broken_merged_files+=("${dest}")
-                    printf '  [merged] %s (missing or broken sentinels)\n' "${dest}" >&2
-                fi
-                ;;
-            generated)
-                if [[ -f ${dest} && -s ${dest}     ]]; then
-                    ok_generated=$((ok_generated + 1))
-                else
-                    broken_generated_files+=("${dest}")
-                    printf '  [generated] %s (missing or empty)\n' "${dest}" >&2
-                fi
-                ;;
-            symlink)
-                if [[ -L ${dest} && -e ${dest} && "$(    readlink "${dest}")" == "${src}" ]]; then
-                    ok_symlink=$((ok_symlink + 1))
-                else
-                    broken_symlink_files+=("${dest}")
-                    printf '  [symlink] %s (broken or incorrect target)\n' "${dest}" >&2
-                fi
-                ;;
-            *)
-                printf 'Error: invalid type detected: %s.\nSomething went wrong!\n' "${ftype}" >&2
-                return 1
-                ;;
-        esac
-    done < "${MANIFEST}"
-
-    broke_symlink="${#broken_symlink_files[@]}"
-    broke_merged="${#broken_merged_files[@]}"
-    broke_generated="${#broken_generated_files[@]}"
-
-    local total_broken=$((broke_symlink + broke_merged + broke_generated))
-    local total_ok=$((ok_merged + ok_generated + ok_symlink))
-    local total=$((total_broken + total_ok))
-
-    if [[ ${total_broken} -eq 0 ]]; then
-        printf '  [verify] OK: All %d files verified successfully.\n' "${total_ok}"
-        printf '           (%d symlinks, %d generated, %d merged)\n' "${ok_symlink}" "${ok_generated}" "${ok_merged}"
-        return 0
-    else
-        printf '  [verify] NOT OK: %d out of %d files are broken.\n' "${total_broken}" "${total}" >&2
-        printf '           Symlinks  : %2d OK, %2d broken\n' "${ok_symlink}" "${broke_symlink}" >&2
-        printf '           Generated : %2d OK, %2d broken\n' "${ok_generated}" "${broke_generated}" >&2
-        printf '           Merged    : %2d OK, %2d broken\n' "${ok_merged}" "${broke_merged}" >&2
-        printf '\n' >&2
-        printf '  [verify] Broken File Details:\n' >&2
-        # print exactly which files are broken
-        if [[ ${broke_symlink} -gt 0   ]]; then
-            for f in "${broken_symlink_files[@]}"; do
-                printf '    - [symlink]   %s (broken or incorrect target)\n' "${f}" >&2
-            done
-        fi
-
-        if [[ ${broke_generated} -gt 0   ]]; then
-            for f in "${broken_generated_files[@]}"; do
-                printf '    - [generated] %s (missing or empty)\n' "${f}" >&2
-            done
-        fi
-
-        if [[ ${broke_merged} -gt 0   ]]; then
-            for f in "${broken_merged_files[@]}"; do
-                printf '    - [merged]    %s (missing or broken sentinels)\n' "${f}" >&2
-            done
-        fi
-
-        printf "\n" >&2
-        return 1
-    fi
     _exit
 }
 
