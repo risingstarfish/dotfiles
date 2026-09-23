@@ -15,7 +15,7 @@ readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-$HOME/.cache/dotfiles}"
 readonly DOTFILES_BACKUP_DIR="${DOTFILES_CACHE_DIR}/backups"
 readonly DOTFILES_MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
 readonly DOTFILES_LOG="${DOTFILES_LOG:-1}"
-readonly SILENCE_INIT_LOG_MSG="true" # logging.sh
+SILENCE_INIT_LOG_MSG="true" # logging.sh
 
 readonly MERGE_TOP_SENTINEL='# --- Local Configuration (managed by dotfiles) ---'
 readonly MERGE_BOTTOM_SENTINEL='# --- Do not edit this line or above ---'
@@ -46,7 +46,6 @@ readonly SOURCE_FILES=(
     "src/print.sh"
     "src/argparse.sh"
     # "src/logging.sh" see initialise
-    "src/filesystem.sh"
     "src/action.sh"
     "src/dependencies.sh"
 )
@@ -639,7 +638,7 @@ main() {
     # NOTE: no DOTFILES_AUTORESTART
     local MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
-        DRY_RUN NOCONFIRM FORCE \
+        DRY_RUN NOCONFIRM INTERACTIVE FORCE \
         NO_BACKUP  NO_DEPS \
         LOG_LEVEL NO_LOG \
         PRINT_TIME
@@ -680,7 +679,11 @@ main() {
             do_install
             ;;
         remove)
-            printf "\n\n--> TODO: Beginning removal! <--\n"
+            local REMOVE_ERRORS=0
+             do_remove || {
+                printf 'Error: remove finished with %d failure(s).\n' "${REMOVE_ERRORS}" >&2
+                exit 1
+            }
             ;;
         uninstall)
             local UNINSTALL_ERRORS=0

@@ -62,7 +62,7 @@ assert_include_modules_unset() {
 
 assert_interactive_unset() {
     _enter
-    _assert_flag_unset "${interactive_flag}" "interactive mode is already set" "$1"
+    _assert_flag_unset "${INTERACTIVE}" "interactive mode is already set" "$1"
     _exit
 }
 assert_noconfirm_unset() {
@@ -96,7 +96,7 @@ argparse() {
     EXCLUDE_SET=()
     DRY_RUN=0
     NOCONFIRM=0
-    local interactive_flag=-1
+    INTERACTIVE=0
     FORCE=0
     DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0} # env
     local autorestart_flag
@@ -204,8 +204,7 @@ argparse() {
             -I | --interactive)
                 assert_force_unset "${1}"
                 assert_noconfirm_unset "${1}"
-                NOCONFIRM=0
-                interactive_flag=1
+                INTERACTIVE=1
                 shift
                 ;;
             --noconfirm | -y | --yes)
@@ -346,7 +345,7 @@ argparse() {
             DOTFILES_AUTORESTART=0
         fi
 
-        if [[ ${interactive_flag} -eq 1 ]]; then
+        if [[ ${INTERACTIVE} -eq 1 ]]; then
             _exit 2
             die 2 '--interactive is meaningless with --dry-run'
         fi
@@ -366,9 +365,10 @@ argparse() {
 
     readonly MAIN_ACTION \
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
-        DRY_RUN NOCONFIRM FORCE DOTFILES_AUTORESTART \
+        DRY_RUN NOCONFIRM INTERACTIVE FORCE DOTFILES_AUTORESTART \
         NO_BACKUP NO_DEPS \
-        LOG_LEVEL NO_LOG
+        LOG_LEVEL NO_LOG \
+        PRINT_TIME
 
     _exit
 }
