@@ -13,6 +13,7 @@
 [url "git@github.com:"]
 	insteadOf = https://github.com/
 [core]
+    fileMode = true
 	editor = codium-insiders -n --wait
 	excludesfile = ~/.gitignore
 	autocrlf = input
