@@ -7,13 +7,13 @@ if [[ -z ${HOME:-} || ! -d $HOME ]]; then
     exit 1
 fi
 
-readonly DOTFILES_START_TIME="$(date +%Y-%m-%d_%H%M%S)}"
+readonly DOTFILES_START_TIME="$(date +%Y-%m-%d_%H%M%S)"
 readonly DOTFILES_ENV="${DOTFILES_ENV:-production}" # development testing production
 readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-$HOME/.config/dotfiles/logs}"
 readonly INIT_LOG_FILE="${DOTFILES_LOG_DIR}/initialise.log"
 readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-$HOME/.cache/dotfiles}"
 readonly DOTFILES_BACKUP_DIR="${DOTFILES_CACHE_DIR}/backups"
-readonly MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
+readonly DOTFILES_MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
 
 readonly MERGE_TOP_SENTINEL='# --- Local Configuration (managed by dotfiles) ---'
 readonly MERGE_BOTTOM_SENTINEL='# --- Do not edit this line or above ---'
@@ -51,22 +51,22 @@ readonly SOURCE_FILES=(
 
 # functions
 bash_version_check() {
-    log_trace "${FUNCNAME[0]}: Entering (BASH_VERSION='${BASH_VERSION:-}', ZSH_VERSION='${ZSH_VERSION:-}')"
+    log_trace "Entering (BASH_VERSION='${BASH_VERSION:-}', ZSH_VERSION='${ZSH_VERSION:-}')"
 
     if [[ -z ${BASH_VERSION:-} || -n ${ZSH_VERSION:-} ]]; then
-        log_error "${FUNCNAME[0]}: Script not executing under pure Bash."
+        log_error "Script not executing under pure Bash."
         printf 'Error: the install instructions explicitly say to use the install script with bash; please follow them.\n' >&2
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_trace "Exiting with status 1"
         return 1
     fi
 
     # script requires bash >=4.0
     if ((BASH_VERSINFO[0] < 4)); then
-        log_error "${FUNCNAME[0]}: Bash version v4.0 or newer required. Detected version: ${BASH_VERSION}"
+        log_error "Bash version v4.0 or newer required. Detected version: ${BASH_VERSION}"
         printf 'Error: This script requires bash v4.0 or newer. You are running %s.\n' "${BASH_VERSION}" >&2
 
         if [[ "$(uname -s)" == "Darwin" ]]; then
-            log_debug "${FUNCNAME[0]}: macOS detected with outdated default bash version."
+            log_debug "macOS detected with outdated default bash version."
             printf '  On macOS, the default bash is severely outdated (v3.2).\n' >&2
             printf '  Please install modern bash via Homebrew:\n' >&2
             printf '    brew install bash\n' >&2
@@ -76,74 +76,74 @@ bash_version_check() {
             printf '  Then restart your terminal and run this script again using the new bash.\n' >&2
         fi
 
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_trace "Exiting with status 1"
         return 1
     fi
 
-    log_debug "${FUNCNAME[0]}: Bash version ${BASH_VERSION} validated successfully."
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    log_debug "Bash version ${BASH_VERSION} validated successfully."
+    log_trace "Exiting successfully with status 0"
 }
 
 # set the absolute directory path of this script
 # Source - https://stackoverflow.com/a/246128
 _set_src_path() {
-    log_trace "${FUNCNAME[0]}: Entering (SRC_PATH='${SRC_PATH:-}')"
+    log_trace "Entering (SRC_PATH='${SRC_PATH:-}')"
 
     if [[ -n ${SRC_PATH:-} ]]; then
-        log_debug "${FUNCNAME[0]}: SRC_PATH is already set to '${SRC_PATH}'. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already set)"
+        log_debug "SRC_PATH is already set to '${SRC_PATH}'. Skipping."
+        log_trace "Exiting (already set)"
         return 0
     fi
 
     local source_path="${BASH_SOURCE[0]}"
-    log_trace "${FUNCNAME[0]}: BASH_SOURCE[0]='${source_path}'"
+    log_trace "BASH_SOURCE[0]='${source_path}'"
 
     # piped to bash
     if [[ -z ${source_path} ]]; then
-        log_error "${FUNCNAME[0]}: Unable to determine source path from BASH_SOURCE."
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_error "Unable to determine source path from BASH_SOURCE."
+        log_trace "Exiting with status 1"
         return 1
     fi
 
     local symlink_dir
     while [[ -L $source_path ]]; do
-        log_trace "${FUNCNAME[0]}: Resolving symlink for '${source_path}'"
+        log_trace "Resolving symlink for '${source_path}'"
         symlink_dir="$(cd -P "$(dirname "$source_path")" > /dev/null 2>&1 && pwd)"
         source_path="$(readlink "$source_path")"
 
         if [[ $source_path != /* ]]; then
             source_path=$symlink_dir/$source_path
         fi
-        log_trace "${FUNCNAME[0]}: Resolved symlink target to '${source_path}'"
+        log_trace "Resolved symlink target to '${source_path}'"
     done
 
     SRC_PATH="$(cd -P "$(dirname "$source_path")" > /dev/null 2>&1 && pwd)"
-    log_debug "${FUNCNAME[0]}: Resolved SRC_PATH='${SRC_PATH}'"
-    log_trace "${FUNCNAME[0]}: Setting SRC_PATH as readonly and exiting successfully"
+    log_debug "Resolved SRC_PATH='${SRC_PATH}'"
+    log_trace "Setting SRC_PATH as readonly and exiting successfully"
     readonly SRC_PATH
 }
 
 _set_module_dir() {
-    log_trace "${FUNCNAME[0]}: Entering (MODULE_DIR='${MODULE_DIR:-}', SRC_PATH='${SRC_PATH:-}')"
+    log_trace "Entering (MODULE_DIR='${MODULE_DIR:-}', SRC_PATH='${SRC_PATH:-}')"
 
     if [[ -n ${MODULE_DIR:-} ]]; then
-        log_debug "${FUNCNAME[0]}: MODULE_DIR is already set to '${MODULE_DIR}'. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already set)"
+        log_debug "MODULE_DIR is already set to '${MODULE_DIR}'. Skipping."
+        log_trace "Exiting (already set)"
         return 0
     fi
 
     MODULE_DIR="${SRC_PATH}/modules"
-    log_trace "${FUNCNAME[0]}: Set MODULE_DIR='${MODULE_DIR}'"
+    log_trace "Set MODULE_DIR='${MODULE_DIR}'"
 
     if [[ ! -d ${MODULE_DIR} ]]; then
-        log_error "${FUNCNAME[0]}: Unable to locate module directory at '${MODULE_DIR}'"
+        log_error "Unable to locate module directory at '${MODULE_DIR}'"
         printf 'Error: unable to locate modules/.\n' >&2
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_trace "Exiting with status 1"
         return 1
     fi
 
-    log_debug "${FUNCNAME[0]}: Verified module directory exists at '${MODULE_DIR}'"
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    log_debug "Verified module directory exists at '${MODULE_DIR}'"
+    log_trace "Exiting successfully with status 0"
     readonly MODULE_DIR
 }
 
@@ -155,68 +155,68 @@ _set_module_dir() {
 #   0 if TARGET_OS and TARGET_RUNTIME are set
 #   1 if TARGET_OS and TARGET_RUNTIME remain 'unknown'
 _set_target_env() {
-    log_trace "${FUNCNAME[0]}: Entering (TARGET_OS='${TARGET_OS:-}', TARGET_RUNTIME='${TARGET_RUNTIME:-}', TARGET_ENV='${TARGET_ENV:-}')"
+    log_trace "Entering (TARGET_OS='${TARGET_OS:-}', TARGET_RUNTIME='${TARGET_RUNTIME:-}', TARGET_ENV='${TARGET_ENV:-}')"
 
     if [[ -n ${TARGET_OS:-} || -n ${TARGET_RUNTIME:-} || -n ${TARGET_ENV:-} ]]; then
-        log_debug "${FUNCNAME[0]}: Environment variables already set. Skipping environment detection."
-        log_trace "${FUNCNAME[0]}: Exiting (already set)"
+        log_debug "Environment variables already set. Skipping environment detection."
+        log_trace "Exiting (already set)"
         return 0
     fi
 
     local kernel_name
     kernel_name="$(uname -s 2> /dev/null || echo "unknown")"
-    log_trace "${FUNCNAME[0]}: Detected kernel_name='${kernel_name}'"
+    log_trace "Detected kernel_name='${kernel_name}'"
 
     case "${kernel_name}" in
         Linux*)
-            log_debug "${FUNCNAME[0]}: Linux kernel detected."
+            log_debug "Linux kernel detected."
             # wsl vs native
             if uname -r | grep -qi "microsoft"; then
-                log_trace "${FUNCNAME[0]}: WSL runtime detected."
+                log_trace "WSL runtime detected."
                 readonly TARGET_RUNTIME="${RUNTIME_WSL}"
             else
-                log_trace "${FUNCNAME[0]}: Native Linux runtime detected."
+                log_trace "Native Linux runtime detected."
                 readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
             fi
 
             # distro
             if [[ -f "/etc/os-release" ]]; then
                 if grep -qiE '^ID=.*cachyos' /etc/os-release; then
-                    log_trace "${FUNCNAME[0]}: CachyOS detected in /etc/os-release."
+                    log_trace "CachyOS detected in /etc/os-release."
                     readonly TARGET_OS="${OS_CACHYOS}"
                 elif grep -qiE '^ID(_LIKE)?=.*debian' /etc/os-release || [[ -f "/etc/debian_version" ]]; then
-                    log_trace "${FUNCNAME[0]}: Debian-based OS detected in /etc/os-release."
+                    log_trace "Debian-based OS detected in /etc/os-release."
                     readonly TARGET_OS="${OS_DEBIAN}"
                 else
-                    log_warn "${FUNCNAME[0]}: Unsupported Linux distribution."
+                    log_warn "Unsupported Linux distribution."
                     readonly TARGET_OS="${OS_UNKNOWN}"
                 fi
             else
-                log_warn "${FUNCNAME[0]}: /etc/os-release not found. Unable to identify Linux distribution."
+                log_warn "/etc/os-release not found. Unable to identify Linux distribution."
                 readonly TARGET_OS="${OS_UNKNOWN}"
             fi
             ;;
 
         Darwin*)
-            log_debug "${FUNCNAME[0]}: macOS (Darwin) environment detected."
+            log_debug "macOS (Darwin) environment detected."
             readonly TARGET_OS="${OS_MACOS}"
             readonly TARGET_RUNTIME="${RUNTIME_NATIVE}"
             ;;
 
         MINGW*)
-            log_debug "${FUNCNAME[0]}: Windows MINGW environment detected."
+            log_debug "Windows MINGW environment detected."
             readonly TARGET_OS="${OS_WINDOWS}"
             if [[ -f "/git-bash.exe" || -n ${EXEPATH:-} ]]; then
-                log_trace "${FUNCNAME[0]}: Git Bash runtime detected."
+                log_trace "Git Bash runtime detected."
                 readonly TARGET_RUNTIME="${RUNTIME_GITBASH}"
             else
-                log_trace "${FUNCNAME[0]}: Unknown MinGW environment detected."
+                log_trace "Unknown MinGW environment detected."
                 readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
             fi
             ;;
 
         *)
-            log_debug "${FUNCNAME[0]}: Fallback environment detection for kernel '${kernel_name}'."
+            log_debug "Fallback environment detection for kernel '${kernel_name}'."
             if [[ ${OS:-} == "Windows_NT" ]]; then
                 readonly TARGET_OS="${OS_WINDOWS}"
                 readonly TARGET_RUNTIME="${RUNTIME_UNKNOWN}"
@@ -228,92 +228,116 @@ _set_target_env() {
     esac
 
     readonly TARGET_ENV="${TARGET_OS}-${TARGET_RUNTIME}"
-    log_debug "${FUNCNAME[0]}: Detected environment: TARGET_OS='${TARGET_OS}', TARGET_RUNTIME='${TARGET_RUNTIME}', TARGET_ENV='${TARGET_ENV}'"
+    log_debug "Detected environment: TARGET_OS='${TARGET_OS}', TARGET_RUNTIME='${TARGET_RUNTIME}', TARGET_ENV='${TARGET_ENV}'"
 
     if [[ ${TARGET_OS} == "${OS_UNKNOWN}" || ${TARGET_RUNTIME} == "${RUNTIME_UNKNOWN}" ]]; then
-        log_error "${FUNCNAME[0]}: Failed to fully detect target environment."
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_error "Failed to fully detect target environment."
+        log_trace "Exiting with status 1"
         return 1
     fi
 
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    log_trace "Exiting successfully with status 0"
 }
 
 # detect if windows user has sudo enabled
 _set_windows_sudo() {
-    log_trace "${FUNCNAME[0]}: Entering"
-
+    _enter
     if [[ -n ${WINDOWS_SUDO:-} ]]; then
-        log_debug "${FUNCNAME[0]}: WINDOWS_SUDO is already set to '${WINDOWS_SUDO}'. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already set)"
+        log_debug "WINDOWS_SUDO is already set to '${WINDOWS_SUDO}'. Skipping."
+        _exit
         return 0
     fi
 
     WINDOWS_SUDO=0
 
     if ! command -v sudo > /dev/null 2>&1; then
-        log_trace "${FUNCNAME[0]}: 'sudo' executable not found in PATH."
+        log_debug "'sudo' executable not found in PATH."
         readonly WINDOWS_SUDO
+        _exit
         return 0
     fi
 
     if ! command -v reg.exe > /dev/null 2>&1; then
-        log_trace "${FUNCNAME[0]}: 'reg.exe' executable not found in PATH."
+        log_debug "'reg.exe' executable not found in PATH."
         readonly WINDOWS_SUDO
+        _exit
         return 0
     fi
 
     local sudo_reg
-    log_trace "${FUNCNAME[0]}: Querying Windows Registry: ${WINDOWS_SUDO_REG_LOCATION}"
+    log_trace "Querying Windows Registry: ${WINDOWS_SUDO_REG_LOCATION}"
     sudo_reg=$(MSYS_NO_PATHCONV=1 reg.exe query "${WINDOWS_SUDO_REG_LOCATION}" /v Enabled 2> /dev/null)
 
     if [[ ${sudo_reg} =~ 0x[1-3] ]]; then
-        log_debug "${FUNCNAME[0]}: Windows sudo detected as ENABLED in registry."
+        log_debug "Windows sudo detected as ENABLED in registry."
         WINDOWS_SUDO=1
     else
-        log_debug "${FUNCNAME[0]}: Windows sudo disabled or key not found."
+        log_debug "Windows sudo disabled or key not found."
     fi
 
-    log_trace "${FUNCNAME[0]}: Setting MSYS=winsymlinks:nativestrict"
+    log_trace "Setting MSYS=winsymlinks:nativestrict"
     export MSYS=winsymlinks:nativestrict
 
-    log_debug "${FUNCNAME[0]}: WINDOWS_SUDO set to ${WINDOWS_SUDO}"
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
     readonly WINDOWS_SUDO
+    log_debug "WINDOWS_SUDO set to ${WINDOWS_SUDO}"
+    _exit
+}
+
+_set_date_cmd() {
+    _enter
+    DATE_CMD="date"
+    DATE_FMT="%Y-%m-%d %H:%M:%S.%3N"
+
+    if ! [[ $(date +%3N 2> /dev/null) =~ ^[0-9]+$ ]]; then
+        # Standard 'date' is BSD (macOS). Look for GNU date (gdate)
+        if command -v gdate > /dev/null 2>&1; then
+            DATE_CMD="gdate"
+        elif [[ -x "/opt/homebrew/bin/gdate" ]]; then
+            DATE_CMD="/opt/homebrew/bin/gdate"
+        elif [[ -x "/usr/local/bin/gdate" ]]; then
+            DATE_CMD="/usr/local/bin/gdate"
+        else
+            # No GNU date capability found; fall back without subseconds to avoid literal '.3N'
+            DATE_FMT='%Y-%m-%d %H:%M:%S'
+        fi
+    fi
+    log_debug "DATE_CMD set to '${DATE_CMD}'. DATE_FMT set to ${DATE_FMT}"
+
+    readonly DATE_CMD DATE_FMT
+    _exit
 }
 
 # Detect if script was run as sudo or root.
 _set_is_elevated() {
-    log_trace "${FUNCNAME[0]}: Entering (IS_ELEVATED='${IS_ELEVATED:-}', EUID='${EUID}', SUDO_USER='${SUDO_USER:-}')"
-
+    _enter
     if [[ -n ${IS_ELEVATED:-} ]]; then
-        log_debug "${FUNCNAME[0]}: IS_ELEVATED is already set to '${IS_ELEVATED}'. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already set)"
+        log_debug "IS_ELEVATED is already set to '${IS_ELEVATED}'. Skipping."
+        log_trace "Exiting (already set)"
         return 0
     fi
 
     IS_ELEVATED=0
     if [[ ${EUID} -eq 0 || -n ${SUDO_USER:-} ]]; then
-        log_debug "${FUNCNAME[0]}: Running as root/sudo user."
+        log_debug "Running as root/sudo user."
         readonly IS_ELEVATED=1
     elif [[ ${TARGET_OS} == "${OS_WINDOWS}" ]] && net session > /dev/null 2>&1; then
-        log_debug "${FUNCNAME[0]}: Windows administrative session detected."
+        log_debug "Windows administrative session detected."
         readonly IS_ELEVATED=1
     else
-        log_debug "${FUNCNAME[0]}: Non-elevated execution context."
+        log_debug "Non-elevated execution context."
         readonly IS_ELEVATED=0
     fi
 
-    log_debug "${FUNCNAME[0]}: Privilege level IS_ELEVATED=${IS_ELEVATED}"
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    log_debug "Privilege level IS_ELEVATED=${IS_ELEVATED}"
+    _exit
 }
 
 _set_dotfiles_manifest() {
     _enter
 
     if [[ -n ${DOTFILES_MANIFEST+x} ]] && ((${#DOTFILES_MANIFEST[@]} > 0)); then
-        log_debug "${FUNCNAME[0]}: DOTFILES_MANIFEST already populated (${#DOTFILES_MANIFEST[@]} items). Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already populated)"
+        log_debug "DOTFILES_MANIFEST already populated (${#DOTFILES_MANIFEST[@]} items). Skipping."
+        log_trace "Exiting (already populated)"
         return 0
     fi
 
@@ -323,7 +347,7 @@ _set_dotfiles_manifest() {
     else
         topgrade_dest="${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
     fi
-    log_trace "${FUNCNAME[0]}: Resolved topgrade_dest='${topgrade_dest}'"
+    log_trace "Resolved topgrade_dest='${topgrade_dest}'"
 
     # tag | src | dest | (post-install cmd)
     readonly DOTFILES_MANIFEST=(
@@ -347,7 +371,7 @@ _set_dotfiles_manifest() {
         "symlink|git/diff-so-fancy|${HOME}/.local/bin/diff-so-fancy|chmod +x ${HOME}/.local/bin/diff-so-fancy"
 
         "symlink|ssh/config|${HOME}/.ssh/config|chmod 600 ${HOME}/.ssh/config"
-        "symlink|ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers"
+        "generate|ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers|chmod 600 ${HOME}/.ssh/allowed_signers"
 
         "generate|dev/gen-cmakepreset.py|${HOME}/.local/bin/gen-cmakepreset.py|chmod 600 ${HOME}/.local/bin/gen-cmakepreset.py"
         "symlink|dev/internal-flags.cmake|${HOME}/dev/internal-flags.cmake"
@@ -356,21 +380,21 @@ _set_dotfiles_manifest() {
         "symlink|dev/clang-tidy|${HOME}/dev/.clang-tidy"
         "symlink|dev/editorconfig|${HOME}/dev/.editorconfig"
 
-        "copy|pwsh.${TARGET_ENV}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
-        "copy|pwsh.${TARGET_ENV}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
-        "copy|pwsh.${TARGET_ENV}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
-        "copy|pwsh.${TARGET_ENV}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
-        "copy|pwsh.${TARGET_ENV}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
-        "copy|pwsh.${TARGET_ENV}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
-        "copy|pwsh.${TARGET_ENV}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
-        "copy|pwsh.${TARGET_ENV}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
+        "copy|pwsh.${TARGET_OS}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
+        "copy|pwsh.${TARGET_OS}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
+        "copy|pwsh.${TARGET_OS}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
+        "copy|pwsh.${TARGET_OS}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
+        "copy|pwsh.${TARGET_OS}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
+        "copy|pwsh.${TARGET_OS}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
+        "copy|pwsh.${TARGET_OS}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
+        "copy|pwsh.${TARGET_OS}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
 
-        "symlink|oh-my-posh.${TARGET_ENV}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
-        "symlink|oh-my-posh.${TARGET_ENV}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
-        "symlink|oh-my-posh.${TARGET_ENV}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
-        "symlink|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
-        "symlink|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
-        "symlink|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
+        "symlink|oh-my-posh.${TARGET_OS}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
+        "symlink|oh-my-posh.${TARGET_OS}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
+        "symlink|oh-my-posh.${TARGET_OS}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
+        "symlink|oh-my-posh.${TARGET_OS}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
+        "symlink|oh-my-posh.${TARGET_OS}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
+        "symlink|oh-my-posh.${TARGET_OS}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
 
         "symlink|topgrade/topgrade.toml|${topgrade_dest}"
         "symlink|fastfetch/config.jsonc.${TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
@@ -385,45 +409,62 @@ _set_dotfiles_manifest() {
     _exit
 }
 
-_set_available_modules() {
+_populate_arrays() {
     _enter
 
-    if [[ -n ${AVAILABLE_MODULES+x} ]] && ((${#AVAILABLE_MODULES[@]} > 0)); then
-        log_debug "${FUNCNAME[0]}: AVAILABLE_MODULES is already set. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already set)"
+    if [[ -n ${AVAILABLE_MODULES+x} ]] && ((${#AVAILABLE_MODULES[@]} > 0)) \
+        && [[ -n ${MODULE_ACTION+x} ]] && ((${#MODULE_ACTION[@]} > 0)) \
+        && [[ -n ${MODULE_DEST+x}  ]] && ((${#MODULE_DEST[@]} > 0)) \
+        && [[ -n ${MODULE_CATEGORY_MAP+x}  ]] && ((${#MODULE_CATEGORY_MAP[@]} > 0)) \
+        && [[ -n ${MODULE_CMD+x}   ]] && ((${#MODULE_CMD[@]} > 0)); then
+        log_debug "Module arrays are already populated. Skipping."
+        log_trace "Exiting (all arrays already set)"
         return 0
     fi
 
     local -a active_modules=()
-    local item tag src dest post_cmd
+    local item action src dest post_cmd
 
     for item in "${DOTFILES_MANIFEST[@]}"; do
-        IFS='|' read -r tag src dest post_cmd <<< "${item}"
+        IFS='|' read -r action src dest post_cmd <<< "${item}"
 
         # skip if not available on os/runtime
         if [[ ! -e "${MODULE_DIR}/${src}" ]]; then
-            log_trace "${FUNCNAME[0]}: Skipping module '${src}': source does not exist at '${MODULE_DIR}/${src}'"
+            log_trace "Skipping module '${src}': source does not exist at '${MODULE_DIR}/${src}'"
             continue
         fi
 
         # skip specific combos
         if [[ ${src} == "topgrade/topgrade.toml" && ${TARGET_OS} == "${OS_WINDOWS}" ]]; then
-            log_trace "${FUNCNAME[0]}: Skipping '${src}' for OS '${TARGET_OS}'"
+            log_trace "Skipping '${src}' for OS '${TARGET_OS}'"
             continue
         fi
 
-        log_debug "${FUNCNAME[0]}: Module available: '${src}'"
+        log_debug "Module available: '${src}'"
         active_modules+=("${src}")
+
+        MODULE_ACTION["${src}"]="${action}"
+        MODULE_DEST["${src}"]="${dest}"
+        MODULE_CMD["${src}"]="${post_cmd:-}"
+
+        local raw_cat="${src%%/*}"
+        local display_cat="${raw_cat}"
+        if [[ ${display_cat} == *".${TARGET_ENV}" ]]; then
+            display_cat="${display_cat%".${TARGET_ENV}"}"
+        elif [[ ${display_cat} == *".${TARGET_OS}" ]]; then
+            display_cat="${display_cat%".${TARGET_OS}"}"
+        fi
+        MODULE_CATEGORY_MAP["${display_cat}"]="${raw_cat}"
     done
 
     AVAILABLE_MODULES=("${active_modules[@]}")
-    log_debug "${FUNCNAME[0]}: Resolved ${#AVAILABLE_MODULES[@]} available modules."
+    log_debug "Resolved ${#AVAILABLE_MODULES[@]} available modules."
     _exit
-    readonly AVAILABLE_MODULES
+    readonly AVAILABLE_MODULES MODULE_ACTION MODULE_DEST MODULE_CMD MODULE_CATEGORY_MAP
 }
 
 check_exists() {
-    log_trace "${FUNCNAME[0]}: Entering"
+    log_trace "Entering"
 
     local -r -a paths=("$@")
     local -a missing_paths=()
@@ -436,65 +477,98 @@ check_exists() {
             target_path="${prefix}${path}"
         fi
 
-        log_trace "${FUNCNAME[0]}: Testing existence of '${target_path}'"
+        log_trace "Testing existence of '${target_path}'"
         if [[ ! -e $target_path ]]; then
-            log_error "${FUNCNAME[0]}: Missing path: '${target_path}'"
+            log_error "Missing path: '${target_path}'"
             missing_paths+=("${target_path#"$prefix"}")
         fi
     done
 
     if [[ ${#missing_paths[@]} -gt 0 ]]; then
-        log_error "${FUNCNAME[0]}: Missing ${#missing_paths[@]} required path(s)."
+        log_error "Missing ${#missing_paths[@]} required path(s)."
         printf "Missing %d path(s):\n" "${#missing_paths[@]}" >&2
 
         for missing in "${missing_paths[@]}"; do
             printf "✗ %s\n" "${missing}" >&2
         done
 
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_trace "Exiting with status 1"
         return 1
     fi
 
-    log_debug "${FUNCNAME[0]}: All path checks passed successfully."
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    log_debug "All path checks passed successfully."
+    log_trace "Exiting successfully with status 0"
     return 0
 }
 
 source_files() {
-    log_trace "${FUNCNAME[0]}: Entering (SOURCE_FILES count: ${#SOURCE_FILES[@]})"
+    log_trace "Entering (SOURCE_FILES count: ${#SOURCE_FILES[@]})"
 
     for file in "${SOURCE_FILES[@]}"; do
-        log_trace "${FUNCNAME[0]}: Processing source file: '${file}'"
+        log_trace "Processing source file: '${file}'"
 
         if [[ -z ${file} ]]; then
-            log_error "${FUNCNAME[0]}: Called without a file path argument."
+            log_error "Called without a file path argument."
             # printf 'Error: source_file called without a file path argument.\n' >&2
             return 1
         fi
 
         if [[ ! -f ${file} ]]; then
-            log_error "${FUNCNAME[0]}: File '${file}' does not exist or is a directory."
+            log_error "File '${file}' does not exist or is a directory."
             # printf 'Error: cannot source "%s": File does not exist or is a directory.\n' "${file}" >&2
             return 1
         fi
 
         if [[ ! -r ${file} ]]; then
-            log_error "${FUNCNAME[0]}: Read permission denied for '${file}'."
+            log_error "Read permission denied for '${file}'."
             # printf 'Error: cannot source "%s": Read permission denied.\n' "${file}" >&2
             return 1
         fi
 
-        log_trace "${FUNCNAME[0]}: Sourcing '${file}'..."
+        log_trace "Sourcing '${file}'..."
         source "${file}" || {
             local ec=$?
-            log_error "${FUNCNAME[0]}: Failed to source '${file}' (exit code: ${ec})."
+            log_error "Failed to source '${file}' (exit code: ${ec})."
             # printf 'Error: file "%s" was read, but execution failed with exit code %d.\n' "${file}" "${ec}" >&2
             return 1
         }
     done
 
-    log_debug "${FUNCNAME[0]}: Successfully sourced ${#SOURCE_FILES[@]} file(s)."
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    log_debug "Successfully sourced ${#SOURCE_FILES[@]} file(s)."
+    log_trace "Exiting successfully with status 0"
+}
+
+# NOTE: no _enter _exit
+timer_start() {
+    if [[ -n ${EPOCHREALTIME:-} ]]; then
+        _TIMER_START="${EPOCHREALTIME}"
+    else
+        # Bash 4.x: no EPOCHREALTIME. Use date (GNU or BSD both support %s and %N or fallback)
+        _TIMER_START=$(date +%s%N 2> /dev/null || date +%s)000000000
+        # if %N isn't supported (BSD), %s%N gives "1234567890N" — guard:
+        [[ ${_TIMER_START} =~ ^[0-9]+$ ]] || _TIMER_START="$(date +%s)000000000"
+    fi
+}
+
+# NOTE: no _enter _exit
+timer_elapsed() {
+    local end
+    if [[ -n ${EPOCHREALTIME:-} ]]; then
+        end="${EPOCHREALTIME}"
+    else
+        end=$(date +%s%N 2> /dev/null || date +%s)000000000
+        [[ ${end} =~ ^[0-9]+$ ]] || end="$(date +%s)000000000"
+    fi
+
+    # Both are nanosecond-precision integers (or "sec.nsec" from EPOCHREALTIME)
+    awk -v s="${_TIMER_START}" -v e="${end}" 'BEGIN {
+        # Handle "sec.nsec" format (EPOCHREALTIME)
+        if (s ~ /\./) { s = s + 0 }
+        if (e ~ /\./) { e = e + 0 }
+        # Handle pure integer (nanoseconds) format
+        else { s = s / 1000000000; e = e / 1000000000 }
+        printf "%.2fs", e - s
+    }'
 }
 
 initialise() {
@@ -505,7 +579,7 @@ initialise() {
         die 1 'failed to initialise logger.\nCheck that log directory exists and is writable.'
     fi
 
-    log_trace "${FUNCNAME[0]}: Entering initialisation sequence..."
+    log_trace "Entering initialisation sequence..."
 
     bash_version_check || die 1 'Bash version validation failed.'
 
@@ -513,7 +587,7 @@ initialise() {
     _set_src_path || die 1 'Failed to determine script source path.'
 
     if [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
-        log_error "${FUNCNAME[0]}: SOURCE_FILES array is empty."
+        log_error "SOURCE_FILES array is empty."
         die 1 "No source files defined."
     fi
 
@@ -521,9 +595,10 @@ initialise() {
     check_exists "${SOURCE_FILES[@]}" || die 1 "One or more required source files are missing."
     source_files "${SOURCE_FILES[@]}" || die 1 "Failed to source framework files."
 
+    _set_date_cmd # DATE_CMD DATE_FMT
     _set_module_dir || die 1 "Failed to establish module directory."
     _set_target_env || {      # TARGET_ENV TARGET_OS TARGET_RUNTIME
-        log_warn "${FUNCNAME[0]}: Target environment detection failed. Prompting user to proceed."
+        log_warn "Target environment detection failed. Prompting user to proceed."
         printf 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.\n' >&2
         prompt_continue 'Some functionality may be limited.'
     }
@@ -533,18 +608,21 @@ initialise() {
         _set_windows_sudo # WINDOWS_SUDO
     fi
 
-    _set_dotfiles_manifest        # DOTFILES_MANIFEST
-    _set_available_modules # AVAILABLE_MODULES
+    _set_dotfiles_manifest # DOTFILES_MANIFEST
+    _populate_arrays # AVAILABLE_MODULES MODULE_ACTION MODULE_DEST MODULE_CMD
+    # TODO: unset DOTFILES_MANIFEST SOURCE_FILES
 
-    log_trace "${FUNCNAME[0]}: Initialisation complete."
+    log_trace "Initialisation complete."
 }
 
 main() {
+    timer_start
     local SRC_PATH MODULE_DIR \
         TARGET_OS TARGET_RUNTIME TARGET_ENV \
-        IS_ELEVATED
+        IS_ELEVATED \
+        DATE_CMD DATE_FMT
     local -a DOTFILES_MANIFEST AVAILABLE_MODULES
-    local -A MAP_DEST MAP_CMD
+    local -A MODULE_ACTION MODULE_DEST MODULE_CMD MODULE_CATEGORY_MAP
 
     initialise
 
@@ -553,7 +631,8 @@ main() {
         REMOVE_SET INCLUDE_SET EXCLUDE_SET \
         DRY_RUN NOCONFIRM FORCE \
         NO_BACKUP  NO_DEPS \
-        LOG_LEVEL NO_LOG
+        LOG_LEVEL NO_LOG \
+        PRINT_TIME
 
     argparse "$@"
 
@@ -573,8 +652,8 @@ main() {
         testing)
             log_cmd+=("--no-colour")
             ;;
-        production)
-            ;;
+        production) ;;
+
     esac
 
     if ! init_logger "${log_cmd[@]}"; then
@@ -604,7 +683,6 @@ main() {
             printf "\n\n--> TODO: Beginning reset! <--\n"
             ;;
     esac
-    print_end
 
     # FIXME:
     # if [[ ${DRY_RUN} -eq 0 && ${DOTFILES_AUTORESTART} -eq 1 ]]; then
@@ -613,6 +691,15 @@ main() {
     #     fi
     # fi
 
+    print_end
+
+    local     elapsed
+    elapsed="$(    timer_elapsed)"
+    if ((PRINT_TIME)); then
+        printf '\n  ⏱  Total: %s\n\n' "${elapsed}"
+    fi
+
+    log_trace "Total execution time: ${elapsed}"
     exit 0
 }
 

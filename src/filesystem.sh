@@ -32,30 +32,12 @@ _prepare_file() {
             "Creating parent directory for ${dest}" \
             "Cannot create target directory '${dest_dir}'" \
             "Created directory '${dest_dir}'" || {
-                _exit 1
-                return 1
+            _exit     1
+            return     1
         }
     fi
 
     _exit
-}
-
-_wanted_module() {
-    _enter
-
-    local src="$1" module m
-    module="${src%%/*}"
-    for m in "${USER_MODULES[@]}"; do
-        if [[ ${module} == ${m} ]]; then
-            log_trace "Module match: '${module}'"
-            _exit 0
-            return 0
-        fi
-    done
-
-    log_trace "No module match for '${module}'"
-    _exit 1
-    return 1
 }
 
 # Backs up a pre-existing dest into:
@@ -169,31 +151,131 @@ _guard_dest() {
     return 0
 }
 
+# ─────────────────────────────────────────────────────────────
+# State-manifest helpers
+# File: ${DOTFILES_MANIFEST_FILE}  (TAB-delimited: source  dest  type)
+# Purpose: record what is currently installed so that
+#          --remove / --uninstall / --repair can find targets,
+#          and re-runs are idempotent.
+# ─────────────────────────────────────────────────────────────
+
+# Append (or update) a single entry.
+# Idempotent: if the dest is already recorded, the row is
+# replaced in-place (preserves file order for the first N entries).
+#
+# $1 = full source path   (e.g. /c/Users/tiger/dotfiles/modules/zsh/zshrc)
+# $2 = full dest path     (e.g. /c/Users/tiger/.zshrc)
+# $3 = type               (symlink | copy | generate)
+manifest_write() {
+    local source="$1" dest="$2" ftype="$3"
+
+    local manifest_dir
+    manifest_dir="$(dirname "${DOTFILES_MANIFEST_FILE}")"
+    if [[ ! -d ${manifest_dir} ]]; then
+        mkdir -p "${manifest_dir}" 2> /dev/null || {
+            log_error "Cannot create manifest directory '${manifest_dir}'"
+            return 1
+        }
+    fi
+
+    # Check if dest already exists in the file
+    if [[ -f ${DOTFILES_MANIFEST_FILE} ]] \
+        && awk -F'\t' -v d="${dest}" '$2 == d { found=1; exit } END { exit found ? 0 : 1 }' "${DOTFILES_MANIFEST_FILE}"; then
+        # Replace in-place (handles re-install with a different source or type)
+        local tmp
+        tmp="$(mktemp)"
+        awk -F'\t' -v OFS='\t' -v d="${dest}" \
+            -v s="${source}" -v t="${ftype}" \
+            '$2 != d { print; next } { print s, d, t }' \
+            "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
+        log_trace "Manifest: updated '${dest}' → ${ftype}"
+    else
+        printf '%s\t%s\t%s\n' "${source}" "${dest}" "${ftype}" >> "${DOTFILES_MANIFEST_FILE}"
+        log_trace "Manifest: added '${dest}' → ${ftype}"
+    fi
+}
+
+# Remove an entry by dest path.
+# $1 = dest path to remove
+manifest_remove() {
+    local dest="$1"
+    [[ -f ${DOTFILES_MANIFEST_FILE} ]] || return 0
+
+    local tmp
+    tmp="$(mktemp)"
+    awk -F'\t' -v d="${dest}" '$2 != d' "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
+    log_trace "Manifest: removed entry for '${dest}'"
+}
+
+# Remove ALL entries whose source is under a given prefix
+# (useful for --remove MODULE where you want to nuke everything under modules/<module>/)
+# $1 = source path prefix (e.g. /c/Users/tiger/dotfiles/modules/zsh/)
+manifest_remove_prefix() {
+    local prefix="$1"
+    [[ -f ${DOTFILES_MANIFEST_FILE} ]] || return 0
+
+    local tmp
+    tmp="$(mktemp)"
+    awk -F'\t' -v p="${prefix}" 'index($1, p) != 1' "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
+    log_trace "Manifest: removed all entries with source prefix '${prefix}'"
+}
+
+# Wipe the entire manifest (for --uninstall).
+manifest_clear() {
+    if [[ -f ${DOTFILES_MANIFEST_FILE} ]]; then
+        : > "${DOTFILES_MANIFEST_FILE}"
+        log_trace "Manifest: cleared (${DOTFILES_MANIFEST_FILE} removed)"
+    fi
+}
+
+# Read the manifest into a caller-supplied associative array keyed by dest.
+# Value is the source path.  Also populates two parallel arrays if you need type.
+#
+# Usage:
+#   local -A installed_src   # dest → source
+#   local -a installed_types  # parallel: type per entry (same order as iteration)
+#   manifest_read installed_src
+#
+# Returns 0 even if file doesn't exist (nothing installed yet).
+manifest_read() {
+    local -n _map="$1"
+    [[ -f ${DOTFILES_MANIFEST_FILE} ]] || return 0
+
+    local src dest ftype
+    while IFS=$'\t' read -r src dest ftype; do
+        dest="${dest%$'\r'}"   # ← strip CR (Git Bash CRLF)
+        src="${src%$'\r'}"
+        [[ -z ${src:-} || -z ${dest:-} ]] && continue
+        [[ ${dest} == \#* ]] && continue
+        _map["${dest}"]="${src}"
+    done < "${DOTFILES_MANIFEST_FILE}"
+
+    log_debug "Manifest: loaded ${#_map[@]} installed entries."
+}
+
 install_all() {
     _enter
     local action src dest cmd full_src label
     local installed=0 skipped=0 failed=0
 
-    log_info "Installing ${#DOTFILES_MANIFEST[@]} manifest entries (stamp: ${DOTFILES_START_TIME})"
+    log_info "Installing ${#USER_MODULES[@]} manifest entries (stamp: ${DOTFILES_START_TIME})"
     log_debug "Flags -> DRY_RUN=${DRY_RUN}, FORCE=${FORCE}, NOCONFIRM=${NOCONFIRM}, NO_BACKUP=${NO_BACKUP}"
 
-    for entry in "${DOTFILES_MANIFEST[@]}"; do
-        if [[ -z ${entry} || ${entry} == \#* ]]; then
-            continue
-        fi
+    for src in "${USER_MODULES[@]}"; do
+        log_trace "Processing: '${src}'"
 
-        IFS='|' read -r action src dest cmd <<< "${entry}"
-        log_trace "Entry: action='${action}' src='${src}' dest='${dest}' cmd='${cmd:-}'"
+        local action="${MODULE_ACTION["${src}"]:-}"
+        local dest="${MODULE_DEST["${src}"]:-}"
+        local cmd="${MODULE_CMD["${src}"]:-}"
 
-        if ! _wanted_module "${src}"; then
-            log_debug "Skip (module not selected): '${src}'"
+        if [[ -z ${action} || -z ${dest} ]]; then
+            log_warn "No manifest data for module '${src}'. Skipping."
             ((++skipped))
             continue
         fi
 
-        full_src="${SRC_PATH}/${src}"
+        full_src="${MODULE_DIR}/${src}"
         label="${src} → ${dest}"
-        log_trace "Resolved full_src='${full_src}'"
 
         if ! _prepare_file "${full_src}" "${dest}"; then
             log_error "Pre-flight failed: '${label}'"
@@ -230,11 +312,12 @@ install_all() {
                 if [[ -f ${dest} && -s ${dest} ]]; then
                     log_debug "[generate] '${dest}' already exists. Skipping."
                     ((++installed))
+                    manifest_write "${full_src}" "${dest}" "generate"
                     continue
                 fi
                 log_debug "[generate] ${label}"
                 _attempt_cmd \
-                    "python3 \"${full_src}\" \"${dest}\"" \
+                    "\"${full_src}\" \"${dest}\"" \
                     "Generating ${label}" \
                     "Generate failed: ${label}" \
                     "Generated ${label}"
@@ -246,7 +329,6 @@ install_all() {
                 continue
                 ;;
         esac
-        log_trace "Action '${action}' for '${label}' → ok=${ok}"
 
         if ((ok == 0)) && [[ -n ${cmd} ]]; then
             log_debug "Post-install: '${cmd}'"
@@ -255,11 +337,11 @@ install_all() {
                 "Post-install failed: ${label}" \
                 "Post-install done: ${label}"
             ok=$?
-            log_trace "Post-install → ok=${ok}"
         fi
 
         if ((ok == 0)); then
             ((++installed))
+            manifest_write "${full_src}" "${dest}" "${action}"
             log_debug "✓ ${label}"
         else
             ((++failed))

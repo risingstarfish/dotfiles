@@ -49,7 +49,7 @@ assert_exclude_modules_unset() {
         _exit 2
         die 2 'excluded modules already set. Conflicting flag: "%s"' "${1}"
     fi
-        _exit
+    _exit
 }
 assert_include_modules_unset() {
     _enter
@@ -104,6 +104,7 @@ argparse() {
     NO_DEPS=0
     LOG_LEVEL=""
     NO_LOG=0
+    PRINT_TIME=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -253,12 +254,12 @@ argparse() {
                 require_arg     "$1" "${2:-}"
                 local level="${2^^}"
                 case "${level}" in
-                    DEBUG | INFO | NOTICE | WARN | ERROR)
+                    TRACE | DEBUG | INFO | NOTICE | WARN | ERROR)
                         LOG_LEVEL="${level}"
                         shift 2
                         ;;
                     *)
-                        die 2 'invalid log level "%s". Use: debug, info, notice, warn, or error' "$2"
+                        die 2 'invalid log level "%s". Use: trace, debug, info, notice, warn, or error' "$2"
                         ;;
                 esac
                 ;;
@@ -267,11 +268,11 @@ argparse() {
                 local level="${1#*=}"
                 level="${level^^}"
                 case "${level}" in
-                    DEBUG | INFO | NOTICE | WARN | ERROR)
+                    TRACE | DEBUG | INFO | NOTICE | WARN | ERROR)
                         LOG_LEVEL="${level}"
                         ;;
                     *)
-                        die 2 'invalid log level "%s". Use: debug, info, notice, warn, or error' "${1#*=}"
+                        die 2 'invalid log level "%s". Use: trace, debug, info, notice, warn, or error' "${1#*=}"
                         ;;
                 esac
                 shift
@@ -283,7 +284,10 @@ argparse() {
                 NO_LOG=1
                 shift
                 ;;
-
+            --time)
+                PRINT_TIME=1
+                shift
+                ;;
             *)
                 die 2 'invalid parameter "%s"\nRun `bash %s --help` for valid options.' "$1" "$(basename "$0")"
                 ;;
@@ -296,7 +300,7 @@ argparse() {
             development)
                 LOG_LEVEL="DEBUG"
                 ;;
-             testing)
+            testing)
                 LOG_LEVEL="TRACE"
                 ;;
             production)

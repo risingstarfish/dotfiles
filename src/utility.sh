@@ -73,7 +73,7 @@ is_windows_bash() {
     _exit
 }
 
-parse_module_list()  {
+parse_module_list() {
     _enter
 
     local -n arr="$2"
@@ -86,29 +86,39 @@ parse_module_list()  {
         # trim whitespace
         m="${m#"${m%%[![:space:]]*}"}"
         m="${m%"${m##*[![:space:]]}"}"
-        [[ -z $m   ]] && continue
+        [[ -z $m ]] && continue
 
         valid=0
-        if [[ $m == */*   ]]; then
+
+        if [[ $m == */* ]]; then
             for mod in "${AVAILABLE_MODULES[@]}"; do
-                if [[ $mod == "$m" || $mod == "$m/"*     ]]; then
+                if [[ $mod == "$m" || $mod == "$m/"* ]]; then
                     valid=1
                     break
                 fi
             done
         else
             for mod in "${AVAILABLE_MODULES[@]}"; do
-                modname="${mod##*/}"
-                if [[ ${mod%%/*} == "$m" || $modname == "$m"     ]]; then
+                local modname="${mod##*/}"
+                local modcat="${mod%%/*}"
+                if [[ ${modcat} == "$m" || $modname == "$m" ]]; then
                     valid=1
                     break
                 fi
             done
         fi
 
+        if [[ $valid -eq 0 && -n ${MODULE_CATEGORY_MAP["$m"]:-} ]]; then
+            valid=1
+            m="${MODULE_CATEGORY_MAP["$m"]}"   # resolve to actual prefix
+            log_debug "Resolved display category '$m' from user input"
+        fi
+
         if [[ $valid -eq 0 ]]; then
+            _exit 2
             die 2 'unknown module "%s".\nRun with --list to see valid modules.' "$m"
         fi
+
         arr+=("$m")
     done
     _exit
@@ -136,7 +146,8 @@ _attempt_cmd() {
         printf '\n  %s\n' "${msg}" >&2
 
         local reply
-        read -r '  Continue? [Y/n] ' reply >&2
+        printf '  Continue? [Y/n] ' >&2
+        read -r reply || reply=""
         log_trace "User prompt reply: '${reply}'"
         case "${reply,,}" in
             y | yes | '')
@@ -167,24 +178,4 @@ _attempt_cmd() {
     fi
 
     _exit
-}
-
-timer_start() {
-    if [[ -n ${EPOCHREALTIME:-} ]]; then
-        _TIMER_START="${EPOCHREALTIME}"
-    else
-        _TIMER_START=$("${_LOG_DATE_CMD:-date}" +%s.%N 2> /dev/null || date +%s)
-    fi
-}
-
-timer_elapsed() {
-    local end
-    if [[ -n ${EPOCHREALTIME:-} ]]; then
-        end="${EPOCHREALTIME}"
-    else
-        end=$("${_LOG_DATE_CMD:-date}" +%s.%N 2> /dev/null || date +%s)
-    fi
-
-    # Calculate difference using awk (works cross-platform without 'bc')
-    awk -v start="${_TIMER_START}" -v end="${end}" 'BEGIN { printf "%.3fs", end - start }'
 }

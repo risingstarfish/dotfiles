@@ -25,7 +25,7 @@ param (
 )
 
 Set-StrictMode -Version Latest
-$defaultModel = "Qwen3.8-27B-UD-Q6_K_XL.mtp.gguf" #"Qwen3.8-Flash-Next-UD-IQ1_M-00001-of-00003.gguf"
+$defaultModel = "Qwen3.8-27B-UD-Q6_K_XL.mtp.gguf" #
 
 # env check
 $RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")

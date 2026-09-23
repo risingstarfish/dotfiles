@@ -49,9 +49,10 @@ BEHAVIOUR
 LOGGING
   -d, --debug                Print debug output (useful for diagnosing).
   -q, --quiet                Suppress all standard output except errors.
-      --log-level <level>    Set log verbosity <level>. Valid options are: debug, info, notice,
-                             warn, or error. (default: info)
+      --log-level <level>    Set log verbosity <level>. Valid options are: trace, debug, info,
+                             notice, warn, or error. (default: info)
       --no-log               Disable logging to stdout (still writes to file).
+      --time                 Print total execution time at script finish.
 
 ENVIRONMENT VARIABLES
   Global (Always Active):
@@ -114,116 +115,104 @@ EOF
 list_modules() {
     _enter
 
-    echo "FIXME: broken"
-    exit 1
-    local -a manifest_sources=()
-    local -a manifest_dests=()
-    local -a manifest_ftypes=()
-    if [[ -f ${MANIFEST}  ]]; then
-        local _src
-        local _dest
-        local _ftype
-        while IFS=$'\t' read -r _src _dest _ftype; do
-            _ftype="${_ftype%$'\r'}" # windows crlf
-            [[ -n ${_src} ]] && {
-                manifest_sources+=("${_src}")
-                manifest_dests+=("${_dest}")
-                manifest_ftypes+=("${_ftype}")
-            }
-        done < "${MANIFEST}"
-    fi
+    local -A installed_src=()
+    manifest_read installed_src
 
     printf '\nAVAILABLE MODULES\n\n'
 
     local current_category=""
-    #local current_module_dir=""
-    local item
-    local src
-    local dest
-    local cmd
-    local category
-    local filename
+    local src dest action filename status category raw_cat
 
-    for item in "${AVAILABLE_MODULES[@]}"; do
-        IFS='|' read -r tag src dest cmd <<< "${item}"
-
-        category="${src%%/*}"
-        src_file="${MODULE_DIR}/${src}"
+    local _env_sfx=".${TARGET_ENV}"
+    local _os_sfx=".${TARGET_OS}"
+    for src in "${AVAILABLE_MODULES[@]}"; do
+        dest="${MODULE_DEST["${src}"]:-}"
+        action="${MODULE_ACTION["${src}"]:-}"
         filename="${src##*/}"
-        filename="${filename%.gen}" # remove .gen
+        filename="${filename%.gen}"
+        raw_cat="${src%%/*}"
+        category="${MODULE_CATEGORY_MAP["${raw_cat}"]:-${raw_cat}}"
+
+        if [[ ${filename} == *"${_env_sfx}" ]]; then
+            filename="${filename%${_env_sfx}}"
+        elif [[ ${filename} == *"${_os_sfx}" ]]; then
+            filename="${filename%${_os_sfx}}"
+        fi
 
         # category header
-        if [[ $category != "$current_category"   ]]; then
+        if [[ ${category} != "${current_category}" ]]; then
             printf '%s\n' "${category}"
             current_category="${category}"
         fi
 
-        local  status="✗"
-        local i
-        for i in "${!manifest_sources[@]}"; do
-            if [[ ${manifest_sources[$i]} == "$src_file" ]]; then
-                local _dest="${manifest_dests[$i]}"
-                local ftype="${manifest_ftypes[$i]}"
-
-                case "${ftype}" in
-                    merged)
-                        if [[ -f $dest ]]; then
-                            status="✓"
-                        else
-                            status="!"
-                        fi
-                        ;;
-                    generated)
-                        if [[ -f $dest && -s $dest ]]; then
-                            status="✓"
-                        elif [[ -f $dest ]]; then
-                            status="!"
-                        fi
-                        ;;
+        status="✗"
+        if [[ -n ${installed_src["${dest}"]:-} ]]; then
+            case "${action}" in
+                symlink)
+                    if [[ -L ${dest} && -e ${dest} ]]; then
+                        status="✓"
+                    elif [[ -L ${dest} ]]; then
+                        status="!"   # broken link (target missing)
+                    else
+                        status="!"   # link removed from disk
+                    fi
+                    ;;
+                copy)
+                    if [[ -f ${dest} ]]; then
+                        status="✓"
+                    else
+                        status="!"
+                    fi
+                    ;;
+                generate)
+                    if [[ -f ${dest} && -s ${dest} ]]; then
+                        status="✓"
+                    elif [[ -f ${dest} ]]; then
+                        status="!"   # exists but empty
+                    else
+                        status="!"   # missing
+                    fi
+                    ;;
+            esac
+        else
+            # Not in manifest — fallback disk check
+            if [[ -n ${dest} ]]; then
+                case "${action}" in
                     symlink)
-                        if [[ -L $dest && -e $dest ]]; then
+                        if [[ -L ${dest} && -e ${dest} ]]; then
                             status="✓"
-                        elif [[ -L $dest ]]; then
+                        elif [[ -L ${dest} ]]; then
+                            status="!"
+                        fi
+                        ;;
+                    generate)
+                        if [[ -f ${dest} && -s ${dest} ]]; then
+                            status="✓"
+                        elif [[ -f ${dest} ]]; then
                             status="!"
                         fi
                         ;;
                     *)
-                        die 1 'invalid type detected: %s.\nSomething went wrong!' "${ftype}"
+                        [[ -f ${dest} ]] && status="✓"
                         ;;
                 esac
-                break
-            fi
-        done
-
-        # fallback check disk
-        if [[ ${status} == "✗" && -n ${dest}     ]]; then
-            if [[ ${src_file} == *.gen   ]]; then
-                # Generated: healthy if output exists and is non-empty
-                if [[ -f ${dest} && -s ${dest}     ]]; then
-                    status="✓"
-                elif [[ -f ${dest}   ]]; then
-                    status="!"
-                fi
-            elif [[ -L ${dest}   ]]; then
-                if [[ -e ${dest}   ]]; then
-                    status="✓"
-                else
-                    status="!" # Broken symlink
-                fi
-            elif [[ -f ${dest}   ]]; then
-                status="✓" # Merged/copied file exists
             fi
         fi
 
-        printf '  (%s) %s\n' "${status}" "${filename}"
+        printf '  %s %s\n' "${status}" "${filename}"
     done
 
-    printf '\n'
+    printf '\n  ✓  installed & healthy\n'
+    printf '  ✗  not installed\n'
+    printf '  !  installed but broken / stale\n\n'
+
     _exit
 }
 
 print_verification()   {
     _enter
+    printf "FIXME: broken!!"
+    exit 1
     if [[ ! -f ${MANIFEST}   ]]; then
         printf 'No manifest found. Nothing to verify.\n'
         return 0
@@ -329,7 +318,7 @@ print_verification()   {
 print_banner() {
     _enter
     printf '%b\n' "$(
-                 cat << 'EOF'
+        cat          << 'EOF'
 \e[1;96m  ____        _    __ _ _             \e[0m
 \e[1;96m |  _ \  ___ | |_ / _(_) | ___  ___   \e[0m
 \e[1;96m | | | |/ _ \| __| |_| | |/ _ \/ __|  \e[0m

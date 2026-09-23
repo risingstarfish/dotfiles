@@ -65,8 +65,8 @@ if ! readonly -p 2> /dev/null | grep -qE '(declare|typeset) -[^ ]*r[^ ]* BASH_LO
     # Only unset if not already readonly (which would indicate re-sourcing)
     # This protects against environment variable override attacks
     for var in LOG_LEVEL_EMERGENCY LOG_LEVEL_ALERT LOG_LEVEL_CRITICAL LOG_LEVEL_ERROR \
-               LOG_LEVEL_WARN LOG_LEVEL_NOTICE LOG_LEVEL_INFO LOG_LEVEL_DEBUG LOG_LEVEL_TRACE \
-               LOG_LEVEL_FATAL; do
+        LOG_LEVEL_WARN        LOG_LEVEL_NOTICE LOG_LEVEL_INFO LOG_LEVEL_DEBUG LOG_LEVEL_TRACE \
+        LOG_LEVEL_FATAL; do
         if ! readonly -p 2> /dev/null | grep -q "declare -[^ ]*r[^ ]* $var="; then
             unset "$var" 2> /dev/null || true
         fi
@@ -160,8 +160,8 @@ if [[ -z ${COLOR_RESET:-}   ]] || ! readonly -p 2> /dev/null | grep -q "declare 
     # Unset potentially malicious color variables before setting them
     # Only unset if not already readonly (which would indicate re-sourcing)
     for var in COLOR_RESET COLOR_BLUE COLOR_GREEN COLOR_YELLOW COLOR_RED \
-               COLOR_RED_BOLD COLOR_WHITE_ON_RED COLOR_BOLD_WHITE_ON_RED \
-               COLOR_PURPLE COLOR_CYAN; do
+        COLOR_RED_BOLD        COLOR_WHITE_ON_RED COLOR_BOLD_WHITE_ON_RED \
+        COLOR_PURPLE        COLOR_CYAN; do
         if ! readonly -p 2> /dev/null | grep -q "declare -[^ ]*r[^ ]* $var="; then
             unset "$var" 2> /dev/null || true
         fi
@@ -516,13 +516,13 @@ _parse_bool_value() {
     local input="${1,,}"
     case "$input" in
         true | yes | on | 1)
-                         echo "true"
-                                       return 0
-                                                ;;
+            echo              "true"
+            return                            0
+            ;;
         false | no | off | 0)
-                         echo "false"
-                                       return 0
-                                                ;;
+            echo              "false"
+            return                            0
+            ;;
         *)               return 1 ;;
     esac
 }
@@ -1130,23 +1130,8 @@ _format_log_message() {
     # Get timestamp in appropriate timezone
     local current_date
     local timezone_str
-
-    local date_cmd="date"
-    local date_fmt="%Y-%m-%d %H:%M:%S.%3N"
-
-    if ! [[ $(date +%3N 2> /dev/null) =~ ^[0-9]+$ ]]; then
-        # Standard 'date' is BSD (macOS). Look for GNU date (gdate)
-        if command -v gdate > /dev/null 2>&1; then
-            date_cmd="gdate"
-        elif [[ -x "/opt/homebrew/bin/gdate" ]]; then
-            date_cmd="/opt/homebrew/bin/gdate"
-        elif [[ -x "/usr/local/bin/gdate" ]]; then
-            date_cmd="/usr/local/bin/gdate"
-        else
-            # No GNU date capability found; fall back without subseconds to avoid literal '.3N'
-            date_fmt='%Y-%m-%d %H:%M:%S'
-        fi
-    fi
+    local date_cmd="${DATE_CMD:-date}"
+    local date_fmt="${DATE_FMT:-%Y-%m-%d %H:%M:%S}"
 
     if [[ ${USE_UTC:-false} == "true" ]]; then
         current_date=$("${date_cmd}" -u +"${date_fmt}")
@@ -1375,7 +1360,7 @@ init_logger() {
         # create symlink between check and creation attempt
         (
             set -C
-                 : > "$LOG_FILE"
+            :      > "$LOG_FILE"
         )                         2> /dev/null || true
 
         # Immediately validate file security to minimize TOCTOU window
@@ -1898,7 +1883,7 @@ log_trace() {
 
 _enter() {
     if [[ $CURRENT_LOG_LEVEL -ge $LOG_LEVEL_TRACE ]]; then
-        _log_message "TRACE" "$LOG_LEVEL_TRACE" "${FUNCNAME[1]}: Entering..."
+        _log_message "TRACE" "$LOG_LEVEL_TRACE" "${FUNCNAME[1]}: Entering"
     fi
 }
 

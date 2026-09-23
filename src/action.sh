@@ -254,6 +254,14 @@ do_update() {
         return 1
     fi
 
+    if [[ -f ${MANIFEST_FILE} ]]; then
+        local tmp
+        tmp="$(mktemp)"
+        printf '# ref=%s timestamp=%s\n' "${DOTFILES_REF}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${tmp}"
+        cat "${MANIFEST_FILE}" >> "${tmp}"
+        mv "${tmp}" "${MANIFEST_FILE}"
+    fi
+
     if [[ ${has_local_mods} -eq 1 && ${DOTFILES_LOCAL_MODS} -eq 1 ]]; then
         log_trace "Attempting rebase branch: has_local_mods=${has_local_mods}, DOTFILES_LOCAL_MODS=${DOTFILES_LOCAL_MODS}"
         log_warn "Local modifications present. Rebasing onto FETCH_HEAD."
