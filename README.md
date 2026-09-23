@@ -43,17 +43,20 @@ This pulls the latest changes from git before re-running the installation. If yo
 
 ### Commands
 
-| Command   | Flag(s)                    | Description                                                                       |
-| --------- | -------------------------- | --------------------------------------------------------------------------------- |
-| Install   | `--install`                | Install (or reinstall) available dotfiles.                                        |
-| Update    | `-u`, `--update`           | Update from git before installing.                                                |
-| Remove    | `-r`, `--remove <modules>` | Remove specific modules (semicolon-separated).                                    |
-| Repair    | `-R`, `--repair`           | Remove broken/orphaned managed files, then re-link/regenerate.                    |
-| Reset     | `--reset`                  | Remove all managed symlinks and generated files (copied files remain).            |
-| Uninstall | `--uninstall`              | Remove everything the installer recorded, plus logs, backups, and the repository. |
-| List      | `-l`, `--list`             | Show all available modules and their install status.                              |
-| Version   | `--version`                | Show version and git information.                                                 |
-| Help      | `-h`, `--help`             | Show the full help text.                                                          |
+| Command       | Flag(s)                    | Description                                                                       |
+| ------------- | -------------------------- | --------------------------------------------------------------------------------- |
+| Install       | `--install`                | Install (or reinstall) available dotfiles.                                        |
+| Update        | `-u`, `--update`           | Update from git before installing.                                                |
+| Remove        | `-r`, `--remove <modules>` | Remove specific modules (semicolon-separated).                                    |
+| Repair        | `-R`, `--repair`           | Remove broken/orphaned managed files, then re-link/regenerate.                    |
+| Reset         | `--reset`                  | Remove all managed symlinks and generated files (copied files remain).            |
+| Clean         | `--clean [N]`              | Clean backups and reset both log files (see below).                               |
+| Clean logs    | `--clean-logs`             | Reset (truncate) both log files.                                                  |
+| Clean backups | `--clean-backups [N]`      | Clean backups (see below).                                                        |
+| Uninstall     | `--uninstall`              | Remove everything the installer recorded, plus logs, backups, and the repository. |
+| List          | `-l`, `--list`             | Show all available modules and their install status.                              |
+| Version       | `--version`                | Show version and git information.                                                 |
+| Help          | `-h`, `--help`             | Show the full help text.                                                          |
 
 Common options (see `--help` for the complete reference):
 
@@ -63,6 +66,17 @@ Common options (see `--help` for the complete reference):
 - `-f`, `--force` — overwrite existing files without backup.
 - `-i`, `--include <modules>` / `-x`, `--exclude <modules>` — limit or narrow the install to specific modules (semicolon-separated, e.g. `-i zsh;git`).
 - `-d`/`-q`, `--log-level <level>`, `--time` — logging controls.
+
+### Maintenance
+
+Backups accumulate one directory per run under `~/.cache/dotfiles/backups/`. To trim them down:
+
+- `--clean-backups N` — remove backup dirs older than `N` days.
+- `--clean-backups` (no `N`) — keep only the latest `DOTFILES_MAX_BACKUPS` dirs (default 10; `0` keeps all).
+- `--clean [N]` — the same backup cleaning, plus a reset of both log files (`~/.config/dotfiles/logs/`).
+- `--clean-logs` — reset the log files without touching backups.
+
+Like the other destructive actions, these prompt before deleting and support `--dry-run` (preview) and `--noconfirm` (skip the prompt).
 
 ### Windows notes
 
@@ -74,14 +88,15 @@ The bash installer works in WSL and Git Bash. In Git Bash (or any non-WSL Window
 - **Personal values** (usernames, tokens, paths) belong in the `.local` files, not in tracked files. The update step refuses to run over local edits and will point you here.
 - **Environment variables:**
 
-| Variable                  | Default                   | Purpose                                                                |
-| ------------------------- | ------------------------- | ---------------------------------------------------------------------- |
-| `DOTFILES_LOG_DIR`        | `~/.config/dotfiles/logs` | Where log files are stored.                                            |
-| `DOTFILES_CACHE_DIR`      | `~/.cache/dotfiles`       | Where backups and the state manifest are stored.                       |
-| `DOTFILES_LOG`            | `1`                       | Set to `0` to disable log file writing.                                |
-| `DOTFILES_LOCAL_MODS`     | `0`                       | Set to `1` to allow updates with uncommitted local changes (dev only). |
-| `DOTFILES_AUTORESTART`    | `0`                       | Set to `1` to restart the shell when the script finishes.              |
-| `DOTFILES_IGNORE_HANDOFF` | `0`                       | Set to `1` to skip the Windows PowerShell handoff prompt.              |
+| Variable                  | Default                   | Purpose                                                                      |
+| ------------------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| `DOTFILES_LOG_DIR`        | `~/.config/dotfiles/logs` | Where log files are stored.                                                  |
+| `DOTFILES_CACHE_DIR`      | `~/.cache/dotfiles`       | Where backups and the state manifest are stored.                             |
+| `DOTFILES_LOG`            | `1`                       | Set to `0` to disable log file writing.                                      |
+| `DOTFILES_LOCAL_MODS`     | `0`                       | Set to `1` to allow updates with uncommitted local changes (dev only).       |
+| `DOTFILES_AUTORESTART`    | `0`                       | Set to `1` to restart the shell when the script finishes.                    |
+| `DOTFILES_MAX_BACKUPS`    | `10`                      | Max backup dirs kept by `--clean`/`--clean-backups` (no `N`). `0` keeps all. |
+| `DOTFILES_IGNORE_HANDOFF` | `0`                       | Set to `1` to skip the Windows PowerShell handoff prompt.                    |
 
 ## Available modules
 
