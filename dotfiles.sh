@@ -670,8 +670,18 @@ main() {
             printf "\n\n--> TODO: Beginning removal! <--\n"
             ;;
         uninstall)
-            printf "\n\n--> TODO: Beginning uninstallation! <--\n"
+            local UNINSTALL_ERRORS=0
+            do_uninstall || {
+                printf 'Error: uninstall finished with %d failure(s).\n' "${UNINSTALL_ERRORS}" >&2
+                printf '\n  You may need to manually remove:\n' >&2
+                printf '    %s\n'  "${DOTFILES_LOG_DIR}"    >&2
+                printf '    %s\n'  "${DOTFILES_CACHE_DIR}"  >&2
+                printf '    %s\n'  "${SRC_PATH}"            >&2
+                printf '\n' >&2
+                exit 1
+            }
             ;;
+
         update)
             do_update
             do_install
@@ -684,13 +694,6 @@ main() {
             ;;
     esac
 
-    # FIXME:
-    # if [[ ${DRY_RUN} -eq 0 && ${DOTFILES_AUTORESTART} -eq 1 ]]; then
-    #     if ! is_windows_bash; then
-    #         exec "${SHELL:-/bin/zsh}" -l
-    #     fi
-    # fi
-
     print_end
 
     local     elapsed
@@ -700,6 +703,13 @@ main() {
     fi
 
     log_trace "Total execution time: ${elapsed}"
+
+    if [[ ${DRY_RUN} -eq 0 && ${DOTFILES_AUTORESTART} -eq 1 ]]; then
+        if ! is_windows_bash; then
+            exec "${SHELL:-/bin/zsh}" -l
+        fi
+    fi
+
     exit 0
 }
 

@@ -329,3 +329,146 @@ do_update() {
     _exit
     return 0
 }
+
+remove_file() {
+    _enter
+    local dest="${1:-}"
+
+    if [[ -z ${dest} ]]; then
+        log_error "remove_file: no destination provided."
+        _exit 1
+        return 1
+    fi
+
+    if [[ ! -e ${dest} && ! -L ${dest} ]]; then
+        log_trace "remove_file: '${dest}' does not exist. Nothing to remove."
+        _exit
+        return 0
+    fi
+
+    if ((DRY_RUN)); then
+        log_info "[dry-run] rm -f ${dest}"
+        _exit
+        return 0
+    fi
+
+    if ! rm -f "${dest}" 2> /dev/null; then
+        log_error "Failed to remove '${dest}'"
+        _exit 1
+        return 1
+    fi
+
+    manifest_remove "${dest}"
+    log_debug "Removed: ${dest}"
+    _exit
+    return 0
+}
+
+do_uninstall() {
+    _enter
+
+    local ec=0
+    local -a failed_files=()
+
+    log_info "Beginning uninstall."
+
+    # ── 1. Remove every file recorded in the manifest ──────────────
+    local -A installed_src=()
+    manifest_read installed_src
+    local entry_count=${#installed_src[@]}
+    log_debug "Manifest holds ${entry_count} installed entr$( ((entry_count == 1)) && printf 'y' || printf 'ies' )."
+
+    if ((entry_count > 0)); then
+        local reply
+        printf '\n  This will remove %d installed file(s):\n' "${entry_count}" >&2
+        local dest
+        for dest in "${!installed_src[@]}"; do
+            printf '    - %s\n' "${dest}" >&2
+        done
+        printf '\n  Continue? [Y/n] ' >&2
+        read -r reply || reply=""
+        log_trace "User prompt reply: '${reply}'"
+        case "${reply,,}" in
+            y | yes | '')
+                log_trace "User confirmed manifest removal"
+                ;;
+            *)
+                log_warn "Uninstall cancelled by user."
+                _exit 130
+                exit 130
+                ;;
+        esac
+        printf '\n' >&2
+
+        local dest src
+        for dest in "${!installed_src[@]}"; do
+            src="${installed_src["${dest}"]}"
+            log_trace "Removing manifest entry: '${dest}' (source: '${src}')"
+            if ! remove_file "${dest}"; then
+                ((++ec))
+                failed_files+=("${dest}")
+            fi
+        done
+    else
+        log_warn "No modules found to uninstall."
+        if ! ((NOCONFIRM)); then
+            prompt_continue
+        fi
+    fi
+
+    # NOTE: redundant with cache dir
+    _attempt_cmd "rm -rf \"${DOTFILES_BACKUP_DIR}\"" \
+        "Are you sure you want to completely remove dotfiles backup directory?" \
+        "Failed to removed \"${DOTFILES_BACKUP_DIR}\"" \
+        "Successfully removed backup directory!" || ((++ec))
+    _attempt_cmd "rm -rf \"${DOTFILES_CACHE_DIR}\"" \
+        "Are you sure you want to completely remove dotfiles cache directory?" \
+        "Failed to removed \"${DOTFILES_CACHE_DIR}\"" \
+        "Successfully removed cache directory!" || ((++ec))
+    _attempt_cmd "rm -rf \"${SRC_PATH}\"" \
+        "Are you sure you want to completely remove dotfiles?" \
+        "Failed to removed \"${SRC_PATH}\"" \
+        "Successfully removed repository!" || ((++ec))
+
+    if [[ ${ec} -gt 0 ]]; then
+        log_error "Uninstall finished with ${ec} error(s)!"
+        if [[ ${#failed_files[@]} -gt 0 ]]; then
+            printf '\n  Failed to remove the following file(s):\n' >&2
+            local f
+            for f in "${failed_files[@]}"; do
+                printf '    ✗ %s\n' "${f}" >&2
+            done
+            printf '\n' >&2
+        fi
+    else
+        log_info "Uninstall finished successfully!"
+    fi
+
+    local reply
+    printf '\n  Remove log directory: %s ? [Y/n] ' "${DOTFILES_LOG_DIR}" >&2
+    read -r reply || reply=""
+    case "${reply,,}" in
+        y | yes | '') ;;
+        *)
+            log_warn "Log directory removal cancelled by user."
+            _exit
+            return "${ec}"
+            ;;
+    esac
+
+    LOG_FILE=""  # stop writing to file; console still works
+    if ! ((DRY_RUN)); then
+        if ! rm -rf "${DOTFILES_LOG_DIR}" 2> /dev/null; then
+            log_info "Failed to remove ${DOTFILES_LOG_DIR}"
+            ((++ec))
+        else
+            log_info "Successfully removed log directory!"
+        fi
+    else
+        log_info "[dry-run] rm -rf ${DOTFILES_LOG_DIR}"
+    fi
+
+    UNINSTALL_ERRORS="${ec}"
+    _exit "${ec}"
+    return "${ec}"
+}

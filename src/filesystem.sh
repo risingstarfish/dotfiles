@@ -93,7 +93,7 @@ _guard_dest() {
     if ((DRY_RUN)); then
         local dry_base
         dry_base="$(basename "${dest}")"
-        log_info "[dry-run] Would back up: ${dest} → ${DOTFILES_BACKUP_DIR}/${DOTFILES_START_TIME}/${dry_base}.bak"
+        log_info "[dry-run] mv ${dest} ${DOTFILES_BACKUP_DIR}/${DOTFILES_START_TIME}/${dry_base}.bak"
         _exit
         return 0
     fi

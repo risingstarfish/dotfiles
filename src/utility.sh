@@ -69,8 +69,15 @@ prompt_continue() {
 
 is_windows_bash() {
     _enter
-    [[ -n ${MSYSTEM:-} || $(uname) == MINGW* || $(uname) == MSYS* ]]
-    _exit
+    # TARGET_OS
+    if [[ ${MSYSTEM:-} =~ ^(MINGW|MSYS|UCRT|UCRT64|MSYS2)$ ||
+          $(uname) == MINGW* ||
+          $(uname) == MSYS* ]]; then
+          _exit 0
+          return 0
+    fi
+    _exit 1
+    return 1
 }
 
 parse_module_list() {
