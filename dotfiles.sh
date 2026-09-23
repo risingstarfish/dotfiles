@@ -382,7 +382,7 @@ _set_dotfiles_manifest() {
         "symlink|zsh/functions|${HOME}/.functions"
         "symlink|zsh/zshrc.toggles|${HOME}/.zshrc.toggles"
 
-        "symlink|.bashrc|bash/bashrc|${HOME}/.bashrc"
+        "symlink|bash/bashrc|${HOME}/.bashrc"
 
         "symlink|git/gitconfig|${HOME}/.gitconfig"
         "copy|git/gitconfig.local.${DF_TARGET_OS}|${HOME}/.gitconfig.local"
