@@ -114,8 +114,8 @@ EOF
 list_modules() {
     _enter
 
-    set_available_modules
-
+    echo "FIXME: broken"
+    exit 1
     local -a manifest_sources=()
     local -a manifest_dests=()
     local -a manifest_ftypes=()
@@ -145,7 +145,7 @@ list_modules() {
     local filename
 
     for item in "${AVAILABLE_MODULES[@]}"; do
-        IFS='|' read -r src dest cmd <<< "${item}"
+        IFS='|' read -r tag src dest cmd <<< "${item}"
 
         category="${src%%/*}"
         src_file="${MODULE_DIR}/${src}"

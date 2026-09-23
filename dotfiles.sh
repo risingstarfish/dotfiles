@@ -7,10 +7,12 @@ if [[ -z ${HOME:-} || ! -d $HOME ]]; then
     exit 1
 fi
 
+readonly DOTFILES_START_TIME="$(date +%Y-%m-%d_%H%M%S)}"
 readonly DOTFILES_ENV="${DOTFILES_ENV:-production}" # development testing production
 readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-$HOME/.config/dotfiles/logs}"
 readonly INIT_LOG_FILE="${DOTFILES_LOG_DIR}/initialise.log"
 readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-$HOME/.cache/dotfiles}"
+readonly DOTFILES_BACKUP_DIR="${DOTFILES_CACHE_DIR}/backups"
 readonly MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
 
 readonly MERGE_TOP_SENTINEL='# --- Local Configuration (managed by dotfiles) ---'
@@ -84,7 +86,7 @@ bash_version_check() {
 
 # set the absolute directory path of this script
 # Source - https://stackoverflow.com/a/246128
-set_src_path() {
+_set_src_path() {
     log_trace "${FUNCNAME[0]}: Entering (SRC_PATH='${SRC_PATH:-}')"
 
     if [[ -n ${SRC_PATH:-} ]]; then
@@ -121,7 +123,7 @@ set_src_path() {
     readonly SRC_PATH
 }
 
-set_module_dir() {
+_set_module_dir() {
     log_trace "${FUNCNAME[0]}: Entering (MODULE_DIR='${MODULE_DIR:-}', SRC_PATH='${SRC_PATH:-}')"
 
     if [[ -n ${MODULE_DIR:-} ]]; then
@@ -147,12 +149,12 @@ set_module_dir() {
 
 # Detects and sets TARGET_OS and TARGET_RUNTIME. Validates by comparing
 # against OS_UNKNOWN and RUNTIME_UNKNOWN
-# Usage: set_env
+# Usage: _set_env
 #
 # Returns:
 #   0 if TARGET_OS and TARGET_RUNTIME are set
 #   1 if TARGET_OS and TARGET_RUNTIME remain 'unknown'
-set_target_env() {
+_set_target_env() {
     log_trace "${FUNCNAME[0]}: Entering (TARGET_OS='${TARGET_OS:-}', TARGET_RUNTIME='${TARGET_RUNTIME:-}', TARGET_ENV='${TARGET_ENV:-}')"
 
     if [[ -n ${TARGET_OS:-} || -n ${TARGET_RUNTIME:-} || -n ${TARGET_ENV:-} ]]; then
@@ -238,7 +240,7 @@ set_target_env() {
 }
 
 # detect if windows user has sudo enabled
-set_windows_sudo() {
+_set_windows_sudo() {
     log_trace "${FUNCNAME[0]}: Entering"
 
     if [[ -n ${WINDOWS_SUDO:-} ]]; then
@@ -281,7 +283,7 @@ set_windows_sudo() {
 }
 
 # Detect if script was run as sudo or root.
-set_is_elevated() {
+_set_is_elevated() {
     log_trace "${FUNCNAME[0]}: Entering (IS_ELEVATED='${IS_ELEVATED:-}', EUID='${EUID}', SUDO_USER='${SUDO_USER:-}')"
 
     if [[ -n ${IS_ELEVATED:-} ]]; then
@@ -306,86 +308,85 @@ set_is_elevated() {
     log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
 }
 
-set_module_map() {
-    log_trace "${FUNCNAME[0]}: Entering)"
+_set_dotfiles_manifest() {
+    _enter
 
-    if [[ -n ${MODULE_MAP+x} ]] && ((${#MODULE_MAP[@]} > 0)); then
-        log_debug "${FUNCNAME[0]}: MODULE_MAP already populated (${#MODULE_MAP[@]} items). Skipping."
+    if [[ -n ${DOTFILES_MANIFEST+x} ]] && ((${#DOTFILES_MANIFEST[@]} > 0)); then
+        log_debug "${FUNCNAME[0]}: DOTFILES_MANIFEST already populated (${#DOTFILES_MANIFEST[@]} items). Skipping."
         log_trace "${FUNCNAME[0]}: Exiting (already populated)"
         return 0
     fi
 
+    local topgrade_dest
     if [[ ${TARGET_OS} == "${OS_WINDOWS}" ]]; then
-        local -r topgrade_dest="${APPDATA}/topgrade/topgrade.toml"
+        topgrade_dest="${APPDATA}/topgrade/topgrade.toml"
     else
-        local -r topgrade_dest="${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
+        topgrade_dest="${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml"
     fi
     log_trace "${FUNCNAME[0]}: Resolved topgrade_dest='${topgrade_dest}'"
 
-    # name | src | dest | (post-install cmd)
-    readonly MODULE_MAP=(
-        ".zshrc|zsh/zshrc|${HOME}/.zshrc"
-        ".zsh_options|zsh/zsh_options|${HOME}/.zsh_options"
-        ".zstyles|zsh/zstyles|${HOME}/.zstyles"
-        ".zimrc|zsh/zimrc|${HOME}/.zimrc"
-        ".p10k.zsh|zsh/p10k.zsh|${HOME}/.p10k.zsh"
-        ".exports|zsh/exports|${HOME}/.exports"
-        ".paths|zsh/paths|${HOME}/.paths"
-        ".aliases|zsh/aliases|${HOME}/.aliases"
-        ".functions|zsh/functions|${HOME}/.functions"
-        ".zshrc.toggles|zsh/zshrc.toggles|${HOME}/.zshrc.toggles"
+    # tag | src | dest | (post-install cmd)
+    readonly DOTFILES_MANIFEST=(
+        "symlink|zsh/zshrc|${HOME}/.zshrc"
+        "symlink|zsh/zsh_options|${HOME}/.zsh_options"
+        "symlink|sh/zstyles|${HOME}/.zstyles"
+        "symlink|zsh/zimrc|${HOME}/.zimrc"
+        "symlink|zsh/p10k.zsh|${HOME}/.p10k.zsh"
+        "symlink|zsh/exports|${HOME}/.exports"
+        "symlink|zsh/paths|${HOME}/.paths"
+        "symlink|zsh/aliases|${HOME}/.aliases"
+        "symlink|zsh/functions|${HOME}/.functions"
+        "symlink|zsh/zshrc.toggles|${HOME}/.zshrc.toggles"
 
-        ".bashrc|bash/bashrc|${HOME}/.bashrc"
+        "symlink|.bashrc|bash/bashrc|${HOME}/.bashrc"
 
-        ".gitconfig|git/gitconfig|${HOME}/.gitconfig"
-        ".gitconfig.local|git/gitconfig.local.${TARGET_OS}|${HOME}/.gitconfig.local"
-        ".gitignore|git/gitignore|${HOME}/.gitignore"
-        ".gitattributes|git/gitattributes|${HOME}/.gitattributes"
-        "diff-so-fancy|git/diff-so-fancy|${HOME}/.local/bin/diff-so-fancy|chmod +x ${HOME}/.local/bin/diff-so-fancy"
+        "symlink|git/gitconfig|${HOME}/.gitconfig"
+        "copy|git/gitconfig.local.${TARGET_OS}|${HOME}/.gitconfig.local"
+        "symlink|git/gitignore|${HOME}/.gitignore"
+        "symlink|git/gitattributes|${HOME}/.gitattributes"
+        "symlink|git/diff-so-fancy|${HOME}/.local/bin/diff-so-fancy|chmod +x ${HOME}/.local/bin/diff-so-fancy"
 
-        "config|ssh/config|${HOME}/.ssh/config|chmod 600 ${HOME}/.ssh/config"
-        "allowed_signers|ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers"
+        "symlink|ssh/config|${HOME}/.ssh/config|chmod 600 ${HOME}/.ssh/config"
+        "symlink|ssh/allowed_signers.gen|${HOME}/.ssh/allowed_signers"
 
-        "gen-cmakepreset.py|dev/gen-cmakepreset.py|${HOME}/.local/bin/gen-cmakepreset.py|chmod 600 ${HOME}/.local/bin/gen-cmakepreset.py"
-        "internal-flags.cmake|dev/internal-flags.cmake|${HOME}/dev/internal-flags.cmake"
-        ".cmake-format.py|dev/cmake-format.py|${HOME}/dev/.cmake-format.py"
-        ".clang-format|dev/clang-format|${HOME}/dev/.clang-format"
-        ".clang-tidy|dev/clang-tidy|${HOME}/dev/.clang-tidy"
-        ".editorconfig|dev/editorconfig|${HOME}/dev/.editorconfig"
+        "generate|dev/gen-cmakepreset.py|${HOME}/.local/bin/gen-cmakepreset.py|chmod 600 ${HOME}/.local/bin/gen-cmakepreset.py"
+        "symlink|dev/internal-flags.cmake|${HOME}/dev/internal-flags.cmake"
+        "symlink|dev/cmake-format.py|${HOME}/dev/.cmake-format.py"
+        "symlink|dev/clang-format|${HOME}/dev/.clang-format"
+        "symlink|dev/clang-tidy|${HOME}/dev/.clang-tidy"
+        "symlink|dev/editorconfig|${HOME}/dev/.editorconfig"
 
-        "Microsoft.PowerShell_profile.ps1|pwsh.${TARGET_ENV}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
-        "Set-MSVC-Environment.ps1|pwsh.${TARGET_ENV}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
-        "Update-Modules.ps1|pwsh.${TARGET_ENV}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
-        "Print-Env.ps1|pwsh.${TARGET_ENV}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
-        "nproc.ps1|pwsh.${TARGET_ENV}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
-        "sha256.ps1|pwsh.${TARGET_ENV}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
-        "sha1.ps1|pwsh.${TARGET_ENV}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
-        "md5.ps1|pwsh.${TARGET_ENV}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
+        "copy|pwsh.${TARGET_ENV}/Microsoft.PowerShell_profile.ps1|${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1"
+        "copy|pwsh.${TARGET_ENV}/Set-MSVC-Environment.ps1|${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1"
+        "copy|pwsh.${TARGET_ENV}/Update-Modules.ps1|${HOME}/Documents/Powershell/Scripts/Update-Modules.ps1"
+        "copy|pwsh.${TARGET_ENV}/Print-Env.ps1|${HOME}/Documents/Powershell/Scripts/Print-Env.ps1"
+        "copy|pwsh.${TARGET_ENV}/nproc.ps1|${HOME}/Documents/Powershell/Scripts/nproc.ps1"
+        "copy|pwsh.${TARGET_ENV}/sha256.ps1|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
+        "copy|pwsh.${TARGET_ENV}/sha1.ps1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
+        "copy|pwsh.${TARGET_ENV}/md5.ps1|${HOME}/Documents/Powershell/Scripts/md5.ps1"
 
-        "tiger.omp.json|oh-my-posh.${TARGET_ENV}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
-        "agnoster.omp.json|oh-my-posh.${TARGET_ENV}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
-        "kushal.omp.json|oh-my-posh.${TARGET_ENV}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
-        "powerlevel10k_classic.omp.json|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
-        "powerlevel10k_lean.omp.json|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
-        "powerlevel10k_modern.omp.json|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
+        "symlink|oh-my-posh.${TARGET_ENV}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
+        "symlink|oh-my-posh.${TARGET_ENV}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
+        "symlink|oh-my-posh.${TARGET_ENV}/themes/kushal.omp.json|${HOME}/.oh-my-posh/themes/kushal.omp.json"
+        "symlink|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_classic.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_classic.omp.json"
+        "symlink|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_lean.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_lean.omp.json"
+        "symlink|oh-my-posh.${TARGET_ENV}/themes/powerlevel10k_modern.omp.json|${HOME}/.oh-my-posh/themes/powerlevel10k_modern.omp.json"
 
-        "topgrade.toml|topgrade/topgrade.toml|${topgrade_dest}"
-        "config.jsonc|fastfetch/config.jsonc.${TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
-        ".tmux.conf|tmux/tmux.conf.${TARGET_OS}|${HOME}/.tmux.conf"
-        ".curlrc|curl/curlrc|${HOME}/.curlrc"
-        ".wgetrc|wget/wgetrc|${HOME}/.wgetrc"
-        ".shellcheckrc|shellcheck/shellcheckrc|${HOME}/.shellcheckrc"
+        "symlink|topgrade/topgrade.toml|${topgrade_dest}"
+        "symlink|fastfetch/config.jsonc.${TARGET_OS}|${HOME}/.config/fastfetch/config.jsonc"
+        "symlink|tmux/tmux.conf.${TARGET_OS}|${HOME}/.tmux.conf"
+        "symlink|curl/curlrc|${HOME}/.curlrc"
+        "symlink|wget/wgetrc|${HOME}/.wgetrc"
+        "symlink|shellcheck/shellcheckrc|${HOME}/.shellcheckrc"
 
-        "settings.json|claude/settings.json|${HOME}/.claude/settings.json"
-        "plugin.json|claude/plugin.json|${HOME}/.claude/plugin.json"
+        "symlink|claude/settings.json|${HOME}/.claude/settings.json"
+        "symlink|claude/plugin.json|${HOME}/.claude/plugin.json"
     )
-
-    log_debug "${FUNCNAME[0]}: Initialized MODULE_MAP with ${#MODULE_MAP[@]} items."
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    _exit
 }
 
-set_available_modules() {
-    log_trace "${FUNCNAME[0]}: Entering"
+_set_available_modules() {
+    _enter
 
     if [[ -n ${AVAILABLE_MODULES+x} ]] && ((${#AVAILABLE_MODULES[@]} > 0)); then
         log_debug "${FUNCNAME[0]}: AVAILABLE_MODULES is already set. Skipping."
@@ -394,10 +395,10 @@ set_available_modules() {
     fi
 
     local -a active_modules=()
-    local item name src dest post_cmd
+    local item tag src dest post_cmd
 
-    for item in "${MODULE_MAP[@]}"; do
-        IFS='|' read -r name src dest post_cmd <<< "${item}"
+    for item in "${DOTFILES_MANIFEST[@]}"; do
+        IFS='|' read -r tag src dest post_cmd <<< "${item}"
 
         # skip if not available on os/runtime
         if [[ ! -e "${MODULE_DIR}/${src}" ]]; then
@@ -417,7 +418,7 @@ set_available_modules() {
 
     AVAILABLE_MODULES=("${active_modules[@]}")
     log_debug "${FUNCNAME[0]}: Resolved ${#AVAILABLE_MODULES[@]} available modules."
-    log_trace "${FUNCNAME[0]}: Exiting successfully with status 0"
+    _exit
     readonly AVAILABLE_MODULES
 }
 
@@ -509,7 +510,7 @@ initialise() {
     bash_version_check || die 1 'Bash version validation failed.'
 
     # SRC_PATH
-    set_src_path || die 1 'Failed to determine script source path.'
+    _set_src_path || die 1 'Failed to determine script source path.'
 
     if [[ ${#SOURCE_FILES[@]} -eq 0 ]]; then
         log_error "${FUNCNAME[0]}: SOURCE_FILES array is empty."
@@ -520,20 +521,20 @@ initialise() {
     check_exists "${SOURCE_FILES[@]}" || die 1 "One or more required source files are missing."
     source_files "${SOURCE_FILES[@]}" || die 1 "Failed to source framework files."
 
-    set_module_dir || die 1 "Failed to establish module directory."
-    set_target_env || {      # TARGET_ENV TARGET_OS TARGET_RUNTIME
+    _set_module_dir || die 1 "Failed to establish module directory."
+    _set_target_env || {      # TARGET_ENV TARGET_OS TARGET_RUNTIME
         log_warn "${FUNCNAME[0]}: Target environment detection failed. Prompting user to proceed."
         printf 'Warning: unable to determine $TARGET_OS or $TARGET_RUNTIME.\n' >&2
         prompt_continue 'Some functionality may be limited.'
     }
 
-    set_is_elevated      # IS_ELEVATED
+    _set_is_elevated      # IS_ELEVATED
     if [[ ${TARGET_OS} == "${OS_WINDOWS}"   ]]; then
-        set_windows_sudo # WINDOWS_SUDO
+        _set_windows_sudo # WINDOWS_SUDO
     fi
 
-    set_module_map        # MODULE_MAP
-    set_available_modules # AVAILABLE_MODULES
+    _set_dotfiles_manifest        # DOTFILES_MANIFEST
+    _set_available_modules # AVAILABLE_MODULES
 
     log_trace "${FUNCNAME[0]}: Initialisation complete."
 }
@@ -542,7 +543,8 @@ main() {
     local SRC_PATH MODULE_DIR \
         TARGET_OS TARGET_RUNTIME TARGET_ENV \
         IS_ELEVATED
-    local -a MODULE_MAP AVAILABLE_MODULES
+    local -a DOTFILES_MANIFEST AVAILABLE_MODULES
+    local -A MAP_DEST MAP_CMD
 
     initialise
 
@@ -552,6 +554,7 @@ main() {
         DRY_RUN NOCONFIRM FORCE \
         NO_BACKUP  NO_DEPS \
         LOG_LEVEL NO_LOG
+
     argparse "$@"
 
     # init logger

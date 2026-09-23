@@ -12,6 +12,7 @@ readonly __ARGPARSE_SH_INCLUDED__=1
 _assert_string_unset() {
     _enter
     if [[ -n ${1}   ]]; then
+        _exit 2
         die 2 '%s. Conflicting flag: "%s"' "${2}" "${3}"
     fi
     _exit
@@ -23,6 +24,7 @@ _assert_string_unset() {
 _assert_flag_unset() {
     _enter
     if [[ $1 -eq 1     ]]; then
+        _exit 2
         die 2 '%s. Conflicting flag: "%s"' "${2}" "${3}"
     fi
     _exit
@@ -43,12 +45,18 @@ assert_log_level_unset() {
 
 assert_exclude_modules_unset() {
     _enter
-    _assert_flag_unset "${EXCLUDE_SET}" "excluded modules is already set" "${1}"
-    _exit
+    if [[ ${#EXCLUDE_SET[@]} -gt 0 ]]; then
+        _exit 2
+        die 2 'excluded modules already set. Conflicting flag: "%s"' "${1}"
+    fi
+        _exit
 }
 assert_include_modules_unset() {
     _enter
-    _assert_flag_unset "${INCLUDE_SET}" "included modules is already set" "${1}"
+    if [[ ${#INCLUDE_SET[@]} -gt 0 ]]; then
+        _exit 2
+        die 2 'included modules already set. Conflicting flag: "%s"' "${1}"
+    fi
     _exit
 }
 
@@ -73,8 +81,10 @@ assert_force_unset() {
 require_arg() {
     _enter
     if [[ -z ${2:-} || ${2} == -* ]]; then
+        _exit 2
         die 2 'missing argument for %s.' "$1"
     fi
+    _exit
 }
 
 argparse() {
@@ -86,7 +96,7 @@ argparse() {
     EXCLUDE_SET=()
     DRY_RUN=0
     NOCONFIRM=0
-    local interactive_flag
+    local interactive_flag=-1
     FORCE=0
     DOTFILES_AUTORESTART=${DOTFILES_AUTORESTART:-0} # env
     local autorestart_flag
@@ -100,19 +110,23 @@ argparse() {
             # information
             -h | --help)
                 print_help
+                _exit
                 exit 0
                 ;;
             --version)
                 print_version
+                _exit
                 exit 0
                 ;;
             --verify)
                 local verify_rc=0
                 print_verification || verify_rc=$?
+                _exit
                 exit "${verify_rc}"
                 ;;
             -l | --list)
                 list_modules
+                _exit
                 exit 0
                 ;;
 
@@ -293,19 +307,22 @@ argparse() {
 
     # validation
     if [[ -z $MAIN_ACTION ]]; then
+        _exit 2
         die 2 'no action specified.\nRun `bash %s --help` for valid options.' "$(basename "$0")"
     fi
     case $MAIN_ACTION in
         remove | update | uninstall | reset | repair)
             [[ ${#INCLUDE_SET[@]} -gt 0 || ${#EXCLUDE_SET[@]} -gt 0 ]] \
-                && die 2 "--include/--exclude not supported with --$MAIN_ACTION"
+                && _exit 2 && die 2 "--include/--exclude not supported with --$MAIN_ACTION"
             ;;
     esac
 
     if [[ $MAIN_ACTION == remove ]] && [[ ${#REMOVE_SET[@]} -eq 0 ]]; then
+        _exit 2
         die 2 "no modules for --remove"
     fi
     if [[ $MAIN_ACTION == reset && $NO_BACKUP -eq 1 ]]; then
+        _exit 2
         die 2 "--no-backup not allowed with --reset"
     fi
 
@@ -318,27 +335,33 @@ argparse() {
     esac
 
     if [[ ${MAIN_ACTION} == uninstall && ${NO_BACKUP} -eq 1 ]]; then
+        _exit 2
         die 2 '--no-backup is redundant with --uninstall (it deletes backups itself)'
     fi
 
     if [[ ${DRY_RUN} -eq 1 ]]; then
         if [[ ${DOTFILES_AUTORESTART} -eq 1 ]]; then
             if [[ ${autorestart_flag} -eq 1 ]]; then
+                _exit 2
                 die 2 '--autorestart is not meaningful with --dry-run'
             fi
             DOTFILES_AUTORESTART=0
         fi
 
         if [[ ${interactive_flag} -eq 1 ]]; then
+            _exit 2
             die 2 '--interactive is meaningless with --dry-run'
         fi
         if [[ ${FORCE} -eq 1 ]]; then
+            _exit 2
             die 2 '--force is meaningless with --dry-run'
         fi
         if [[ ${NO_BACKUP} -eq 1 ]]; then
+            _exit 2
             die 2 '--no-backup is meaningless with --dry-run'
         fi
         if [[ ${NO_DEPS} -eq 1 ]]; then
+            _exit 2
             die 2 '--no-deps is meaningless with --dry-run'
         fi
     fi

@@ -10,8 +10,9 @@ set_user_modules() {
     _enter
 
     if [[ -n ${USER_MODULES:-}  ]]; then
-        log_debug "${FUNCNAME[0]}: USER_MODULES is already populated. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (already populated)"
+        log_debug "USER_MODULES is already populated. Skipping."
+        log_trace "Exiting (already populated)"
+        _exit
         return 0
     fi
 
@@ -20,7 +21,7 @@ set_user_modules() {
     local num_total=${#AVAILABLE_MODULES[@]}
     local num_target
 
-    log_trace "${FUNCNAME[0]}: Set counts -> num_inc=${num_inc}, num_exc=${num_exc}, num_total=${num_total}"
+    log_trace "Set counts -> num_inc=${num_inc}, num_exc=${num_exc}, num_total=${num_total}"
 
     if ((num_inc > 0)); then
         num_target=${num_inc}
@@ -30,28 +31,28 @@ set_user_modules() {
         num_target=${num_total}
     fi
 
-    log_debug "${FUNCNAME[0]}: Processing ${num_target}/${num_total} modules."
+    log_debug "Processing ${num_target}/${num_total} modules."
 
     local mod inc exc included excluded
     local mod_slash
 
     for mod in "${AVAILABLE_MODULES[@]}"; do
         mod_slash="${mod}/"
-        log_trace "${FUNCNAME[0]}: Evaluating module '${mod}' (mod_slash='${mod_slash}')"
+        log_trace "Evaluating module '${mod}' (mod_slash='${mod_slash}')"
 
         if ((num_inc > 0)); then
             included=0
             for inc in "${INCLUDE_SET[@]}"; do
-                log_trace "${FUNCNAME[0]}: Testing include filter '${inc}/'* against '${mod_slash}'"
+                log_trace "Testing include filter '${inc}/'* against '${mod_slash}'"
                 if [[ ${mod_slash} == "${inc}/"*     ]]; then
                     included=1
-                    log_trace "${FUNCNAME[0]}: Match found for include filter '${inc}'"
+                    log_trace "Match found for include filter '${inc}'"
                     break
                 fi
             done
             if ! ((included)); then
-                log_debug "${FUNCNAME[0]}: Skipped '${mod}' (not in INCLUDE_SET)"
-                log_trace "${FUNCNAME[0]}: Module '${mod}' skipped because it did not match INCLUDE_SET"
+                log_debug "Skipped '${mod}' (not in INCLUDE_SET)"
+                log_trace "Module '${mod}' skipped because it did not match INCLUDE_SET"
                 continue
             fi
         fi
@@ -59,21 +60,21 @@ set_user_modules() {
         if ((num_exc > 0)); then
             excluded=0
             for exc in "${EXCLUDE_SET[@]}"; do
-                log_trace "${FUNCNAME[0]}: Testing exclude filter '${exc}/'* against '${mod_slash}'"
+                log_trace "Testing exclude filter '${exc}/'* against '${mod_slash}'"
                 if [[ ${mod_slash} == "${exc}/"* ]]; then
                     excluded=1
-                    log_trace "${FUNCNAME[0]}: Match found for exclude filter '${exc}'"
+                    log_trace "Match found for exclude filter '${exc}'"
                     break
                 fi
             done
             if ((excluded)); then
-                log_debug "${FUNCNAME[0]}: Skipped '${mod}' (matched EXCLUDE_SET)"
-                log_trace "${FUNCNAME[0]}: Module '${mod}' skipped because it matched EXCLUDE_SET"
+                log_debug "Skipped '${mod}' (matched EXCLUDE_SET)"
+                log_trace "Module '${mod}' skipped because it matched EXCLUDE_SET"
                 continue
             fi
         fi
-        log_debug "${FUNCNAME[0]}: Added '${mod}'"
-        log_trace "${FUNCNAME[0]}: Appending '${mod}' to USER_MODULES"
+        log_debug "Added '${mod}'"
+        log_trace "Appending '${mod}' to USER_MODULES"
         USER_MODULES+=("${mod}")
     done
 
@@ -86,28 +87,29 @@ set_user_modules() {
 set_file_types() {
     _enter
     if [[ -n ${SYMLINK_FILES:-} || -n ${COPY_FILES:-} || -n ${GENERATE_FILES:-} ]]; then
-        log_debug "${FUNCNAME[0]}: SYMLINK_FILES, COPY_FILES, and GENERATE_FILES are already populated. Skipping categorisation."
-        log_trace "${FUNCNAME[0]}: Exiting (already populated)"
+        log_debug "SYMLINK_FILES, COPY_FILES, and GENERATE_FILES are already populated. Skipping categorisation."
+        log_trace "Exiting (already populated)"
+        _exit
         return 0
     fi
 
-    log_debug "${FUNCNAME[0]}: Categorising ${#USER_MODULES[@]} files..."
+    log_debug "Categorising ${#USER_MODULES[@]} files..."
 
     local file
     local base
     for file in "${USER_MODULES[@]}"; do
         base="${file##*/}"
         if [[ ${base} == *.local || ${base} == *.local.* ]]; then
-            log_debug "${FUNCNAME[0]}: [COPY] ${base}"
-            log_trace "${FUNCNAME[0]}: Matched COPY pattern (*.local / *.local.*) -> adding to COPY_FILES"
+            log_debug "[COPY] ${base}"
+            log_trace "Matched COPY pattern (*.local / *.local.*) -> adding to COPY_FILES"
             COPY_FILES+=("${file}")
         elif [[ ${base} == *.gen ]]; then
-            log_debug "${FUNCNAME[0]}: [GENERATE] ${base}"
-            log_trace "${FUNCNAME[0]}: Matched GENERATE pattern (*.gen) -> adding to GENERATE_FILES"
+            log_debug "[GENERATE] ${base}"
+            log_trace "Matched GENERATE pattern (*.gen) -> adding to GENERATE_FILES"
             GENERATE_FILES+=("${file}")
         else
-            log_debug "${FUNCNAME[0]}: [SYMLINK] ${base}"
-            log_trace "${FUNCNAME[0]}: Default match -> adding to SYMLINK_FILES"
+            log_debug "[SYMLINK] ${base}"
+            log_trace "Default match -> adding to SYMLINK_FILES"
             SYMLINK_FILES+=("${file}")
         fi
     done
@@ -122,34 +124,36 @@ set_dotfiles_ref() {
     _enter
 
     if [[ -n ${DOTFILES_REF:-} ]]; then
-        log_debug "${FUNCNAME[0]}: DOTFILES_REF already set to '${DOTFILES_REF}'. Skipping."
-        log_trace "${FUNCNAME[0]}: Exiting (DOTFILES_REF already set)"
+        log_debug "DOTFILES_REF already set to '${DOTFILES_REF}'. Skipping."
+        log_trace "Exiting (DOTFILES_REF already set)"
+        _exit
         return 0
     fi
 
-    log_debug "${FUNCNAME[0]}: Determining git ref for '${SRC_PATH}'..."
+    log_debug "Determining git ref for '${SRC_PATH}'..."
 
-    log_trace "${FUNCNAME[0]}: Executing: git -C '${SRC_PATH}' rev-parse --git-dir"
+    log_trace "Executing: git -C '${SRC_PATH}' rev-parse --git-dir"
     if ! git -C "${SRC_PATH}" rev-parse --git-dir > /dev/null 2>&1; then
-        log_trace "${FUNCNAME[0]}: git rev-parse failed (not a git repository)"
-        log_error "${FUNCNAME[0]}: Unable to determine git ref. Make sure '${SRC_PATH}' is a git repo."
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_trace "git rev-parse failed (not a git repository)"
+        log_error "Unable to determine git ref. Make sure '${SRC_PATH}' is a git repo."
+        log_trace "Exiting with status 1"
+        _exit 1
         return 1
     fi
 
     local config_ref
-    log_trace "${FUNCNAME[0]}: Executing: git -C '${SRC_PATH}' config --local dotfiles.ref"
+    log_trace "Executing: git -C '${SRC_PATH}' config --local dotfiles.ref"
     config_ref="$(git -C "${SRC_PATH}" config --local dotfiles.ref 2> /dev/null || true)"
-    log_trace "${FUNCNAME[0]}: Retrieved config_ref='${config_ref}'"
+    log_trace "Retrieved config_ref='${config_ref}'"
 
     if [[ -n ${config_ref} ]]; then
         DOTFILES_REF="${config_ref}"
-        log_debug "${FUNCNAME[0]}: Found custom ref in git config."
-        log_trace "${FUNCNAME[0]}: Assigned DOTFILES_REF='${DOTFILES_REF}' from git config"
+        log_debug "Found custom ref in git config."
+        log_trace "Assigned DOTFILES_REF='${DOTFILES_REF}' from git config"
     else
         DOTFILES_REF="main"
-        log_debug "${FUNCNAME[0]}: No custom git config found. Falling back to default."
-        log_trace "${FUNCNAME[0]}: Assigned DOTFILES_REF='main' (default fallback)"
+        log_debug "No custom git config found. Falling back to default."
+        log_trace "Assigned DOTFILES_REF='main' (default fallback)"
     fi
 
     _exit
@@ -166,29 +170,27 @@ do_install() {
 
     log_info "Beginning installation!"
 
-    log_trace "${FUNCNAME[0]}: Calling set_user_modules()"
+    log_trace "Calling set_user_modules()"
     set_user_modules # USER_MODULES
-    log_trace "${FUNCNAME[0]}: Returned from set_user_modules() (USER_MODULES count: ${#USER_MODULES[@]})"
+    log_trace "Returned from set_user_modules() (USER_MODULES count: ${#USER_MODULES[@]})"
 
-    log_trace "${FUNCNAME[0]}: Calling set_file_types()"
+    log_trace "Calling set_file_types()"
     set_file_types   # SYMLINK_FILES COPY_FILES GENERATE_FILES
-    log_trace "${FUNCNAME[0]}: Returned from set_file_types() (SYMLINK: ${#SYMLINK_FILES[@]}, COPY: ${#COPY_FILES[@]}, GENERATE: ${#GENERATE_FILES[@]})"
+    log_trace "Returned from set_file_types() (SYMLINK: ${#SYMLINK_FILES[@]}, COPY: ${#COPY_FILES[@]}, GENERATE: ${#GENERATE_FILES[@]})"
 
-    log_debug "${FUNCNAME[0]}: Initialized local module and file arrays"
+    log_debug "Initialized local module and file arrays"
 
     local rc=0
-    local num_err=0
-    log_trace "${FUNCNAME[0]}: Initialized status tracer rc=${rc}"
+    log_trace "Initialized status tracer rc=${rc}"
 
-    symlink_all "${num_err}" || rc=1
-    copy_all "${num_err}" || rc=1
-    generate_all "${num_err}" || rc=1
+    install_all || rc=1
 
-    log_trace "${FUNCNAME[0]}: Evaluating final status code rc=${rc}"
+    log_trace "Evaluating final status code rc=${rc}"
     if ((rc)); then
-        log_trace "${FUNCNAME[0]}: Error state detected (rc != 0)"
+        log_trace "Error state detected!"
         log_error 'Install finished with errors!' # TODO: print total number
-        log_trace "${FUNCNAME[0]}: Exiting with status 1"
+        log_trace "Exiting with status 1"
+        _exit 1
         return 1
     fi
 
@@ -202,7 +204,8 @@ do_update() {
     local DOTFILES_REF
 
     set_dotfiles_ref || { # DOTFILES_REF
-        log_trace "set_dotfiles_ref failed with exit status $?, exiting ${FUNCNAME[0]}()"
+        log_trace "set_dotfiles_ref failed with exit status $?, exiting"
+        _exit 1
         exit 1
     }
     log_trace "Resolved DOTFILES_REF='${DOTFILES_REF}'"
@@ -239,7 +242,7 @@ do_update() {
         } >&2
         log_trace "Executing: git -C '${SRC_PATH}' diff --stat HEAD"
         command git -C "${SRC_PATH}" diff --stat HEAD 2> /dev/null >&2
-        log_trace "Exiting ${FUNCNAME[0]}() with status 1 (blocked)"
+        _exit 1
         return 1
     fi
 
@@ -247,7 +250,7 @@ do_update() {
     if ! command git -C "${SRC_PATH}" fetch origin --depth=1 "${DOTFILES_REF}" 2> /dev/null; then
         log_trace "git fetch command failed"
         log_error "Fetch failed (ref: ${DOTFILES_REF}). Check network or repo URL."
-        log_trace "Exiting ${FUNCNAME[0]}() with status 1 (fetch failed)"
+        _exit 1
         return 1
     fi
 
@@ -263,7 +266,7 @@ do_update() {
             printf '    git -C "%s" rebase --continue\n' "${SRC_PATH}" >&2
             printf '  Or abort with:\n' >&2
             printf '    git -C "%s" rebase --abort\n' "${SRC_PATH}" >&2
-            log_trace "Exiting ${FUNCNAME[0]}() with status 1 (rebase failed)"
+            _exit 1
             return 1
         fi
     else

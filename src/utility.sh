@@ -10,9 +10,12 @@ readonly __UTILITY_SH_INCLUDED__=1
 # $2 = printf format string
 # $3.. = format args
 die() {
+    _enter
     local -r rc="${1:-2}"
     shift
     printf "Error: ${1}\n" "${@:2}" >&2
+
+    _exit "${rc}"
     exit "${rc}"
 }
 
@@ -24,7 +27,7 @@ die() {
 #   $1 (format) : (Optional) The warning message, or a printf-style format string.
 #   $@ (args)   : (Optional) Arguments to populate the format string.
 prompt_continue() {
-    log_trace "${FUNCNAME[0]}: Entering"
+    _enter
 
     local msg
     if [[ $# -eq 0 ]]; then
@@ -44,6 +47,7 @@ prompt_continue() {
         echo
         if ! read -r -p 'Do you want to continue anyway? [y/N]: ' choice; then
             printf 'Error: No input available for prompt.\n' >&2
+            _exit 1
             return 1
         fi
 
@@ -60,15 +64,17 @@ prompt_continue() {
                 ;;
         esac
     done
-    log_trace "${FUNCNAME[0]}: Exiting"
+    _exit
 }
 
 is_windows_bash() {
+    _enter
     [[ -n ${MSYSTEM:-} || $(uname) == MINGW* || $(uname) == MSYS* ]]
+    _exit
 }
 
 parse_module_list()  {
-    log_trace "${FUNCNAME[0]}: Entering"
+    _enter
 
     local -n arr="$2"
     local mod
@@ -105,11 +111,11 @@ parse_module_list()  {
         fi
         arr+=("$m")
     done
-    log_trace "${FUNCNAME[0]}: Exiting"
+    _exit
 }
 
 _attempt_cmd() {
-    log_trace "${FUNCNAME[0]}: Entering"
+    _enter
 
     local -r cmd="${1}"
     local -r msg="${2}"
@@ -117,40 +123,42 @@ _attempt_cmd() {
     local -r suc_msg="${4:-}"
 
     if ((DRY_RUN)); then
-        log_trace "${FUNCNAME[0]}: DRY_RUN is set (${DRY_RUN}); bypassing operation"
+        log_trace "DRY_RUN is set (${DRY_RUN}); bypassing operation"
         log_info "[dry-run] ${cmd}"
+        _exit
         return 0
     fi
 
     if ((NOCONFIRM)); then
-        log_trace "${FUNCNAME[0]}: NOCONFIRM is set (${NOCONFIRM}); bypassing interactive prompt"
+        log_trace "NOCONFIRM is set (${NOCONFIRM}); bypassing interactive prompt"
     else
         log_info "About to run: ${cmd}"
         printf '\n  %s\n' "${msg}" >&2
 
         local reply
         read -r '  Continue? [Y/n] ' reply >&2
-        log_trace "${FUNCNAME[0]}: User prompt reply: '${reply}'"
+        log_trace "User prompt reply: '${reply}'"
         case "${reply,,}" in
             y | yes | '')
-                log_trace "${FUNCNAME[0]}: User confirmed"
+                log_trace "User confirmed"
                 ;;
             *)
-                log_trace "${FUNCNAME[0]}: User rejected prompt"
+                log_trace "User rejected prompt"
                 log_warn "Operation cancelled by user."
-                log_trace "${FUNCNAME[0]}: Exiting with status 130 (user cancelled)"
+                log_trace "Exiting with status 130 (user cancelled)"
                 return 130
                 ;;
         esac
         printf '\n' >&2
     fi
 
-    log_trace "${FUNCNAME[0]}: Executing: ${cmd}"
+    log_trace "Executing: ${cmd}"
     local err_output
     if ! err_output=$(eval "${cmd}" 2>&1); then
-        log_trace "${FUNCNAME[0]}: Operation failed"
+        log_trace "Operation failed"
         log_error "${err_msg}"
         log_debug "System error: ${err_output}"
+        _exit 1
         return 1
     fi
 
@@ -158,7 +166,7 @@ _attempt_cmd() {
         log_debug "${suc_msg}"
     fi
 
-    log_trace "${FUNCNAME[0]}: Exiting"
+    _exit
 }
 
 timer_start() {

@@ -1892,16 +1892,20 @@ _log_message() {
 # Log a trace message
 log_trace() {
     if [[ $CURRENT_LOG_LEVEL -ge $LOG_LEVEL_TRACE ]]; then
-        _log_message "TRACE" "$LOG_LEVEL_TRACE" "$1"
+        _log_message "TRACE" "$LOG_LEVEL_TRACE" "${FUNCNAME[1]}: ${1}"
     fi
 }
 
 _enter() {
-    log_trace "${FUNCNAME[1]}: Entering..."
+    if [[ $CURRENT_LOG_LEVEL -ge $LOG_LEVEL_TRACE ]]; then
+        _log_message "TRACE" "$LOG_LEVEL_TRACE" "${FUNCNAME[1]}: Entering..."
+    fi
 }
 
 _exit() {
-    log_trace "${FUNCNAME[1]}: Exiting..."
+    if [[ $CURRENT_LOG_LEVEL -ge $LOG_LEVEL_TRACE ]]; then
+        _log_message "TRACE" "$LOG_LEVEL_TRACE" "${FUNCNAME[1]}: Exiting with code ${1:-0}"
+    fi
 }
 
 log_debug() {
