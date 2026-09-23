@@ -254,12 +254,12 @@ do_update() {
         return 1
     fi
 
-    if [[ -f ${MANIFEST_FILE} ]]; then
+    if [[ -f ${DOTFILES_MANIFEST_FILE} ]]; then
         local tmp
         tmp="$(mktemp)"
         printf '# ref=%s timestamp=%s\n' "${DOTFILES_REF}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${tmp}"
-        cat "${MANIFEST_FILE}" >> "${tmp}"
-        mv "${tmp}" "${MANIFEST_FILE}"
+        cat "${DOTFILES_MANIFEST_FILE}" >> "${tmp}"
+        mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
     fi
 
     if [[ ${has_local_mods} -eq 1 && ${DOTFILES_LOCAL_MODS} -eq 1 ]]; then
