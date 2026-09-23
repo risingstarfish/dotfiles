@@ -20,8 +20,8 @@ alias .....='cd ../../../..' # 4
 alias -- -='cd -'            # revert directories
 alias H='cd ~'
 alias dots='cd ~/dotfiles'
-alias dev='cd ~/opt'
-alias star='cd ~/repos/risingstarfish'
+alias opts='cd ~/opt'
+alias stars='cd ~/repos/risingstarfish'
 
 # grep
 alias grep='grep --color=auto'
