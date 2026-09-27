@@ -1,43 +1,74 @@
-#. $env:USERPROFILE\Documents\Powershell\Scripts\Set-MSVC-Environment.ps1
-. $env:USERPROFILE\Documents\Powershell\Scripts\Update-Modules.ps1
-##. $env:USERPROFILE\oh-my-posh\scripts\AutoCd.ps1
-. $env:USERPROFILE\Documents\Powershell\Scripts\Print-Env.ps1
-. $env:USERPROFILE\Documents\Powershell\Scripts\nproc.ps1
-# hash functions
-. $env:USERPROFILE\Documents\Powershell\Scripts\sha256.ps1
-. $env:USERPROFILE\Documents\Powershell\Scripts\sha1.ps1
-. $env:USERPROFILE\Documents\Powershell\Scripts\md5.ps1
+# Microsoft.PowerShell_profile.ps1
 
-
-
-if (-not $env:HOME) {
+if (-not $env:HOME -and $env:USERPROFILE) {
     $env:HOME = $env:USERPROFILE
+}
+if (-not $env:USERPROFILE -and $env:HOME) {
+    $env:USERPROFILE = $env:HOME
+}
+if (-not $env:USERPROFILE) {
+    $env:USERPROFILE = $HOME
+}
+if (-not $env:HOME) {
+    $env:HOME = $HOME
+}
+
+$scriptsDir = Join-Path $env:USERPROFILE 'Documents/Powershell/Scripts'
+$profileScripts = @(
+    'Update-Modules.ps1',
+    'Print-Env.ps1',
+    'nproc.ps1',
+    'sha256.ps1',
+    'sha1.ps1',
+    'md5.ps1',
+    'Exports.ps1',
+    'Paths.ps1',
+    'Aliases.ps1',
+    'Functions.ps1'
+)
+
+foreach ($scriptName in $profileScripts) {
+    $scriptPath = Join-Path $scriptsDir $scriptName
+    if (Test-Path -LiteralPath $scriptPath) {
+        . $scriptPath
+    }
+}
+
+$localProfile = Join-Path $env:HOME '.profile.local.ps1'
+if (Test-Path -LiteralPath $localProfile) {
+    . $localProfile
 }
 
 if ($env:TMUX -or $env:PSMUX) {
     Remove-Item Function:\Set-Location -ErrorAction SilentlyContinue
 }
 
-Import-Module syntax-highlighting
-Import-Module cd-extras
-Import-Module LocationHistory
-#Import-Module Terminal-Icons
-Import-Module psfzf
-# Import-Module foil
-# Import-Module chocolateyget
-Import-Module PowerShellGet
-Import-Module 7zip4powershell
-#Import-Module pspgp
-Import-Module PSReadLine
+$optionalModules = @(
+    'syntax-highlighting',
+    'cd-extras',
+    'LocationHistory',
+    'psfzf',
+    'PowerShellGet',
+    '7zip4powershell',
+    'PSReadLine'
+)
+
+foreach ($modName in $optionalModules) {
+    if (Get-Module -ListAvailable -Name $modName -ErrorAction SilentlyContinue) {
+        Import-Module $modName -ErrorAction SilentlyContinue
+    }
+}
 
 Set-Alias G git -Force
 
-
-Invoke-Expression (& { (zoxide init powershell | Out-String) })
-
-
+if (Get-Command zoxide -ErrorAction SilentlyContinue) {
+    Invoke-Expression (& { (zoxide init powershell | Out-String) })
+}
 
 # Keep last !!!
-oh-my-posh init pwsh --config ~/.oh-my-posh/themes/tiger.omp.json | Invoke-Expression
-
-#psmux
+if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
+    $ompTheme = Join-Path $env:HOME '.oh-my-posh/themes/tiger.omp.json'
+    if (Test-Path -LiteralPath $ompTheme) {
+        oh-my-posh init pwsh --config $ompTheme | Invoke-Expression
+    }
+}

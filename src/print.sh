@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # print.sh
+# shellcheck disable=SC2034,SC2154,SC2016
 
 if [[ -n ${__PRINT_SH_INCLUDED__:-}     ]]; then
     return 0
@@ -132,18 +133,35 @@ list_modules() {
 
     local _env_sfx=".${DF_TARGET_ENV}"
     local _os_sfx=".${DF_TARGET_OS}"
-    for src in "${DF_AVAILABLE_MODULES[@]}"; do
+    local _rt_sfx=".${DF_TARGET_RUNTIME}"
+    local -a module_list=()
+    if [[ ${#DF_ALL_MODULES[@]} -gt 0 ]]; then
+        module_list=("${DF_ALL_MODULES[@]}")
+    else
+        module_list=("${DF_AVAILABLE_MODULES[@]}")
+    fi
+
+    for src in "${module_list[@]}"; do
         dest="${DF_MODULE_DEST["${src}"]:-}"
         action="${DF_MODULE_ACTION["${src}"]:-}"
         filename="${src##*/}"
         filename="${filename%.gen}"
         raw_cat="${src%%/*}"
         category="${DF_CATEGORY_MAP["${raw_cat}"]:-${raw_cat}}"
+        if [[ ${category} == *"${_env_sfx}" ]]; then
+            category="${category%"${_env_sfx}"}"
+        elif [[ ${category} == *"${_os_sfx}" ]]; then
+            category="${category%"${_os_sfx}"}"
+        elif [[ -n ${DF_TARGET_RUNTIME:-} && ${category} == *"${_rt_sfx}" ]]; then
+            category="${category%"${_rt_sfx}"}"
+        fi
 
         if [[ ${filename} == *"${_env_sfx}" ]]; then
-            filename="${filename%${_env_sfx}}"
+            filename="${filename%"${_env_sfx}"}"
         elif [[ ${filename} == *"${_os_sfx}" ]]; then
-            filename="${filename%${_os_sfx}}"
+            filename="${filename%"${_os_sfx}"}"
+        elif [[ -n ${DF_TARGET_RUNTIME:-} && ${filename} == *"${_rt_sfx}" ]]; then
+            filename="${filename%"${_rt_sfx}"}"
         fi
 
         # category header
@@ -153,42 +171,26 @@ list_modules() {
         fi
 
         status="✗"
-        if [[ -n ${installed_src["${dest}"]:-} ]]; then
-            case "${action}" in
-                symlink)
-                    if [[ -L ${dest} && -e ${dest} ]]; then
-                        status="✓"
-                    elif [[ -L ${dest} ]]; then
-                        status="!"   # broken link (target missing)
-                    else
-                        status="!"   # link removed from disk
-                    fi
-                    ;;
-                copy)
-                    if [[ -f ${dest} ]]; then
-                        status="✓"
-                    else
-                        status="!"
-                    fi
-                    ;;
-                generate)
-                    if [[ -f ${dest} && -s ${dest} ]]; then
-                        status="✓"
-                    elif [[ -f ${dest} ]]; then
-                        status="!"   # exists but empty
-                    else
-                        status="!"   # missing
-                    fi
-                    ;;
-            esac
+        if [[ -n ${DF_UNAVAILABLE_MODULES["${src}"]:-} ]]; then
+            status="?"
         else
-            # Not in manifest — fallback disk check
-            if [[ -n ${dest} ]]; then
+            local canon_dest
+            canon_dest="$(_canonical_path "${dest}")"
+            if [[ -n ${installed_src["${canon_dest}"]:-} || -n ${installed_src["${dest}"]:-} ]]; then
                 case "${action}" in
                     symlink)
                         if [[ -L ${dest} && -e ${dest} ]]; then
                             status="✓"
                         elif [[ -L ${dest} ]]; then
+                            status="!"   # broken link (target missing)
+                        else
+                            status="!"   # link removed from disk
+                        fi
+                        ;;
+                    copy)
+                        if [[ -f ${dest} ]]; then
+                            status="✓"
+                        else
                             status="!"
                         fi
                         ;;
@@ -196,13 +198,35 @@ list_modules() {
                         if [[ -f ${dest} && -s ${dest} ]]; then
                             status="✓"
                         elif [[ -f ${dest} ]]; then
-                            status="!"
+                            status="!"   # exists but empty
+                        else
+                            status="!"   # missing
                         fi
                         ;;
-                    *)
-                        [[ -f ${dest} ]] && status="✓"
-                        ;;
                 esac
+            else
+                # Not in manifest — fallback disk check
+                if [[ -n ${dest} ]]; then
+                    case "${action}" in
+                        symlink)
+                            if [[ -L ${dest} && -e ${dest} ]]; then
+                                status="✓"
+                            elif [[ -L ${dest} ]]; then
+                                status="!"
+                            fi
+                            ;;
+                        generate)
+                            if [[ -f ${dest} && -s ${dest} ]]; then
+                                status="✓"
+                            elif [[ -f ${dest} ]]; then
+                                status="!"
+                            fi
+                            ;;
+                        *)
+                            [[ -f ${dest} ]] && status="✓"
+                            ;;
+                    esac
+                fi
             fi
         fi
 
@@ -211,7 +235,8 @@ list_modules() {
 
     printf '\n  ✓  installed & healthy\n'
     printf '  ✗  not installed\n'
-    printf '  !  installed but broken / stale\n\n'
+    printf '  !  installed but broken / stale\n'
+    printf '  ?  unavailable on this platform\n\n'
 
     _exit
 }

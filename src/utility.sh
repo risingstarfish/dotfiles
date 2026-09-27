@@ -1,10 +1,33 @@
 #!/usr/bin/env bash
 # utility.sh
+# shellcheck disable=SC2034,SC2154,SC2059
 
 if [[ -n ${__UTILITY_SH_INCLUDED__:-}     ]]; then
     return 0
 fi
 readonly __UTILITY_SH_INCLUDED__=1
+
+# Canonicalize a file path per D2:
+# - Replaces backslashes with forward slashes
+# - Converts Windows drive paths (C:/foo or C:\foo) to MSYS /c/foo
+# - Collapses duplicate slashes and strips trailing slash (except /)
+_canonical_path() {
+    local p="${1:-}"
+    p="${p%$'\r'}"
+    p="${p//\\//}"
+    if [[ ${p} =~ ^([A-Za-z]):(/.*)?$ ]]; then
+        local drv="${BASH_REMATCH[1],,}"
+        local rest="${BASH_REMATCH[2]:-/}"
+        p="/${drv}${rest}"
+    fi
+    while [[ ${p} == *//* ]]; do
+        p="${p//\/\//\/}"
+    done
+    if [[ ${#p} -gt 1 ]]; then
+        p="${p%/}"
+    fi
+    printf '%s' "${p}"
+}
 
 # $1 = exit code (default 2)
 # $2 = printf format string

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034,SC2154,SC1090,SC2016
 
 set -euo pipefail
 
@@ -7,13 +8,16 @@ if [[ -z ${HOME:-} || ! -d $HOME ]]; then
     exit 1
 fi
 
-readonly DOTFILES_START_TIME="$(date +%Y-%m-%d_%H%M%S)"
+DOTFILES_START_TIME="$(date +%Y-%m-%d_%H%M%S)"
+readonly DOTFILES_START_TIME
 readonly DOTFILES_ENV="${DOTFILES_ENV:-production}" # development testing production
 readonly DOTFILES_LOG_DIR="${DOTFILES_LOG_DIR:-$HOME/.config/dotfiles/logs}"
 readonly INIT_LOG_FILE="${DOTFILES_LOG_DIR}/initialise.log"
 readonly DOTFILES_CACHE_DIR="${DOTFILES_CACHE_DIR:-$HOME/.cache/dotfiles}"
 readonly DOTFILES_BACKUP_DIR="${DOTFILES_CACHE_DIR}/backups"
 readonly DOTFILES_MANIFEST_FILE="${DOTFILES_CACHE_DIR}/manifest.tsv"
+readonly DOTFILES_LOCK_FILE="${DOTFILES_CACHE_DIR}/dotfiles.lock"
+readonly DOTFILES_LOCK_TIMEOUT="${DOTFILES_LOCK_TIMEOUT:-3600}"
 readonly DOTFILES_LOG="${DOTFILES_LOG:-1}"
 SILENCE_INIT_LOG_MSG="true" # logging.sh
 readonly DOTFILES_LOCAL_MODS="${DOTFILES_LOCAL_MODS:-0}"
@@ -61,7 +65,9 @@ DF_ERROR_COUNT=0
 DF_CLEAN_LOGS=0
 DF_CLEAN_BACKUPS=0
 
-declare -A DF_MODULE_ACTION DF_MODULE_DEST DF_MODULE_CMD DF_CATEGORY_MAP
+declare -A DF_MODULE_ACTION DF_MODULE_DEST DF_MODULE_CMD DF_CATEGORY_MAP DF_UNAVAILABLE_MODULES
+DF_ALL_MODULES=()
+DF_AVAILABLE_MODULES=()
 
 # src files
 readonly SOURCE_FILES=(
@@ -418,6 +424,10 @@ _set_dotfiles_manifest() {
         "copy|pwsh.${DF_TARGET_OS}/sha256|${HOME}/Documents/Powershell/Scripts/sha256.ps1"
         "copy|pwsh.${DF_TARGET_OS}/sha1|${HOME}/Documents/Powershell/Scripts/sha1.ps1"
         "copy|pwsh.${DF_TARGET_OS}/md5|${HOME}/Documents/Powershell/Scripts/md5.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Exports|${HOME}/Documents/Powershell/Scripts/Exports.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Paths|${HOME}/Documents/Powershell/Scripts/Paths.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Aliases|${HOME}/Documents/Powershell/Scripts/Aliases.ps1"
+        "copy|pwsh.${DF_TARGET_OS}/Functions|${HOME}/Documents/Powershell/Scripts/Functions.ps1"
 
         "symlink|oh-my-posh.${DF_TARGET_OS}/themes/tiger.omp.json|${HOME}/.oh-my-posh/themes/tiger.omp.json"
         "symlink|oh-my-posh.${DF_TARGET_OS}/themes/agnoster.omp.json|${HOME}/.oh-my-posh/themes/agnoster.omp.json"
@@ -446,42 +456,95 @@ _populate_arrays() {
     fi
 
     local -a active_modules=()
-    local item action src dest post_cmd
+    local -a all_modules=()
+    local item action src dest post_cmd resolved_src rt_src base_src raw_cat display_cat
 
     for item in "${DF_MANIFEST[@]}"; do
         IFS='|' read -r action src dest post_cmd <<< "${item}"
 
-        # skip if not available on os/runtime
-        if [[ ! -e "${DF_MODULE_DIR}/${src}" ]]; then
-            log_trace "Skipping module '${src}': source does not exist at '${DF_MODULE_DIR}/${src}'"
-            continue
-        fi
-
-        # skip specific combos
-        if [[ ${src} == "topgrade/topgrade.toml" && ${DF_TARGET_OS} == "${OS_WINDOWS}" ]]; then
-            log_trace "Skipping '${src}' for OS '${DF_TARGET_OS}'"
-            continue
-        fi
-
-        log_debug "Module available: '${src}'"
-        active_modules+=("${src}")
-
-        DF_MODULE_ACTION["${src}"]="${action}"
-        DF_MODULE_DEST["${src}"]="${dest}"
-        DF_MODULE_CMD["${src}"]="${post_cmd:-}"
-
-        local raw_cat="${src%%/*}"
-        local display_cat="${raw_cat}"
+        raw_cat="${src%%/*}"
+        display_cat="${raw_cat}"
         if [[ ${display_cat} == *".${DF_TARGET_ENV}" ]]; then
             display_cat="${display_cat%".${DF_TARGET_ENV}"}"
         elif [[ ${display_cat} == *".${DF_TARGET_OS}" ]]; then
             display_cat="${display_cat%".${DF_TARGET_OS}"}"
+        elif [[ ${display_cat} == *".${DF_TARGET_RUNTIME}" ]]; then
+            display_cat="${display_cat%".${DF_TARGET_RUNTIME}"}"
+        fi
+        DF_CATEGORY_MAP["${display_cat}"]="${raw_cat}"
+
+        # D4 Step 1: Explicit OS exclusion check
+        if [[ ${src} == "topgrade/topgrade.toml" && ${DF_TARGET_OS} == "${OS_WINDOWS}" ]]; then
+            log_warn "Skipping module '${src}': not supported on OS '${DF_TARGET_OS}'"
+            all_modules+=("${src}")
+            DF_UNAVAILABLE_MODULES["${src}"]=1
+            DF_MODULE_ACTION["${src}"]="${action}"
+            DF_MODULE_DEST["${src}"]="${dest}"
+            DF_MODULE_CMD["${src}"]="${post_cmd:-}"
+            continue
+        fi
+
+        # D4 Step 2 & 3: Exact match -> Runtime suffix fallback -> Base file/dir fallback
+        resolved_src="${src}"
+        if [[ ! -e "${DF_MODULE_DIR}/${resolved_src}" ]]; then
+            if [[ ${src} == *".${DF_TARGET_OS}" && -n ${DF_TARGET_RUNTIME:-} ]]; then
+                rt_src="${src%".${DF_TARGET_OS}"}.${DF_TARGET_RUNTIME}"
+                if [[ -e "${DF_MODULE_DIR}/${rt_src}" ]]; then
+                    resolved_src="${rt_src}"
+                    log_debug "Module '${src}' resolved via runtime fallback to '${resolved_src}'"
+                fi
+            fi
+        fi
+
+        if [[ ! -e "${DF_MODULE_DIR}/${resolved_src}" ]]; then
+            base_src="${src}"
+            if [[ ${base_src} == *".${DF_TARGET_ENV}" ]]; then
+                base_src="${base_src%".${DF_TARGET_ENV}"}"
+            elif [[ ${base_src} == *".${DF_TARGET_OS}" ]]; then
+                base_src="${base_src%".${DF_TARGET_OS}"}"
+            elif [[ ${base_src} == *".${DF_TARGET_OS}/"* ]]; then
+                base_src="${base_src/".${DF_TARGET_OS}/"/"/"}"
+            fi
+            if [[ ${base_src} != "${src}" && -e "${DF_MODULE_DIR}/${base_src}" ]]; then
+                resolved_src="${base_src}"
+                log_debug "Module '${src}' resolved via base fallback to '${resolved_src}'"
+            fi
+        fi
+
+        # D4 Step 4: Visible skip on missing source
+        if [[ ! -e "${DF_MODULE_DIR}/${resolved_src}" ]]; then
+            log_warn "Skipping unavailable module '${src}': source does not exist at '${DF_MODULE_DIR}/${src}'"
+            all_modules+=("${src}")
+            DF_UNAVAILABLE_MODULES["${src}"]=1
+            DF_MODULE_ACTION["${src}"]="${action}"
+            DF_MODULE_DEST["${src}"]="${dest}"
+            DF_MODULE_CMD["${src}"]="${post_cmd:-}"
+            continue
+        fi
+
+        log_debug "Module available: '${resolved_src}'"
+        active_modules+=("${resolved_src}")
+        all_modules+=("${resolved_src}")
+
+        DF_MODULE_ACTION["${resolved_src}"]="${action}"
+        DF_MODULE_DEST["${resolved_src}"]="${dest}"
+        DF_MODULE_CMD["${resolved_src}"]="${post_cmd:-}"
+
+        raw_cat="${resolved_src%%/*}"
+        display_cat="${raw_cat}"
+        if [[ ${display_cat} == *".${DF_TARGET_ENV}" ]]; then
+            display_cat="${display_cat%".${DF_TARGET_ENV}"}"
+        elif [[ ${display_cat} == *".${DF_TARGET_OS}" ]]; then
+            display_cat="${display_cat%".${DF_TARGET_OS}"}"
+        elif [[ ${display_cat} == *".${DF_TARGET_RUNTIME}" ]]; then
+            display_cat="${display_cat%".${DF_TARGET_RUNTIME}"}"
         fi
         DF_CATEGORY_MAP["${display_cat}"]="${raw_cat}"
     done
 
     DF_AVAILABLE_MODULES=("${active_modules[@]}")
-    log_debug "Resolved ${#DF_AVAILABLE_MODULES[@]} available modules."
+    DF_ALL_MODULES=("${all_modules[@]}")
+    log_debug "Resolved ${#DF_AVAILABLE_MODULES[@]} available modules (${#DF_ALL_MODULES[@]} total)."
     _exit
 }
 
@@ -686,7 +749,7 @@ windows_handoff() {
         ps_script=$(wslpath -w "$ps_script")
     fi
 
-    local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script")
+    local -a ps_args=("-NoProfile" "-ExecutionPolicy" "Bypass" "-File" "$ps_script" "$@")
 
     #if [[ ${DF_IS_ELEVATED} -eq 1 ]]; then
     #	ps_args+=("-IsElevated")
@@ -706,6 +769,86 @@ windows_handoff() {
     echo
     read -rn 1 -p "Press any key to exit..."
     exit "${ec}"
+}
+
+acquire_lock() {
+    _enter
+    local lock_dir
+    lock_dir="$(dirname "${DOTFILES_LOCK_FILE}")"
+    if [[ ! -d ${lock_dir} ]]; then
+        mkdir -p "${lock_dir}" 2> /dev/null || {
+            log_error "Cannot create cache directory '${lock_dir}' for lock."
+            _exit 1
+            return 1
+        }
+    fi
+
+    local now_epoch
+    now_epoch="$(date +%s)"
+
+    if [[ -f ${DOTFILES_LOCK_FILE} ]]; then
+        local lock_pid="" lock_start="" lock_stamp="" lock_script=""
+        local k v
+        while IFS='=' read -r k v; do
+            v="${v%$'\r'}"
+            case "${k}" in
+                pid) lock_pid="${v}" ;;
+                start_time) lock_start="${v}" ;;
+                stamp) lock_stamp="${v}" ;;
+                script) lock_script="${v}" ;;
+            esac
+        done < "${DOTFILES_LOCK_FILE}" 2> /dev/null || true
+
+        local is_stale=0
+        if [[ ! ${lock_pid} =~ ^[0-9]+$ ]]; then
+            is_stale=1
+        elif ! kill -0 "${lock_pid}" 2> /dev/null; then
+            is_stale=1
+        elif [[ ${lock_start} =~ ^[0-9]+$ ]] && (((now_epoch - lock_start) > DOTFILES_LOCK_TIMEOUT)); then
+            is_stale=1
+        fi
+
+        if ((is_stale)); then
+            log_warn "Removing stale lock '${DOTFILES_LOCK_FILE}' (pid=${lock_pid:-unknown}, script=${lock_script:-unknown}, started=${lock_stamp:-unknown})."
+            rm -f "${DOTFILES_LOCK_FILE}" 2> /dev/null || true
+        else
+            log_error "Another dotfiles instance is currently running (pid=${lock_pid}, script=${lock_script:-unknown}, started=${lock_stamp:-unknown})."
+            printf 'Error: Another dotfiles instance (pid=%s, script=%s) holds lock %s.\n' "${lock_pid}" "${lock_script:-unknown}" "${DOTFILES_LOCK_FILE}" >&2
+            _exit 1
+            exit 1
+        fi
+    fi
+
+    if ! (
+        set -o noclobber
+        printf 'pid=%s\nstart_time=%s\nstamp=%s\nscript=dotfiles.sh\n' "$$" "${now_epoch}" "${DOTFILES_START_TIME}" > "${DOTFILES_LOCK_FILE}"
+    ) 2> /dev/null; then
+        log_error "Failed to acquire lock '${DOTFILES_LOCK_FILE}' (race detected)."
+        printf 'Error: Could not acquire concurrency lock %s.\n' "${DOTFILES_LOCK_FILE}" >&2
+        _exit 1
+        exit 1
+    fi
+
+    log_debug "Acquired concurrency lock '${DOTFILES_LOCK_FILE}' (pid=$$)."
+    _exit
+}
+
+# shellcheck disable=SC2317
+release_lock() {
+    if [[ -f ${DOTFILES_LOCK_FILE} ]]; then
+        local lock_pid="" k v
+        while IFS='=' read -r k v; do
+            v="${v%$'\r'}"
+            if [[ ${k} == "pid" ]]; then
+                lock_pid="${v}"
+                break
+            fi
+        done < "${DOTFILES_LOCK_FILE}" 2> /dev/null || true
+
+        if [[ ${lock_pid} == "$$" ]]; then
+            rm -f "${DOTFILES_LOCK_FILE}" 2> /dev/null || true
+        fi
+    fi
 }
 
 initialise() {
@@ -769,7 +912,7 @@ main() {
             case "${DF_TARGET_RUNTIME}" in
                 "${RUNTIME_GITBASH}" | "${RUNTIME_UNKNOWN}")
                     if prompt_windows_handoff; then
-                        windows_handoff
+                        windows_handoff "$@"
                     fi
                     ;;
                 *) ;;
@@ -778,6 +921,9 @@ main() {
     fi
 
     argparse "$@"
+
+    acquire_lock
+    trap 'release_lock' EXIT INT TERM
 
     # init logger
     local log_cmd=(
@@ -884,6 +1030,7 @@ main() {
         fi
     fi
 
+    release_lock
     exit "${ec}"
 }
 

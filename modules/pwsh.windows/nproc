@@ -1,1 +1,8 @@
-function nproc { (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors }
+function nproc {
+    if ($IsWindows -and (Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) {
+        try {
+            return (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+        } catch {}
+    }
+    return [Environment]::ProcessorCount
+}

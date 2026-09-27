@@ -78,9 +78,20 @@ Backups accumulate one directory per run under `~/.cache/dotfiles/backups/`. To 
 
 Like the other destructive actions, these prompt before deleting and support `--dry-run` (preview) and `--noconfirm` (skip the prompt).
 
-### Windows notes
+### Windows & PowerShell Installer (`dotfiles.ps1`)
 
-The bash installer works in WSL and Git Bash. In Git Bash (or any non-WSL Windows bash) it will pause and offer to hand off to the native PowerShell installer (`dotfiles.ps1`), which is significantly faster and can create real symlinks (with Developer Mode or [Windows Sudo](https://learn.microsoft.com/en-us/windows/advanced-settings/sudo/) enabled). Answer `n` to continue with bash instead.
+The bash installer works in WSL and Git Bash. In Git Bash (or any non-WSL Windows bash) it will pause and offer to hand off to the native PowerShell installer (`dotfiles.ps1`), forwarding all CLI arguments (`-NoProfile -ExecutionPolicy Bypass -File dotfiles.ps1 ...`). You can also invoke `dotfiles.ps1` directly from PowerShell (`pwsh` or `powershell.exe`):
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\dotfiles.ps1 --install
+```
+
+- **What `--update` does from `dotfiles.ps1`:** Mirrors `dotfiles.sh --update` identically — resolves the target git ref (`git config --local dotfiles.ref`, defaulting to `main`), blocks if uncommitted changes exist in tracked files (unless `DOTFILES_LOCAL_MODS=1` is set), fetches `origin --depth=2 <ref>`, prepends `# ref=<ref> timestamp=<ISO8601Z>` to `manifest.tsv`, rebases (if `DOTFILES_LOCAL_MODS=1`) or prompts before `git reset --hard FETCH_HEAD` and `git branch -f <ref> FETCH_HEAD`, and then re-runs installation.
+- **Symlink-vs-copy fallback & enabling native symlinks:** On Windows, creating native symbolic links (`New-Item -ItemType SymbolicLink`) requires either **Windows Developer Mode** (`Settings -> System -> For developers -> Developer Mode`), **[Windows Sudo](https://learn.microsoft.com/en-us/windows/advanced-settings/sudo/)**, or an elevated Administrator PowerShell session. If `dotfiles.ps1` is run without symlink privileges, it logs a warning, automatically falls back to copying the file (`Copy-Item`), and records `copy` in `manifest.tsv` so subsequent operations remain consistent.
+- **Cross-script interoperability (`dotfiles.sh` <-> `dotfiles.ps1`):** Both installers read and write the exact same on-disk state and can be used interchangeably on the same machine:
+  - **Shared Manifest (`~/.cache/dotfiles/manifest.tsv`):** UTF-8 (no BOM), LF-delimited TSV (`source<TAB>dest<TAB>type`) with canonical POSIX/MSYS paths (`/c/Users/<user>/...`) and CR-tolerant readers so `--list`, `--repair`, `--remove`, `--reset`, and `--uninstall` make identical decisions regardless of which script installed the files.
+  - **Shared Backups (`~/.cache/dotfiles/backups/<YYYY-MM-DD_HHMMSS>/`):** Both scripts use the same `<basename>.bak` (and `.1.bak`, `.2.bak` collision) naming scheme and skip backing up destinations that already symlink into the repo.
+  - **Shared Logs & Concurrency Lock:** Both scripts write `[%l] %d %z [%s] %m` entries to `~/.config/dotfiles/logs/initialise.log` and `main.log`, and coordinate concurrent runs via `~/.cache/dotfiles/dotfiles.lock` (blocking live concurrent instances with exit code `1` and automatically recovering stale locks).
 
 ## Customisation
 
@@ -157,6 +168,7 @@ claude
   ✓  installed & healthy
   ✗  not installed
   !  installed but broken / stale
+  ?  unavailable on this platform
 ```
 
 Some functionality depends on tools installed via your OS package manager (e.g. `fzf`, `eza`, `tmux`, `topgrade`, `oh-my-posh`). If you don't plan to install those dependencies, look through `modules/zsh/` and the relevant module files first and install only what you actually use — missing tools degrade gracefully but the related aliases/completions won't do anything.

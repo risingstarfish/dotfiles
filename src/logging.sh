@@ -996,7 +996,7 @@ _strip_ansi_codes() {
     local input="$1"
 
     # If unsafe mode is enabled, skip ANSI stripping and return input as-is
-    if [[ $LOG_UNSAFE_ALLOW_ANSI_CODES == "true"   ]]; then
+    if [[ $LOG_UNSAFE_ALLOW_ANSI_CODES == "true" || $input != *$'\033'* ]]; then
         echo "$input"
         return
     fi
@@ -1137,6 +1137,10 @@ _format_log_message() {
     if [[ ${USE_UTC:-false} == "true" ]]; then
         current_date=$("${date_cmd}" -u +"${date_fmt}")
         timezone_str="UTC"
+    elif [[ -n ${EPOCHREALTIME:-} ]]; then
+        local frac="${EPOCHREALTIME#*.}"
+        printf -v current_date '%(%Y-%m-%d %H:%M:%S)T.%s' -1 "${frac:0:3}"
+        timezone_str="LOCAL"
     else
         current_date=$("${date_cmd}" +"${date_fmt}")
         timezone_str="LOCAL"
