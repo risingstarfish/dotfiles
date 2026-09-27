@@ -1,11 +1,11 @@
-# Exports.ps1 - PowerShell counterpart to modules/zsh/exports
+# Exports.ps1
 
 $env:EDITOR = 'nano'
 $env:VISUAL = 'nano'
 $env:LANG   = 'en_US.UTF-8'
 $env:LC_ALL = 'en_US.UTF-8'
 
-$env:ANTHROPIC_BASE_URL = 'http://192.168.0.245:9931'
+$env:ANTHROPIC_BASE_URL = 'http://192.168.0.222:9931'
 $env:ANTHROPIC_MODEL    = 'kvstorm1'
 $env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
 $env:DISABLE_TELEMETRY  = '1'
