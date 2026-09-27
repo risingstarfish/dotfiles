@@ -1,0 +1,18 @@
+# Exports.ps1 - PowerShell counterpart to modules/zsh/exports
+
+$env:EDITOR = 'nano'
+$env:VISUAL = 'nano'
+$env:LANG   = 'en_US.UTF-8'
+$env:LC_ALL = 'en_US.UTF-8'
+
+$env:ANTHROPIC_BASE_URL = 'http://192.168.0.245:9931'
+$env:ANTHROPIC_MODEL    = 'kvstorm1'
+$env:CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = '1'
+$env:DISABLE_TELEMETRY  = '1'
+$env:CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT = '1'
+
+$env:GITHUB_PUBLIC_EMAIL = '169690632+risingstarfish@users.noreply.github.com'
+
+if ($IsMacOS) {
+    $env:BASH_SILENCE_DEPRECATION_WARNING = '1'
+}

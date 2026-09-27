@@ -1,0 +1,155 @@
+# Functions.ps1 - PowerShell counterpart to modules/zsh/functions
+
+function mkcd {
+    param(
+        [switch]$p,
+        [switch]$v,
+        [string]$m,
+        [switch]$h,
+        [switch]$help,
+        [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+        [string[]]$Remaining
+    )
+    $msg = 'USAGE: mkcd [-pv] [-m mode] directory_name...'
+    if ($h -or $help) {
+        Write-Output $msg
+        return
+    }
+    if (-not $Remaining -or $Remaining.Count -eq 0) {
+        [Console]::Error.WriteLine("mkcd: no directory name provided")
+        [Console]::Error.WriteLine($msg)
+        return
+    }
+    if ($Remaining.Count -gt 1) {
+        [Console]::Error.WriteLine("mkcd: expected only one directory name")
+        [Console]::Error.WriteLine($msg)
+        return
+    }
+    $targetDir = $Remaining[0]
+    if (-not (Test-Path -LiteralPath $targetDir -PathType Container)) {
+        try {
+            $created = New-Item -ItemType Directory -Path $targetDir -Force -ErrorAction Stop
+            if ($v) { Write-Output $created.FullName }
+        } catch {
+            [Console]::Error.WriteLine("Error: could not create directory ${targetDir}")
+            return
+        }
+    }
+    try {
+        Set-Location -LiteralPath $targetDir -ErrorAction Stop
+    } catch {
+        [Console]::Error.WriteLine("Error: could not change to directory ${targetDir}")
+    }
+}
+
+function cpv {
+    if (Get-Command rsync -ErrorAction SilentlyContinue) {
+        $u = if ($env:USERNAME) { $env:USERNAME } elseif ($env:USER) { $env:USER } else { 'user' }
+        & rsync -pogbr -hhh "--backup-dir=/tmp/rsync-${u}" -e /dev/null --progress @args
+    } else {
+        Copy-Item @args -Recurse -Force -Verbose
+    }
+}
+
+function fs {
+    param([string[]]$Paths = @('.'))
+    foreach ($p in $Paths) {
+        if (Test-Path -LiteralPath $p) {
+            $item = Get-Item -LiteralPath $p -Force
+            if ($item.PSIsContainer) {
+                $bytes = (Get-ChildItem -LiteralPath $p -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            } else {
+                $bytes = $item.Length
+            }
+            if ($null -eq $bytes) { $bytes = 0 }
+            [PSCustomObject]@{
+                Path  = $p
+                Bytes = [long]$bytes
+            }
+        }
+    }
+}
+
+function _generate_github_ssh_key {
+    param([string]$KeyType)
+    $email = $env:GITHUB_PUBLIC_EMAIL
+    if ([string]::IsNullOrEmpty($email)) {
+        $email = Read-Host '$GITHUB_PUBLIC_EMAIL is unset. Enter GitHub email'
+    } else {
+        Write-Output "Using `$GITHUB_PUBLIC_EMAIL: $email"
+    }
+    & ssh-keygen -t $KeyType -C "`"$email`""
+}
+
+function github_ssh_key {
+    _generate_github_ssh_key 'ed25519'
+}
+
+function github_ssh_sk {
+    _generate_github_ssh_key 'ed25519-sk'
+}
+
+function _git_flow {
+    param(
+        [int]$DoPush,
+        [string]$CommitMsg,
+        [string[]]$Paths
+    )
+    if (-not $Paths -or $Paths.Count -eq 0) {
+        & git add -A 2>$null
+    } else {
+        & git add -- @Paths 2>$null
+    }
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine("Error: failed to stage changes")
+        return
+    }
+    & git commit -S -m $CommitMsg 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        [Console]::Error.WriteLine("Error: failed to commit changes")
+        return
+    }
+    if ($DoPush -ne 1) { return }
+    $branch = (& git symbolic-ref --short -q HEAD 2>$null | Out-String).Trim()
+    if ([string]::IsNullOrEmpty($branch)) {
+        [Console]::Error.WriteLine("Error: not on a branch (detached HEAD or not a repo)")
+        return
+    }
+    & git push origin $branch 2>$null
+}
+
+function gac {
+    if ($args.Count -lt 2 -or [string]::IsNullOrEmpty([string]$args[0])) {
+        [Console]::Error.WriteLine('Usage: gac <commit_msg> <paths...>')
+        return
+    }
+    _git_flow 0 ([string]$args[0]) @($args[1..($args.Count - 1)])
+}
+
+function gacp {
+    if ($args.Count -lt 2 -or [string]::IsNullOrEmpty([string]$args[0])) {
+        [Console]::Error.WriteLine('Usage: gacp <commit_msg> <paths...>')
+        return
+    }
+    _git_flow 1 ([string]$args[0]) @($args[1..($args.Count - 1)])
+}
+
+function gaac {
+    if ($args.Count -ne 1 -or [string]::IsNullOrEmpty([string]$args[0])) {
+        [Console]::Error.WriteLine('Usage: gaac <commit_msg>')
+        return
+    }
+    _git_flow 0 ([string]$args[0]) @()
+}
+
+function gaacp {
+    if ($args.Count -ne 1 -or [string]::IsNullOrEmpty([string]$args[0])) {
+        [Console]::Error.WriteLine('Usage: gaacp <commit_msg>')
+        return
+    }
+    _git_flow 1 ([string]$args[0]) @()
+}
+
+function git_init {
+    & git init 2>$null
+}

@@ -1,0 +1,23 @@
+# Paths.ps1 - PowerShell counterpart to modules/zsh/paths
+
+function Prepend-Path {
+    param([string]$Dir)
+    if ([string]::IsNullOrEmpty($Dir)) { return }
+    if (Test-Path -LiteralPath $Dir -PathType Container) {
+        $sep = [System.IO.Path]::PathSeparator
+        $entries = @($env:PATH -split [regex]::Escape([string]$sep) | Where-Object { $_ -ne '' })
+        if ($entries -notcontains $Dir) {
+            $env:PATH = "${Dir}${sep}$($env:PATH)"
+        }
+    }
+}
+
+$homeBase = if ($env:HOME) { $env:HOME } elseif ($env:USERPROFILE) { $env:USERPROFILE } else { $HOME }
+
+Prepend-Path (Join-Path $homeBase '.local/bin')
+Prepend-Path (Join-Path $homeBase 'opt/clang-p2996/bin')
+Prepend-Path (Join-Path $homeBase 'opt/clang-trunk/bin')
+Prepend-Path (Join-Path $homeBase 'opt/gcc-trunk/bin')
+Prepend-Path (Join-Path $homeBase 'opt/llamacpp/bin')
+
+Remove-Item Function:\Prepend-Path -ErrorAction SilentlyContinue

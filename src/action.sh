@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # action.sh
+# shellcheck disable=SC2034,SC2154
 
 if [[ -n ${__ACTION_SH_INCLUDED__:-}     ]]; then
     return 0
@@ -179,9 +180,14 @@ _guard_dest() {
     fi
 
     if [[ -L ${dest} ]]; then
-        local target
+        local target canon_target canon_src
         target="$(readlink "${dest}")"
-        if [[ ${target} == ${src}* ]]; then
+        if [[ ${target} != /* && ${target} != [A-Za-z]:* ]]; then
+            target="$(dirname "${dest}")/${target}"
+        fi
+        canon_target="$(_canonical_path "${target}")"
+        canon_src="$(_canonical_path "${src}")"
+        if [[ ${canon_target} == "${canon_src}"* ]]; then
             log_debug "'${dest}' is already a symlink into our repo (${target}). Skipping backup."
             _exit
             return 0
@@ -291,7 +297,12 @@ _guard_dest() {
 # $2 = full dest path     (e.g. /c/Users/tiger/.zshrc)
 # $3 = type               (symlink | copy | generate)
 manifest_write() {
-    local source="$1" dest="$2" ftype="$3"
+    if ((DF_DRY_RUN)); then
+        return 0
+    fi
+    local source dest ftype="$3"
+    source="$(_canonical_path "$1")"
+    dest="$(_canonical_path "$2")"
 
     local manifest_dir
     manifest_dir="$(dirname "${DOTFILES_MANIFEST_FILE}")"
@@ -302,15 +313,15 @@ manifest_write() {
         }
     fi
 
-    # Check if dest already exists in the file
+    # Check if dest already exists in the file (handling optional CR per D1)
     if [[ -f ${DOTFILES_MANIFEST_FILE} ]] \
-        && awk -F'\t' -v d="${dest}" '$2 == d { found=1; exit } END { exit found ? 0 : 1 }' "${DOTFILES_MANIFEST_FILE}"; then
+        && awk -F'\t' -v d="${dest}" '{ sub(/\r$/, "", $0) } $1 !~ /^#/ && $2 == d { found=1; exit } END { exit found ? 0 : 1 }' "${DOTFILES_MANIFEST_FILE}"; then
         # Replace in-place (handles re-install with a different source or type)
         local tmp
         tmp="$(mktemp)"
         awk -F'\t' -v OFS='\t' -v d="${dest}" \
             -v s="${source}" -v t="${ftype}" \
-            '$2 != d { print; next } { print s, d, t }' \
+            '{ sub(/\r$/, "", $0) } $1 ~ /^#/ || $2 != d { print; next } { print s, d, t }' \
             "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
         log_trace "Manifest: updated '${dest}' → ${ftype}"
     else
@@ -322,12 +333,16 @@ manifest_write() {
 # Remove an entry by dest path.
 # $1 = dest path to remove
 manifest_remove() {
-    local dest="$1"
+    if ((DF_DRY_RUN)); then
+        return 0
+    fi
+    local dest
+    dest="$(_canonical_path "$1")"
     [[ -f ${DOTFILES_MANIFEST_FILE} ]] || return 0
 
     local tmp
     tmp="$(mktemp)"
-    awk -F'\t' -v d="${dest}" '$2 != d' "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
+    awk -F'\t' -v d="${dest}" '{ sub(/\r$/, "", $0) } $1 ~ /^#/ || $2 != d' "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
     log_trace "Manifest: removed entry for '${dest}'"
 }
 
@@ -335,17 +350,24 @@ manifest_remove() {
 # (useful for --remove MODULE where you want to nuke everything under modules/<module>/)
 # $1 = source path prefix (e.g. /c/Users/tiger/dotfiles/modules/zsh/)
 manifest_remove_prefix() {
-    local prefix="$1"
+    if ((DF_DRY_RUN)); then
+        return 0
+    fi
+    local prefix
+    prefix="$(_canonical_path "$1")"
     [[ -f ${DOTFILES_MANIFEST_FILE} ]] || return 0
 
     local tmp
     tmp="$(mktemp)"
-    awk -F'\t' -v p="${prefix}" 'index($1, p) != 1' "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
+    awk -F'\t' -v p="${prefix}" '{ sub(/\r$/, "", $0) } $1 ~ /^#/ || index($1, p) != 1' "${DOTFILES_MANIFEST_FILE}" > "${tmp}" && mv "${tmp}" "${DOTFILES_MANIFEST_FILE}"
     log_trace "Manifest: removed all entries with source prefix '${prefix}'"
 }
 
 # Wipe the entire manifest (for --uninstall).
 manifest_clear() {
+    if ((DF_DRY_RUN)); then
+        return 0
+    fi
     if [[ -f ${DOTFILES_MANIFEST_FILE} ]]; then
         : > "${DOTFILES_MANIFEST_FILE}"
         log_trace "Manifest: cleared (${DOTFILES_MANIFEST_FILE} removed)"
@@ -367,14 +389,112 @@ manifest_read() {
 
     local src dest ftype
     while IFS=$'\t' read -r src dest ftype; do
-        dest="${dest%$'\r'}"   # ← strip CR (Git Bash CRLF)
         src="${src%$'\r'}"
+        dest="${dest%$'\r'}"
         [[ -z ${src:-} || -z ${dest:-} ]] && continue
-        [[ ${dest} == \#* ]] && continue
+        [[ ${src} == \#* || ${dest} == \#* ]] && continue
+        src="$(_canonical_path "${src}")"
+        dest="$(_canonical_path "${dest}")"
         _map["${dest}"]="${src}"
     done < "${DOTFILES_MANIFEST_FILE}"
 
     log_debug "Manifest: loaded ${#_map[@]} installed entries."
+}
+
+# Shared per-file install pipeline (D7 / 1-B.2):
+#   prepare -> guard (if enabled) -> symlink/copy/generate -> post_cmd -> manifest_write
+#
+# $1 = full_src
+# $2 = dest
+# $3 = action (symlink | copy | generate)
+# $4 = post_cmd (optional)
+# $5 = skip_guard (1 = skip _guard_dest, 0 = run _guard_dest unless DF_NO_BACKUP)
+# $6 = label (for logging)
+_install_entry() {
+    _enter
+    local full_src="$1"
+    local dest="$2"
+    local action="$3"
+    local cmd="${4:-}"
+    local skip_guard="${5:-0}"
+    local label="${6:-${full_src} → ${dest}}"
+
+    if ! _prepare_file "${full_src}" "${dest}"; then
+        log_error "Pre-flight failed: '${label}'"
+        _exit 1
+        return 1
+    fi
+
+    if ((! skip_guard)); then
+        if ! ((DF_NO_BACKUP)); then
+            if ! _guard_dest "${dest}" "${full_src}"; then
+                _exit 1
+                return 1
+            fi
+        else
+            log_trace "Backups are explicitly disabled via DF_NO_BACKUP."
+        fi
+    fi
+
+    local ok=0
+    case "${action}" in
+        symlink)
+            log_debug "[symlink] ${label}"
+            attempt_cmd_quiet \
+                "ln -sfn \"${full_src}\" \"${dest}\"" \
+                "Symlinking ${label}" \
+                "Symlink failed: ${label}" \
+                "Symlinked ${label}" || ok=$?
+            ;;
+        copy)
+            log_debug "[copy] ${label}"
+            attempt_cmd_quiet \
+                "cp -f \"${full_src}\" \"${dest}\"" \
+                "Copying ${label}" \
+                "Copy failed: ${label}" \
+                "Copied ${label}" || ok=$?
+            ;;
+        generate)
+            if [[ -f ${dest} && -s ${dest} ]] && ((DF_NO_REGENERATE)); then
+                log_debug "[generate] '${dest}' already exists. Skipping."
+                manifest_write "${full_src}" "${dest}" "generate"
+                _exit
+                return 0
+            fi
+            if ! ((DF_NO_REGENERATE)); then
+                log_debug "[generate] regenerating '${dest}'."
+            fi
+            attempt_cmd_quiet \
+                "\"${full_src}\" \"${dest}\"" \
+                "Generating ${label}" \
+                "Generate failed: ${label}" \
+                "Generated ${label}" || ok=$?
+            ;;
+        *)
+            log_error "Unknown action '${action}' for '${label}'"
+            _exit 1
+            return 1
+            ;;
+    esac
+
+    if ((ok == 0)) && [[ -n ${cmd} ]]; then
+        log_debug "Post-install: '${cmd}'"
+        attempt_cmd_quiet "${cmd}" \
+            "Post-install for ${label}" \
+            "Post-install failed: ${label}" \
+            "Post-install done: ${label}" || ok=$?
+    fi
+
+    if ((ok == 0)); then
+        manifest_write "${full_src}" "${dest}" "${action}"
+        log_debug "✓ ${label}"
+        _exit
+        return 0
+    else
+        log_error "✗ ${label}"
+        _exit 1
+        return 1
+    fi
 }
 
 install_all() {
@@ -388,9 +508,9 @@ install_all() {
     for src in "${DF_USER_MODULES[@]}"; do
         log_trace "Processing: '${src}'"
 
-        local action="${DF_MODULE_ACTION["${src}"]:-}"
-        local dest="${DF_MODULE_DEST["${src}"]:-}"
-        local cmd="${DF_MODULE_CMD["${src}"]:-}"
+        action="${DF_MODULE_ACTION["${src}"]:-}"
+        dest="${DF_MODULE_DEST["${src}"]:-}"
+        cmd="${DF_MODULE_CMD["${src}"]:-}"
 
         if [[ -z ${action} || -z ${dest} ]]; then
             log_warn "No manifest data for module '${src}'. Skipping."
@@ -401,81 +521,10 @@ install_all() {
         full_src="${DF_MODULE_DIR}/${src}"
         label="${src} → ${dest}"
 
-        if ! _prepare_file "${full_src}" "${dest}"; then
-            log_error "Pre-flight failed: '${label}'"
-            ((++failed))
-            continue
-        fi
-
-        if ! ((DF_NO_BACKUP)); then
-            if ! _guard_dest "${dest}" "${full_src}"; then
-                ((++failed))
-                continue
-            fi
-        else
-            log_trace "Backups are explicitly disabled via DF_NO_BACKUP."
-        fi
-
-        local ok=0
-        case "${action}" in
-            symlink)
-                log_debug "[symlink] ${label}"
-                attempt_cmd_quiet \
-                    "ln -sfn \"${full_src}\" \"${dest}\"" \
-                    "Symlinking ${label}" \
-                    "Symlink failed: ${label}" \
-                    "Symlinked ${label}"
-                ok=$?
-                ;;
-            copy)
-                log_debug "[copy] ${label}"
-                attempt_cmd_quiet \
-                    "cp -f \"${full_src}\" \"${dest}\"" \
-                    "Copying ${label}" \
-                    "Copy failed: ${label}" \
-                    "Copied ${label}"
-                ok=$?
-                ;;
-            generate)
-                if [[ -f ${dest} && -s ${dest} ]] && ((DF_NO_REGENERATE)); then
-                    log_debug "[generate] '${dest}' already exists. Skipping."
-                    ((++installed))
-                    manifest_write "${full_src}" "${dest}" "generate"
-                    continue
-                fi
-                if ! ((DF_NO_REGENERATE)); then
-                    log_debug "[generate] regenerating '${dest}'."
-                fi
-                attempt_cmd_quiet \
-                    "\"${full_src}\" \"${dest}\"" \
-                    "Generating ${label}" \
-                    "Generate failed: ${label}" \
-                    "Generated ${label}"
-                ok=$?
-                ;;
-            *)
-                log_error "Unknown action '${action}' for '${src}'"
-                ((++failed))
-                continue
-                ;;
-        esac
-
-        if ((ok == 0)) && [[ -n ${cmd} ]]; then
-            log_debug "Post-install: '${cmd}'"
-            attempt_cmd_quiet "${cmd}" \
-                "Post-install for ${label}" \
-                "Post-install failed: ${label}" \
-                "Post-install done: ${label}"
-            ok=$?
-        fi
-
-        if ((ok == 0)); then
+        if _install_entry "${full_src}" "${dest}" "${action}" "${cmd}" 0 "${label}"; then
             ((++installed))
-            manifest_write "${full_src}" "${dest}" "${action}"
-            log_debug "✓ ${label}"
         else
             ((++failed))
-            log_error "✗ ${label}"
         fi
     done
 
@@ -555,6 +604,23 @@ do_update() {
         command git -C "${DF_SRC_PATH}" diff --stat HEAD 2> /dev/null >&2
         _exit 1
         return 1
+    fi
+
+    if ((DF_DRY_RUN)); then
+        log_info "[dry-run] git -C \"${DF_SRC_PATH}\" fetch origin --depth=2 \"${DF_DOTFILES_REF}\""
+        if [[ -f ${DOTFILES_MANIFEST_FILE} ]]; then
+            log_info "[dry-run] Prepend '# ref=${DF_DOTFILES_REF} timestamp=<UTC>' to ${DOTFILES_MANIFEST_FILE}"
+        fi
+        if ((has_local_mods)) && is_true "${DOTFILES_LOCAL_MODS}"; then
+            log_info "[dry-run] git -C \"${DF_SRC_PATH}\" rebase FETCH_HEAD"
+        else
+            attempt_cmd "git -C '\"${DF_SRC_PATH}\"' reset --hard FETCH_HEAD" \
+                "This discards ALL local changes in '${DF_SRC_PATH}'" \
+                "Reset to ${DF_DOTFILES_REF} failed in '${DF_SRC_PATH}'." \
+                "Reset local repository." || return 1
+        fi
+        _exit
+        return 0
     fi
 
     log_trace "Executing: git -C '${DF_SRC_PATH}' fetch origin --depth=2 '${DF_DOTFILES_REF}'"
@@ -657,26 +723,28 @@ do_uninstall() {
     log_debug "Manifest holds ${entry_count} installed entr$( ((entry_count == 1)) && printf 'y' || printf 'ies' )."
 
     if ((entry_count > 0)); then
-        local reply
-        printf '\n  This will remove %d installed file(s):\n' "${entry_count}" >&2
-        local dest
-        for dest in "${!installed_src[@]}"; do
-            printf '    - %s\n' "${dest}" >&2
-        done
-        printf '\n  Continue? [Y/n] ' >&2
-        read -r reply || reply=""
-        log_trace "User prompt reply: '${reply}'"
-        case "${reply,,}" in
-            y | yes | '')
-                log_trace "User confirmed manifest removal"
-                ;;
-            *)
-                log_warn "Uninstall cancelled by user."
-                _exit 130
-                exit 130
-                ;;
-        esac
-        printf '\n' >&2
+        if ! ((DF_DRY_RUN)) && ! ((DF_NOCONFIRM)); then
+            local reply
+            printf '\n  This will remove %d installed file(s):\n' "${entry_count}" >&2
+            local dest
+            for dest in "${!installed_src[@]}"; do
+                printf '    - %s\n' "${dest}" >&2
+            done
+            printf '\n  Continue? [Y/n] ' >&2
+            read -r reply || reply=""
+            log_trace "User prompt reply: '${reply}'"
+            case "${reply,,}" in
+                y | yes | '')
+                    log_trace "User confirmed manifest removal"
+                    ;;
+                *)
+                    log_warn "Uninstall cancelled by user."
+                    _exit 130
+                    exit 130
+                    ;;
+            esac
+            printf '\n' >&2
+        fi
 
         local dest src
         for dest in "${!installed_src[@]}"; do
@@ -689,7 +757,7 @@ do_uninstall() {
         done
     else
         log_warn "No modules found to uninstall."
-        if ! ((DF_NOCONFIRM)); then
+        if ! ((DF_DRY_RUN)) && ! ((DF_NOCONFIRM)); then
             prompt_continue
         fi
     fi
@@ -726,7 +794,7 @@ do_uninstall() {
         log_info "Uninstall finished successfully!"
     fi
 
-    if ! ((DF_NOCONFIRM)); then
+    if ! ((DF_DRY_RUN)) && ! ((DF_NOCONFIRM)); then
         local reply
         printf '\n  Remove log directory: %s ? [Y/n] ' "${DOTFILES_LOG_DIR}" >&2
         read -r reply || reply=""
@@ -1008,7 +1076,9 @@ _read_manifest_entries() {
         dest="${dest%$'\r'}"
         ftype="${ftype%$'\r'}"
         [[ -z ${src:-} || -z ${dest:-} ]] && continue
-        [[ ${dest} == \#* ]] && continue
+        [[ ${src} == \#* || ${dest} == \#* ]] && continue
+        src="$(_canonical_path "${src}")"
+        dest="$(_canonical_path "${dest}")"
         _m_srcs+=("${src}")
         _m_dests+=("${dest}")
         _m_types+=("${ftype}")
@@ -1128,7 +1198,15 @@ do_repair() {
             symlink)
                 dest="${m_dests[$i]}"
                 src="${m_srcs[$i]}"
-                if [[ -L ${dest} && -e ${dest} && "$(readlink "${dest}")" == "${src}" ]]; then
+                local link_target=""
+                if [[ -L ${dest} ]]; then
+                    link_target="$(readlink "${dest}")"
+                    if [[ ${link_target} != /* && ${link_target} != [A-Za-z]:* ]]; then
+                        link_target="$(dirname "${dest}")/${link_target}"
+                    fi
+                    link_target="$(_canonical_path "${link_target}")"
+                fi
+                if [[ -L ${dest} && -e ${dest} && "${link_target}" == "$(_canonical_path "${src}")" ]]; then
                     log_trace "Healthy symlink: ${dest}"
                     continue
                 fi
@@ -1199,51 +1277,15 @@ do_repair() {
         dest="${m_dests[$idx]}"
         local ftype="${m_types[$idx]}"
         local label="${src} → ${dest}"
+        local rel_src="${src#"${DF_MODULE_DIR}/"}"
+        local cmd="${DF_MODULE_CMD["${rel_src}"]:-}"
 
-        if ! _prepare_file "${src}" "${dest}"; then
-            log_warn "Cannot re-install '${label}': parent directory failed."
+        if _install_entry "${src}" "${dest}" "${ftype}" "${cmd}" 1 "${label}"; then
+            ((++repaired))
+        else
             ((++ec))
             failed+=("${dest}")
-            continue
         fi
-
-        case "${ftype}" in
-            symlink)
-                log_debug "[repair:relink] ${label}"
-                attempt_cmd_quiet \
-                    "ln -sfn \"${src}\" \"${dest}\"" \
-                    "Re-linking ${label}" \
-                    "Re-link failed: ${label}" \
-                    "Re-linked ${label}"
-                if (($? == 0)); then
-                    manifest_write "${src}" "${dest}" "symlink"
-                    ((++repaired))
-                    log_debug "✓ ${label}"
-                else
-                    ((++ec))
-                    failed+=("${dest}")
-                    log_error "✗ ${label}"
-                fi
-                ;;
-
-            generate)
-                log_debug "[repair:regenerate] ${label}"
-                attempt_cmd_quiet \
-                    "\"${src}\" \"${dest}\"" \
-                    "Regenerating ${label}" \
-                    "Regenerate failed: ${label}" \
-                    "Regenerated ${label}"
-                if (($? == 0)); then
-                    manifest_write "${src}" "${dest}" "generate"
-                    ((++repaired))
-                    log_debug "✓ ${label}"
-                else
-                    ((++ec))
-                    failed+=("${dest}")
-                    log_error "✗ ${label}"
-                fi
-                ;;
-        esac
     done
 
     log_info "Repair complete: ${removed} removed, ${repaired} re-installed, ${ec} error(s)."

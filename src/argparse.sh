@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # argparse.sh
+# shellcheck disable=SC2034,SC2154,SC2016
 
 if [[ -n ${__ARGPARSE_SH_INCLUDED__:-}     ]]; then
     return 0

@@ -1,0 +1,67 @@
+# Aliases.ps1 - PowerShell counterpart to modules/zsh/aliases
+# Where PowerShell Set-Alias cannot pass parameters, functions are used per precedent.
+
+function ez {
+    $pwshExe = (Get-Process -Id $PID).Path
+    if ($pwshExe) { & $pwshExe -NoLogo }
+}
+
+if (-not (Get-Command paths -ErrorAction SilentlyContinue)) {
+    function paths {
+        $sep = [System.IO.Path]::PathSeparator
+        $env:PATH -split [regex]::Escape([string]$sep) | Where-Object { $_.Trim() }
+    }
+}
+
+Set-Alias -Name c -Value Clear-Host -Scope Global -Force
+Set-Alias -Name G -Value git -Scope Global -Force
+
+# Navigation functions (PowerShell aliases cannot include arguments like '..' or '~/dotfiles')
+function ..    { Set-Location .. }
+function ...   { Set-Location ../.. }
+function ....  { Set-Location ../../.. }
+function ..... { Set-Location ../../../.. }
+function H     { Set-Location ~ }
+function dots  { Set-Location (Join-Path ~ 'dotfiles') }
+function opts  { Set-Location (Join-Path ~ 'opt') }
+function stars { Set-Location (Join-Path ~ 'repos/risingstarfish') }
+
+# clang-tools-extra
+function fmt {
+    $files = Get-ChildItem -File -Include '*.cpp', '*.hpp', '*.h' -ErrorAction SilentlyContinue
+    if ($files) { & clang-format -i @($files.FullName) }
+}
+
+function tidy {
+    $files = Get-ChildItem -File -Include '*.cpp', '*.hpp', '*.h' -ErrorAction SilentlyContinue
+    if ($files) { & clang-tidy -i @($files.FullName) }
+}
+
+function invoke_shellcheck {
+    & shellcheck --color=always -a -x @args
+}
+
+# eza wrappers
+if (Get-Command eza -ErrorAction SilentlyContinue) {
+    if (-not $env:EZA_COLORS) {
+        $env:EZA_COLORS = 'da=1;34:gm=1;34:Su=1;34'
+    }
+    function ll { & eza --icons=always --hyperlink=always --group-directories-first --time-style long-iso -l @args }
+    function l  { ll -a @args }
+    function lr { l -T @args }
+    function ld { ll -d @args }
+    function lx { l --sort=extension @args }
+    function lk { l --sort=size @args }
+    function lt { l --sort=type @args }
+    function lc { l --sort=changed @args }
+}
+
+# VSCodium / VSCode wrappers
+if ((Get-Command codium-insiders -ErrorAction SilentlyContinue) -or (Get-Command codium -ErrorAction SilentlyContinue)) {
+    $script:_code_bin = if (Get-Command codium-insiders -ErrorAction SilentlyContinue) { 'codium-insiders' } else { 'codium' }
+    function code  { & $script:_code_bin @args }
+    function c.    { code . }
+    function cdiff { code --diff @args }
+    function cr    { code -r @args }
+    function cr.   { code -r . }
+}
