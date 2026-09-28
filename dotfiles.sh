@@ -71,11 +71,11 @@ DF_AVAILABLE_MODULES=()
 
 # src files
 readonly SOURCE_FILES=(
-    "src/utility.sh"
-    "src/print.sh"
-    "src/argparse.sh"
-    # "src/logging.sh" see initialise
-    "src/action.sh"
+    "source/utility.sh"
+    "source/print.sh"
+    "source/argparse.sh"
+    # "source/logging.sh" see initialise
+    "source/action.sh"
 )
 
 # functions
@@ -852,7 +852,7 @@ release_lock() {
 }
 
 initialise() {
-    source "src/logging.sh" || {
+    source "source/logging.sh" || {
         exit 1
     }
 
@@ -872,7 +872,7 @@ initialise() {
         die 1 "No source files defined."
     fi
 
-    # check src/
+    # check source/
     check_exists "${SOURCE_FILES[@]}" || {
          printf "One or more required source files are missing." >&2
          exit 1

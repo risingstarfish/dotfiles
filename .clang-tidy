@@ -1,0 +1,69 @@
+Checks: >
+    -*,
+    bugprone-*,
+    clang-analyzer-*,
+    cppcoreguidelines-*,
+      -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+      -cppcoreguidelines-avoid-c-arrays,
+      -cppcoreguidelines-macro-usage,
+    modernize-*,
+      -modernize-use-trailing-return-type,
+      -modernize-avoid-c-arrays,
+    performance-*,
+    portability-*,
+      -portability-avoid-pragma-once,
+    readability-*,
+      -readability-identifier-length,
+      -readability-avoid-nested-conditional-operator,
+      -readability-magic-numbers,
+      -readability-function-cognitive-complexity,
+      -readability-named-parameter,
+    concurrency-*,
+    hicpp-*,
+      -hicpp-avoid-c-arrays,
+      -hicpp-named-parameter,
+    llvm-*,
+    google-*,
+      -google-build-using-namespace,
+      -google-readability-todo,
+
+WarningsAsErrors: >
+    bugprone-*,
+      -bugprone-easily-swappable-parameters,
+    clang-analyzer-*,
+    cppcoreguidelines-*,
+      -cppcoreguidelines-avoid-magic-numbers,
+    modernize-*,
+      -modernize-use-designated-initializers,
+    misc-*,
+    performance-*,
+    portability-*,
+    readability-*,
+    cert-*,
+    concurrency-*,
+    hicpp-*,
+    llvm-*,
+      -llvm-include-order,
+    google-*,
+
+HeaderFilterRegex: "*"
+FormatStyle: file
+CheckOptions:
+    - key: readability-identifier-naming.Function
+      value: lower_case
+    - key: readability-identifier-naming.Variable
+      value: lower_case
+    - key: readability-identifier-naming.Const
+      value: lower_case
+    - key: readability-identifier-naming.Capture
+      value: lower_case
+    - key: readability-identifier-naming.TypeAliasIgnoredRegexp
+      value: "^[A-Z]$"
+    - key: readability-identifier-naming.StructOrUnion
+      value: lower_case
+    - key: readability-identifier-naming.Union
+      value: lower_case
+    - key: readability-identifier-naming.Namespace
+      value: lower_case
+    - key: readability-identifier-naming.EnumConstantCase
+      value: lower_case

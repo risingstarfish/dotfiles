@@ -97,10 +97,10 @@ $script:DF_CATEGORY_MAP        = @{}
 $script:DF_USER_MODULES        = @()
 
 $script:SOURCE_FILES = @(
-    "src/utility.ps1",
-    "src/print.ps1",
-    "src/argparse.ps1",
-    "src/action.ps1"
+    "source/utility.ps1",
+    "source/print.ps1",
+    "source/argparse.ps1",
+    "source/action.ps1"
 )
 
 function pwsh_version_check {
@@ -573,9 +573,9 @@ function release_lock {
 }
 
 function initialise {
-    $loggingPath = [System.IO.Path]::Combine($PSScriptRoot, "src/logging.ps1")
+    $loggingPath = [System.IO.Path]::Combine($PSScriptRoot, "source/logging.ps1")
     if (-not [System.IO.File]::Exists($loggingPath)) {
-        [Console]::Error.WriteLine("Error: missing src/logging.ps1")
+        [Console]::Error.WriteLine("Error: missing source/logging.ps1")
         exit 1
     }
     . $loggingPath

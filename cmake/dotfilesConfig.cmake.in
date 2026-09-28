@@ -1,0 +1,9 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+@DOTFILES_FIND_DEPENDENCIES@
+
+include("${CMAKE_CURRENT_LIST_DIR}/@DOTFILES_TARGETS_FILE_BASENAME@")
+
+check_required_components(dotfiles)
