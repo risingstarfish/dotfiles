@@ -293,7 +293,7 @@ function print_end {
             . $PROFILE
         }
     } else {
-        "│  Run `. $PROFILE` to apply your changes.    │"
+        "│  Run `. `$PROFILE` to apply your changes.    │"
     }
     $box = @(
         "",
