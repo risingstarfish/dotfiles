@@ -290,9 +290,10 @@ function print_end {
             "│  Returning to shell...                    │"
         } else {
             "│  Restarting shell...                      │"
+            . $PROFILE
         }
     } else {
-        "│  Run `exec zsh` to apply your changes.    │"
+        "│  Run `. $PROFILE` to apply your changes.    │"
     }
     $box = @(
         "",
