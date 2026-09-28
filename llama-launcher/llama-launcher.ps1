@@ -28,7 +28,7 @@ Set-StrictMode -Version Latest
 $defaultModel = "Qwen3.8-27B-UD-Q6_K_XL.mtp.gguf" #
 
 # env check
-$RequiredEnvs = @("LLAMA_API_KEY", "AI_MODELS")
+$RequiredEnvs = @("HOME", "LLAMA_API_KEY", "AI_MODELS")
 $MissingEnv = @()
 foreach ($envVar in $RequiredEnvs) {
     if (-not (Test-Path "env:$envVar")) {
@@ -304,7 +304,7 @@ else {
 Write-Host ""
 
 # log setup
-$logDir = if ($env:LLAMA_LAUNCHER_LOG_DIR) { $env:LLAMA_LAUNCHER_LOG_DIR } else { "$env:USERPROFILE\.config\llama-launcher" }
+$logDir = if ($env:LLAMA_LAUNCHER_LOG_DIR) { $env:LLAMA_LAUNCHER_LOG_DIR } else { "$env:HOME\.config\llama-launcher" }
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
 $logFile = Join-Path $logDir "${binName}_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 

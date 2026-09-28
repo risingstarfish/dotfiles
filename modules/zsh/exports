@@ -13,7 +13,7 @@ if [ -t 0 ]; then
 fi
 
 # llama and claude stuff
-export ANTHROPIC_BASE_URL="http://192.168.0.245:9931"
+export ANTHROPIC_BASE_URL="http://192.168.0.222:9931"
 export ANTHROPIC_MODEL="kvstorm1"
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 export DISABLE_TELEMETRY=1
