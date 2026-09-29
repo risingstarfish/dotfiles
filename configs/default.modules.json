@@ -1,4 +1,5 @@
 {
+    "$schema": "../schemas/modules.schema.json",
     "version": "1.0",
     "os_list": [
         "cachyos",
@@ -9,140 +10,138 @@
         "windows-bash"
     ],
     "modules": {
-        "shell": {
-            "zsh": {
-                "available": [
-                    "cachyos",
-                    "macos",
-                    "debian",
-                    "windows-wsl",
-                    "windows-bash"
-                ],
-                "files": [
-                    {
-                        "name": "zshrc",
-                        "description": "Startup file that Zsh loads to set preferences (like prompt settings, colors, and aliases).",
-                        "source": "zshrc",
-                        "destination": "${HOME}/.zshrc",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "zsh_options",
-                        "description": "Zsh option settings (setopt) controlling completion, history, directory navigation, and globbing behaviour.",
-                        "source": "zsh_options",
-                        "destination": "${HOME}/.zsh_options",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "zstyles",
-                        "description": "zstyle settings that customise completion menu appearance and per-command styling.",
-                        "source": "zstyles",
-                        "destination": "${HOME}/.zstyles",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "zimrc",
-                        "description": "Configuration for the zim framework: enabled plugins, autoloads, and block organisation.",
-                        "source": "zimrc",
-                        "destination": "${HOME}/.zimrc",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "p10k.zsh",
-                        "description": "Powerlevel10k prompt configuration: theme, segment layout, icons, and instant prompt settings.",
-                        "source": "p10k.zsh",
-                        "destination": "${HOME}/.p10k.zsh",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "zshrc.toggles",
-                        "description": "Optional feature toggles that .zshrc sources to switch parts of the setup on or off.",
-                        "source": "zshrc.toggles",
-                        "destination": "${HOME}/.zshrc.toggles",
-                        "type": "symlink"
-                    },
-                    {
-                        "available": ["windows-wsl"],
-                        "name": "Set-MSVC-Environment",
-                        "description": "WSL helper function exposing the Windows MSVC (Visual Studio) compiler toolchain to the shell.",
-                        "source": "functions/Set-MSVC-Environment",
-                        "destination": "${HOME}/.Set-MSVC-Environment",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "exports",
-                        "description": "Environment variable exports (including DOTFILES_* defaults) sourced at shell startup.",
-                        "source": "exports",
-                        "destination": "${HOME}/.exports",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "paths",
-                        "description": "PATH setup: directories prepended to the command search path, sourced at shell startup.",
-                        "source": "paths",
-                        "destination": "${HOME}/.paths",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "functions",
-                        "description": "Directory of user-defined zsh functions, symlinked into the home directory and loaded at startup.",
-                        "source": "functions",
-                        "destination": "${HOME}/.dotfiles/zsh/functions",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "aliases",
-                        "description": "Zsh aliases for common commands and shortcuts.",
-                        "source": "aliases",
-                        "destination": "${HOME}/.aliases",
-                        "type": "symlink"
-                    }
-                ]
-            },
-            "bash": {
-                "available": [
-                    "cachyos",
-                    "macos",
-                    "debian",
-                    "windows-wsl",
-                    "windows-bash"
-                ],
-                "files": [
-                    {
-                        "name": "bashrc",
-                        "description": "Bash startup file: prompt, shell options, and entry point for the aliases and functions it sources.",
-                        "source": "bashrc",
-                        "destination": "${HOME}/.bashrc",
-                        "type": "copy"
-                    }
-                ]
-            },
-            "pwsh": {
-                "available": ["windows", "windows-bash"],
-                "files": [
-                    {
-                        "name": "Profile",
-                        "description": "PowerShell profile: sets module paths, imports aliases and functions, and configures the prompt.",
-                        "source": "windows.ps1",
-                        "destination": "${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "Functions",
-                        "description": "Directory of PowerShell function scripts, placed in the Scripts folder for automatic discovery.",
-                        "source": "functions",
-                        "destination": "${HOME}/Documents/Powershell/Scripts/Functions",
-                        "type": "symlink"
-                    },
-                    {
-                        "name": "Set-MSVC-Environment",
-                        "description": "PowerShell function that initialises the Windows MSVC compiler environment for the current session.",
-                        "source": "Set-MSVC-Environment.ps1",
-                        "destination": "${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1",
-                        "type": "symlink"
-                    }
-                ]
-            }
+        "zsh": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "zshrc",
+                    "description": "Startup file that Zsh loads to set preferences (like prompt settings, colors, and aliases).",
+                    "source": "zshrc",
+                    "destination": "${HOME}/.zshrc",
+                    "type": "symlink"
+                },
+                {
+                    "name": "zsh_options",
+                    "description": "Zsh option settings (setopt) controlling completion, history, directory navigation, and globbing behaviour.",
+                    "source": "zsh_options",
+                    "destination": "${HOME}/.zsh_options",
+                    "type": "symlink"
+                },
+                {
+                    "name": "zstyles",
+                    "description": "zstyle settings that customise completion menu appearance and per-command styling.",
+                    "source": "zstyles",
+                    "destination": "${HOME}/.zstyles",
+                    "type": "symlink"
+                },
+                {
+                    "name": "zimrc",
+                    "description": "Configuration for the zim framework: enabled plugins, autoloads, and block organisation.",
+                    "source": "zimrc",
+                    "destination": "${HOME}/.zimrc",
+                    "type": "symlink"
+                },
+                {
+                    "name": "p10k.zsh",
+                    "description": "Powerlevel10k prompt configuration: theme, segment layout, icons, and instant prompt settings.",
+                    "source": "p10k.zsh",
+                    "destination": "${HOME}/.p10k.zsh",
+                    "type": "symlink"
+                },
+                {
+                    "name": "zshrc.toggles",
+                    "description": "Optional feature toggles that .zshrc sources to switch parts of the setup on or off.",
+                    "source": "zshrc.toggles",
+                    "destination": "${HOME}/.zshrc.toggles",
+                    "type": "symlink"
+                },
+                {
+                    "available": ["windows-wsl"],
+                    "name": "Set-MSVC-Environment",
+                    "description": "WSL helper function exposing the Windows MSVC (Visual Studio) compiler toolchain to the shell.",
+                    "source": "functions/Set-MSVC-Environment",
+                    "destination": "${HOME}/.Set-MSVC-Environment",
+                    "type": "symlink"
+                },
+                {
+                    "name": "exports",
+                    "description": "Environment variable exports (including DOTFILES_* defaults) sourced at shell startup.",
+                    "source": "exports",
+                    "destination": "${HOME}/.exports",
+                    "type": "symlink"
+                },
+                {
+                    "name": "paths",
+                    "description": "PATH setup: directories prepended to the command search path, sourced at shell startup.",
+                    "source": "paths",
+                    "destination": "${HOME}/.paths",
+                    "type": "symlink"
+                },
+                {
+                    "name": "functions",
+                    "description": "Directory of user-defined zsh functions, symlinked into the home directory and loaded at startup.",
+                    "source": "functions",
+                    "destination": "${HOME}/.dotfiles/zsh/functions",
+                    "type": "symlink"
+                },
+                {
+                    "name": "aliases",
+                    "description": "Zsh aliases for common commands and shortcuts.",
+                    "source": "aliases",
+                    "destination": "${HOME}/.aliases",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "bash": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "bashrc",
+                    "description": "Bash startup file: prompt, shell options, and entry point for the aliases and functions it sources.",
+                    "source": "bashrc",
+                    "destination": "${HOME}/.bashrc",
+                    "type": "copy"
+                }
+            ]
+        },
+        "pwsh": {
+            "available": ["windows", "windows-bash"],
+            "files": [
+                {
+                    "name": "Profile",
+                    "description": "PowerShell profile: sets module paths, imports aliases and functions, and configures the prompt.",
+                    "source": "windows.ps1",
+                    "destination": "${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1",
+                    "type": "symlink"
+                },
+                {
+                    "name": "Functions",
+                    "description": "Directory of PowerShell function scripts, placed in the Scripts folder for automatic discovery.",
+                    "source": "functions",
+                    "destination": "${HOME}/Documents/Powershell/Scripts/Functions",
+                    "type": "symlink"
+                },
+                {
+                    "name": "Set-MSVC-Environment",
+                    "description": "PowerShell function that initialises the Windows MSVC compiler environment for the current session.",
+                    "source": "Set-MSVC-Environment.ps1",
+                    "destination": "${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1",
+                    "type": "symlink"
+                }
+            ]
         },
         "git": {
             "available": [
@@ -229,7 +228,7 @@
                     "source": "cmakepreset.py",
                     "destination": "${HOME}/.local/bin/cmakepreset.py",
                     "type": "symlink",
-                    "post_install": "chmod 600 ${HOME}/.local/bin/cmakepreset.py"
+                    "post_install": "chmod +x ${HOME}/.local/bin/cmakepreset.py"
                 },
                 {
                     "name": "internal-flags",

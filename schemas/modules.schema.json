@@ -2,16 +2,16 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/risingstarfish/dotfiles/schemas/modules.schema.json",
     "title": "Dotfiles Modules",
-    "description": "Schema for dotfiles user modules file",
+    "description": "Schema for dotfiles user modules file. Module names are open-ended: every key under 'modules' must match a directory in modules/, which the installer checks at runtime.",
     "type": "object",
     "$defs": {
-        "os": {
+        "os_name": {
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9-]*$"
         },
         "os_list": {
             "type": "array",
-            "items": { "$ref": "#/$defs/os" },
+            "items": { "$ref": "#/$defs/os_name" },
             "minItems": 1,
             "uniqueItems": true
         },
@@ -42,12 +42,9 @@
                 },
                 "type": { "$ref": "#/$defs/file_type" },
                 "post_install": {
-                    "description": "Post-install shell command, or false when none",
-                    "anyOf": [
-                        { "type": "boolean" },
-                        { "type": "string", "minLength": 1 }
-                    ],
-                    "default": false
+                    "description": "Post-install shell command, or an empty string when none",
+                    "type": "string",
+                    "default": ""
                 }
             },
             "required": [
@@ -72,48 +69,28 @@
             },
             "required": ["files"],
             "additionalProperties": false
-        },
-        "shell_module": {
-            "type": "object",
-            "description": "The shell module, grouping per-shell sub-modules",
-            "properties": {
-                "enabled": { "type": "boolean", "default": true },
-                "zsh": { "$ref": "#/$defs/module" },
-                "bash": { "$ref": "#/$defs/module" },
-                "pwsh": { "$ref": "#/$defs/module" }
-            },
-            "additionalProperties": false
         }
     },
     "properties": {
+        "$schema": {
+            "description": "Editor hint pointing at this schema; ignored at install time",
+            "type": "string"
+        },
         "version": {
             "description": "Dotfiles modules schema version",
             "type": "string",
             "enum": ["1.0"]
         },
         "os_list": {
-            "description": "Known environments; 'available' values should come from this list",
             "$ref": "#/$defs/os_list"
         },
         "modules": {
             "type": "object",
-            "properties": {
-                "shell": { "$ref": "#/$defs/shell_module" },
-                "git": { "$ref": "#/$defs/module" },
-                "ssh": { "$ref": "#/$defs/module" },
-                "dev": { "$ref": "#/$defs/module" },
-                "topgrade": { "$ref": "#/$defs/module" },
-                "fastfetch": { "$ref": "#/$defs/module" },
-                "tmux": { "$ref": "#/$defs/module" },
-                "curl": { "$ref": "#/$defs/module" },
-                "wget": { "$ref": "#/$defs/module" },
-                "shellcheck": { "$ref": "#/$defs/module" },
-                "claude": { "$ref": "#/$defs/module" },
-                "oh-my-posh": { "$ref": "#/$defs/module" }
-            },
-            "unevaluatedProperties": { "$ref": "#/$defs/module" },
-            "additionalProperties": false
+            "description": "Map of module name to module definition. Every key must match a directory in modules/.",
+            "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+            "additionalProperties": { "$ref": "#/$defs/module" }
         }
     },
-    "required": ["version", "modules"]
+    "required": ["version", "os_list", "modules"],
+    "additionalProperties": false
 }

@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/risingstarfish/dotfiles/schemas/config.schema.json",
     "title": "Dotfiles Config",
-    "description": "Schema for the dotfiles configuration file",
+    "description": "Schema for the dotfiles configuration file. Module names are open-ended; the installer cross-checks them against the modules file at runtime.",
     "type": "object",
     "$defs": {
         "log_level": {
@@ -23,18 +23,78 @@
         },
         "env_value": {
             "description": "A DOTFILES_* environment variable default value",
+            "anyOf": [{ "type": "string" }, { "type": "boolean" }]
+        },
+        "module_name": {
+            "description": "A module name, matching a directory in modules/ and a key in the modules file.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "file_type": {
+            "type": "string",
+            "enum": ["symlink", "copy", "generate"]
+        },
+        "canonical_path": {
+            "description": "A module-relative file path, e.g. 'topgrade/topgrade.toml' or 'zsh/zshrc.toggles'",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*/[A-Za-z0-9._/-]+$"
+        },
+        "file_override": {
+            "description": "Per-device overrides for a single file entry from the modules file. A plain boolean force-enables (true) or force-disables (false) the file.",
             "anyOf": [
-                { "type": "string" },
                 { "type": "boolean" },
-                { "type": "number" }
+                {
+                    "type": "object",
+                    "minProperties": 1,
+                    "properties": {
+                        "enabled": { "type": "boolean" },
+                        "destination": {
+                            "anyOf": [
+                                { "type": "string", "minLength": 1 },
+                                {
+                                    "type": "object",
+                                    "minProperties": 1,
+                                    "additionalProperties": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            ]
+                        },
+                        "type": { "$ref": "#/$defs/file_type" },
+                        "post_install": {
+                            "description": "Overrides the post-install command; empty string clears it",
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": false
+                }
             ]
         }
     },
     "properties": {
+        "$schema": {
+            "description": "Editor hint pointing at this schema; ignored at install time",
+            "type": "string"
+        },
         "version": {
             "description": "Dotfiles config schema version",
             "type": "string",
             "enum": ["1.0"]
+        },
+        "env": {
+            "description": "Users target environment. Must be a valid option from the modules file os_list, or 'unknown' to auto-detect.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "examples": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash",
+                "unknown"
+            ]
         },
         "language": {
             "description": "Language during installation",
@@ -83,16 +143,19 @@
             },
             "additionalProperties": false
         },
-        "disabled": {
-            "description": "Canonical module/file paths to skip on this device (e.g. 'shell/zsh', 'shell/zsh/zshrc')",
-            "type": "array",
-            "items": {
-                "type": "string",
-                "pattern": "^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$"
-            },
-            "uniqueItems": true,
-            "default": []
+        "modules": {
+            "description": "Affirmative allowlist of modules to install on this device. A module that is not listed here (or is listed false) is not installed.",
+            "type": "object",
+            "propertyNames": { "$ref": "#/$defs/module_name" },
+            "additionalProperties": { "type": "boolean" }
+        },
+        "files": {
+            "description": "Per-device file toggles/overrides keyed by canonical path. A boolean force-enables/disables a file; an object overrides specific fields. e.g. { \"zsh/p10k.zsh\": false, \"topgrade/topgrade.toml\": { \"destination\": \"...\" } }",
+            "type": "object",
+            "propertyNames": { "$ref": "#/$defs/canonical_path" },
+            "additionalProperties": { "$ref": "#/$defs/file_override" }
         }
     },
-    "required": ["version", "language"]
+    "required": ["version", "env", "language", "modules"],
+    "additionalProperties": false
 }
