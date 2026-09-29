@@ -5,7 +5,6 @@ Checks: >
     cppcoreguidelines-*,
       -cppcoreguidelines-pro-bounds-pointer-arithmetic,
       -cppcoreguidelines-avoid-c-arrays,
-      -cppcoreguidelines-macro-usage,
     modernize-*,
       -modernize-use-trailing-return-type,
       -modernize-avoid-c-arrays,

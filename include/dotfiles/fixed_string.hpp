@@ -30,17 +30,41 @@
 // SOFTWARE.
 
 
+// NOLINTBEGIN(cppcoreguidelines-macro-usage)
 #pragma once
 
 #if !defined RS_FIXED_STRING_HOSTED && defined __STDC_HOSTED__
 #    define RS_FIXED_STRING_HOSTED __STDC_HOSTED__
 #endif
 
+#if defined(__has_include) && __has_include(<compare>)
+#    define RS_FIXED_STRING_HAS_STD_COMPARE 1
+#else
+#    define RS_FIXED_STRING_HAS_STD_COMPARE 0
+#endif
+
+#if defined(__cpp_contracts) && __cpp_contracts >= 202502L
+#    define RS_FIXED_STRING_HAS_STD_CONTRACTS 1
+
+#    define RS_FIXED_STRING_CONTRACT_PRE(...)    pre(__VA_ARGS__)
+#    define RS_FIXED_STRING_CONTRACT_POST(...)   post(__VA_ARGS__)
+#    define RS_FIXED_STRING_CONTRACT_ASSERT(...) contract_assert(__VA_ARGS__)
+#else
+#    define RS_FIXED_STRING_HAS_STD_CONTRACTS 0
+
+#    define RS_FIXED_STRING_CONTRACT_PRE(...)
+#    define RS_FIXED_STRING_CONTRACT_POST(...)
+#    define RS_FIXED_STRING_CONTRACT_ASSERT(...)
+#endif
+
+#if defined(__has_cpp_attribute) && __has_cpp_attribute(assume)
+#    define RS_FIXED_STRING_ASSUME(...) [[assume(__VA_ARGS__)]]
+#else
+#    define RS_FIXED_STRING_ASSUME(...)
+#endif
 
 #ifndef RS_FIXED_STRING_USE_STD_MODULE
 #    include <array>
-#    include <compare>
-#    include <contracts>
 #    include <cstddef>
 #    include <cstdlib>
 #    include <format>
@@ -49,14 +73,22 @@
 #    include <string>
 #    include <string_view>
 #    include <type_traits>
+
+#    if RS_FIXED_STRING_HOSTED
+#        include <stdexcept>
+#    endif  // RS_FIXED_STRING_HOSTED
+
+#    if RS_FIXED_STRING_HAS_STD_CONTRACTS
+#        include <contracts>
+#    endif  // RS_FIXED_STRING_HAS_STD_CONTRACTS
+
+#    if RS_FIXED_STRING_HAS_STD_COMPARE
+#        include <compare>
+#    endif  // RS_FIXED_STRING_HAS_STD_COMPARE
+
 #else
 import std;
 #endif
-
-#define RS_FIXED_STRING_CONTRACT_PRE(...) pre(__VA_ARGS__)
-#define RS_FIXED_STRING_PRECONDITION(...)
-#define RS_FIXED_STRING_EXPECTS(expr) static_cast<void>(0);
-
 
 namespace risingstarfish {
 
@@ -65,7 +97,9 @@ class basic_fixed_string;
 
 namespace detail {
 
+#if RS_FIXED_STRING_HAS_STD_COMPARE
 using suppress_unused_includes = std::strong_ordering;
+#endif  // RS_FIXED_STRING_HAS_STD_COMPARE
 
 // Hidden-friend interface for `basic_fixed_string`. Concatenation and comparison are
 // heterogeneous in the size parameter, so they were never members to begin with; hosting them
@@ -117,7 +151,7 @@ struct fixed_string_interface {
     template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
     [[nodiscard]] consteval friend basic_fixed_string<CharT, N + N2 - 1, Traits>
       operator+(const basic_fixed_string<CharT, N, Traits> &lhs, const CharT (&rhs)[N2]) noexcept {
-        RS_FIXED_STRING_PRECONDITION(rhs[N2 - 1] == CharT {});
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
         CharT  txt[N + N2];
         CharT *it = txt;
         for (CharT ch : lhs) {
@@ -132,7 +166,7 @@ struct fixed_string_interface {
     template<typename CharT, std::size_t N, typename Traits, std::size_t N1>
     [[nodiscard]] consteval friend basic_fixed_string<CharT, N1 + N - 1, Traits>
       operator+(const CharT (&lhs)[N1], const basic_fixed_string<CharT, N, Traits> &rhs) noexcept {
-        RS_FIXED_STRING_PRECONDITION(lhs[N1 - 1] == CharT {});
+        RS_FIXED_STRING_ASSUME(lhs[N1 - 1] == CharT {});
         CharT  txt[N1 + N];
         CharT *it = txt;
         for (std::size_t i = 0; i != N1 - 1; ++i) {
@@ -155,10 +189,11 @@ struct fixed_string_interface {
     template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
     [[nodiscard]] friend consteval bool operator==(const basic_fixed_string<CharT, N, Traits> &lhs,
                                                    const CharT (&rhs)[N2]) {
-        RS_FIXED_STRING_PRECONDITION(rhs[N2 - 1] == CharT {});
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
         return lhs.view() == std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
     }
 
+#if RS_FIXED_STRING_HAS_STD_COMPARE
     template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
     [[nodiscard]] friend constexpr auto operator<=>(const basic_fixed_string<CharT, N, Traits>  &lhs,
                                                     const basic_fixed_string<CharT, N2, Traits> &rhs) {
@@ -168,9 +203,75 @@ struct fixed_string_interface {
     template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
     [[nodiscard]] friend consteval auto operator<=>(const basic_fixed_string<CharT, N, Traits> &lhs,
                                                     const CharT (&rhs)[N2]) {
-        RS_FIXED_STRING_PRECONDITION(rhs[N2 - 1] == CharT {});
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
         return lhs.view() <=> std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
     }
+#else
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend constexpr auto operator!=(const basic_fixed_string<CharT, N, Traits>  &lhs,
+                                                   const basic_fixed_string<CharT, N2, Traits> &rhs) {
+        return lhs.view() != rhs.view();
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend consteval auto operator!=(const basic_fixed_string<CharT, N, Traits> &lhs,
+                                                   const CharT (&rhs)[N2]) {
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
+        return lhs.view() != std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend constexpr auto operator<(const basic_fixed_string<CharT, N, Traits>  &lhs,
+                                                  const basic_fixed_string<CharT, N2, Traits> &rhs) {
+        return lhs.view() < rhs.view();
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend consteval auto operator<(const basic_fixed_string<CharT, N, Traits> &lhs,
+                                                  const CharT (&rhs)[N2]) {
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
+        return lhs.view() < std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend constexpr auto operator<=(const basic_fixed_string<CharT, N, Traits>  &lhs,
+                                                   const basic_fixed_string<CharT, N2, Traits> &rhs) {
+        return lhs.view() <= rhs.view();
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend consteval auto operator<=(const basic_fixed_string<CharT, N, Traits> &lhs,
+                                                   const CharT (&rhs)[N2]) {
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
+        return lhs.view() <= std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend constexpr auto operator>(const basic_fixed_string<CharT, N, Traits>  &lhs,
+                                                  const basic_fixed_string<CharT, N2, Traits> &rhs) {
+        return lhs.view() > rhs.view();
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend consteval auto operator>(const basic_fixed_string<CharT, N, Traits> &lhs,
+                                                  const CharT (&rhs)[N2]) {
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
+        return lhs.view() > std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend constexpr auto operator>=(const basic_fixed_string<CharT, N, Traits>  &lhs,
+                                                   const basic_fixed_string<CharT, N2, Traits> &rhs) {
+        return lhs.view() >= rhs.view();
+    }
+
+    template<typename CharT, std::size_t N, typename Traits, std::size_t N2>
+    [[nodiscard]] friend consteval auto operator>=(const basic_fixed_string<CharT, N, Traits> &lhs,
+                                                   const CharT (&rhs)[N2]) {
+        RS_FIXED_STRING_ASSUME(rhs[N2 - 1] == CharT {});
+        return lhs.view() >= std::basic_string_view<CharT, Traits>(std::cbegin(rhs), std::cend(rhs) - 1);
+    }
+#endif  // RS_FIXED_STRING_HAS_STD_COMPARE
 
     // specialized algorithms
     //
@@ -191,7 +292,7 @@ struct fixed_string_interface {
                                                          const basic_fixed_string<CharT, N, Traits> &str) {
         return os << str.c_str();
     }
-#endif
+#endif  // RS_FIXED_STRING_HOSTED
 };
 }  // namespace detail
 
@@ -221,7 +322,7 @@ public:
     [[nodiscard]] constexpr explicit basic_fixed_string(Chars... chars) noexcept : data_ {chars..., CharT {}} {}
 
     [[nodiscard]] explicit(false) consteval basic_fixed_string(const CharT (&txt)[N + 1]) noexcept {
-        RS_FIXED_STRING_PRECONDITION(txt[N] == CharT {});
+        RS_FIXED_STRING_ASSUME(txt[N] == CharT {});
         for (auto i = 0UZ; i < N; ++i) {
             data_[i] = txt[i];
         }
@@ -230,7 +331,7 @@ public:
     template<std::input_iterator It, std::sentinel_for<It> S>
         requires std::convertible_to<std::iter_value_t<It>, CharT>
     [[nodiscard]] constexpr basic_fixed_string(It begin, S end) {
-        RS_FIXED_STRING_PRECONDITION(std::distance(begin, end)++ N);
+        RS_FIXED_STRING_ASSUME(std::distance(begin, end)++ N);
         for (auto it = data_; begin != end; ++begin, ++it) {
             *it = *begin;
         }
@@ -239,7 +340,7 @@ public:
     template<std::ranges::input_range R>
         requires std::convertible_to<std::ranges::range_value_t<R>, CharT>
     [[nodiscard]] constexpr basic_fixed_string(std::from_range_t, R &&r) {
-        RS_FIXED_STRING_PRECONDITION(std::ranges::size(r) == N);
+        RS_FIXED_STRING_ASSUME(std::ranges::size(r) == N);
         for (auto it = data_; auto &&v : std::forward<R>(r)) {
             *it++ = std::forward<decltype(v)>(v);
         }
@@ -303,7 +404,7 @@ public:
     [[nodiscard]] constexpr const_pointer c_str() const noexcept { return data(); }
     [[nodiscard]] constexpr const_pointer data() const noexcept { return static_cast<const_pointer>(data_); }
     [[nodiscard]] constexpr std::basic_string_view<CharT, Traits> view() const noexcept {
-        return std::basic_string_view<CharT>(cbegin(), cend());
+        return std::basic_string_view<CharT, Traits>(cbegin(), cend());
     }
 
     // NOLINTNEXTLINE (google-explicit-constructor)
@@ -365,3 +466,4 @@ struct formatter<risingstarfish::basic_fixed_string<CharT, N, Traits>> : formatt
 };
 #endif
 }  // namespace std
+// NOLINTEND(cppcoreguidelines-macro-usage)
