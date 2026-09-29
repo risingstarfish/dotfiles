@@ -1,0 +1,98 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/risingstarfish/dotfiles/schemas/config.schema.json",
+    "title": "Dotfiles Config",
+    "description": "Schema for the dotfiles configuration file",
+    "type": "object",
+    "$defs": {
+        "log_level": {
+            "type": "string",
+            "enum": ["trace", "debug", "info", "warn", "error"]
+        },
+        "logging_config": {
+            "type": "object",
+            "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "quiet": { "type": "boolean" },
+                "path": { "type": "string" },
+                "log_level": { "$ref": "#/$defs/log_level" },
+                "log_size_mb": { "type": "number", "minimum": 0 },
+                "time": { "type": "boolean" }
+            },
+            "additionalProperties": false
+        },
+        "env_value": {
+            "description": "A DOTFILES_* environment variable default value",
+            "anyOf": [
+                { "type": "string" },
+                { "type": "boolean" },
+                { "type": "number" }
+            ]
+        }
+    },
+    "properties": {
+        "version": {
+            "description": "Dotfiles config schema version",
+            "type": "string",
+            "enum": ["1.0"]
+        },
+        "language": {
+            "description": "Language during installation",
+            "type": "string",
+            "enum": ["english-uk", "english-us"]
+        },
+        "environment": {
+            "description": "Default values for DOTFILES_* environment variables",
+            "type": "object",
+            "properties": {
+                "DOTFILES_LOG": { "type": "boolean", "default": true },
+                "DOTFILES_LOG_DIR": {
+                    "type": "string",
+                    "default": "${HOME}/.config/dotfiles/logs"
+                },
+                "DOTFILES_CACHE_DIR": {
+                    "type": "string",
+                    "default": "${HOME}/.cache/dotfiles"
+                },
+                "DOTFILES_LOCAL_MODS": { "type": "boolean", "default": false },
+                "DOTFILES_AUTORESTART": { "type": "boolean", "default": false },
+                "DOTFILES_IGNORE_HANDOFF": {
+                    "type": "boolean",
+                    "default": false
+                }
+            },
+            "additionalProperties": { "$ref": "#/$defs/env_value" }
+        },
+        "colour": {
+            "description": "Colour output mode",
+            "type": "string",
+            "enum": ["auto", "always", "never", "ansi", "truecolor"],
+            "default": "auto"
+        },
+        "max_backups": {
+            "description": "Maximum amount of backups to store",
+            "type": "integer",
+            "minimum": 0,
+            "default": 10
+        },
+        "logging": {
+            "type": "object",
+            "properties": {
+                "initialise": { "$ref": "#/$defs/logging_config" },
+                "main": { "$ref": "#/$defs/logging_config" }
+            },
+            "additionalProperties": false
+        },
+        "disabled": {
+            "description": "Canonical module/file paths to skip on this device (e.g. 'shell/zsh', 'shell/zsh/zshrc')",
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]*(/[a-z0-9][a-z0-9._-]*)*$"
+            },
+            "uniqueItems": true,
+            "default": []
+        }
+    },
+    "required": ["version", "language"]
+}

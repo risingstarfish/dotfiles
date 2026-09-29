@@ -5,6 +5,11 @@ Checks: >
     cppcoreguidelines-*,
       -cppcoreguidelines-pro-bounds-pointer-arithmetic,
       -cppcoreguidelines-avoid-c-arrays,
+<<<<<<< Updated upstream
+||||||| Stash base
+=======
+      -cppcoreguidelines-macro-usage,
+>>>>>>> Stashed changes
     modernize-*,
       -modernize-use-trailing-return-type,
       -modernize-avoid-c-arrays,

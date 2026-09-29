@@ -1,0 +1,32 @@
+{
+    "version": "1.0",
+    "language": "english-uk",
+    "environment": {
+        "DOTFILES_LOG_DIR": "~/.config/dotfiles/logs",
+        "DOTFILES_CACHE_DIR": "~/.cache/dotfiles",
+        "DOTFILES_LOG": true,
+        "DOTFILES_LOCAL_MODS": false,
+        "DOTFILES_AUTORESTART": false,
+        "DOTFILES_IGNORE_HANDOFF": false
+    },
+    "colour": "auto",
+    "max_backups": 10,
+    "logging": {
+        "initialise": {
+            "enabled": true,
+            "quiet": true,
+            "path": "${DOTFILES_LOG_DIR}/init.log",
+            "log_level": "trace",
+            "log_size_mb": 0
+        },
+        "main": {
+            "enabled": true,
+            "quiet": false,
+            "path": "${DOTFILES_LOG_DIR}/main.log",
+            "log_level": "info",
+            "log_size_mb": 0,
+            "time": true
+        }
+    },
+    "disabled": []
+}

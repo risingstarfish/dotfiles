@@ -1,0 +1,119 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/risingstarfish/dotfiles/schemas/modules.schema.json",
+    "title": "Dotfiles Modules",
+    "description": "Schema for dotfiles user modules file",
+    "type": "object",
+    "$defs": {
+        "os": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "os_list": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/os" },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "path_map": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": { "default": { "type": "string", "minLength": 1 } },
+            "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "file_type": {
+            "type": "string",
+            "enum": ["symlink", "copy", "generate"]
+        },
+        "file_entry": {
+            "type": "object",
+            "description": "A single file (or directory) to install",
+            "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "available": { "$ref": "#/$defs/os_list" },
+                "name": { "type": "string", "minLength": 1 },
+                "description": { "type": "string" },
+                "source": { "type": "string", "minLength": 1 },
+                "destination": {
+                    "anyOf": [
+                        { "type": "string", "minLength": 1 },
+                        { "$ref": "#/$defs/path_map" }
+                    ]
+                },
+                "type": { "$ref": "#/$defs/file_type" },
+                "post_install": {
+                    "description": "Post-install shell command, or false when none",
+                    "anyOf": [
+                        { "type": "boolean" },
+                        { "type": "string", "minLength": 1 }
+                    ],
+                    "default": false
+                }
+            },
+            "required": [
+                "name",
+                "description",
+                "source",
+                "destination",
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "module": {
+            "type": "object",
+            "description": "A standard flat dotfiles module",
+            "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "available": { "$ref": "#/$defs/os_list" },
+                "files": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/file_entry" }
+                }
+            },
+            "required": ["files"],
+            "additionalProperties": false
+        },
+        "shell_module": {
+            "type": "object",
+            "description": "The shell module, grouping per-shell sub-modules",
+            "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "zsh": { "$ref": "#/$defs/module" },
+                "bash": { "$ref": "#/$defs/module" },
+                "pwsh": { "$ref": "#/$defs/module" }
+            },
+            "additionalProperties": false
+        }
+    },
+    "properties": {
+        "version": {
+            "description": "Dotfiles modules schema version",
+            "type": "string",
+            "enum": ["1.0"]
+        },
+        "os_list": {
+            "description": "Known environments; 'available' values should come from this list",
+            "$ref": "#/$defs/os_list"
+        },
+        "modules": {
+            "type": "object",
+            "properties": {
+                "shell": { "$ref": "#/$defs/shell_module" },
+                "git": { "$ref": "#/$defs/module" },
+                "ssh": { "$ref": "#/$defs/module" },
+                "dev": { "$ref": "#/$defs/module" },
+                "topgrade": { "$ref": "#/$defs/module" },
+                "fastfetch": { "$ref": "#/$defs/module" },
+                "tmux": { "$ref": "#/$defs/module" },
+                "curl": { "$ref": "#/$defs/module" },
+                "wget": { "$ref": "#/$defs/module" },
+                "shellcheck": { "$ref": "#/$defs/module" },
+                "claude": { "$ref": "#/$defs/module" },
+                "oh-my-posh": { "$ref": "#/$defs/module" }
+            },
+            "unevaluatedProperties": { "$ref": "#/$defs/module" },
+            "additionalProperties": false
+        }
+    },
+    "required": ["version", "modules"]
+}

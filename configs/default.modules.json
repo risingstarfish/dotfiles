@@ -1,0 +1,428 @@
+{
+    "version": "1.0",
+    "os_list": [
+        "cachyos",
+        "macos",
+        "debian",
+        "windows",
+        "windows-wsl",
+        "windows-bash"
+    ],
+    "modules": {
+        "shell": {
+            "zsh": {
+                "available": [
+                    "cachyos",
+                    "macos",
+                    "debian",
+                    "windows-wsl",
+                    "windows-bash"
+                ],
+                "files": [
+                    {
+                        "name": "zshrc",
+                        "description": "Startup file that Zsh loads to set preferences (like prompt settings, colors, and aliases).",
+                        "source": "zshrc",
+                        "destination": "${HOME}/.zshrc",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "zsh_options",
+                        "description": "Zsh option settings (setopt) controlling completion, history, directory navigation, and globbing behaviour.",
+                        "source": "zsh_options",
+                        "destination": "${HOME}/.zsh_options",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "zstyles",
+                        "description": "zstyle settings that customise completion menu appearance and per-command styling.",
+                        "source": "zstyles",
+                        "destination": "${HOME}/.zstyles",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "zimrc",
+                        "description": "Configuration for the zim framework: enabled plugins, autoloads, and block organisation.",
+                        "source": "zimrc",
+                        "destination": "${HOME}/.zimrc",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "p10k.zsh",
+                        "description": "Powerlevel10k prompt configuration: theme, segment layout, icons, and instant prompt settings.",
+                        "source": "p10k.zsh",
+                        "destination": "${HOME}/.p10k.zsh",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "zshrc.toggles",
+                        "description": "Optional feature toggles that .zshrc sources to switch parts of the setup on or off.",
+                        "source": "zshrc.toggles",
+                        "destination": "${HOME}/.zshrc.toggles",
+                        "type": "symlink"
+                    },
+                    {
+                        "available": ["windows-wsl"],
+                        "name": "Set-MSVC-Environment",
+                        "description": "WSL helper function exposing the Windows MSVC (Visual Studio) compiler toolchain to the shell.",
+                        "source": "functions/Set-MSVC-Environment",
+                        "destination": "${HOME}/.Set-MSVC-Environment",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "exports",
+                        "description": "Environment variable exports (including DOTFILES_* defaults) sourced at shell startup.",
+                        "source": "exports",
+                        "destination": "${HOME}/.exports",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "paths",
+                        "description": "PATH setup: directories prepended to the command search path, sourced at shell startup.",
+                        "source": "paths",
+                        "destination": "${HOME}/.paths",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "functions",
+                        "description": "Directory of user-defined zsh functions, symlinked into the home directory and loaded at startup.",
+                        "source": "functions",
+                        "destination": "${HOME}/.dotfiles/zsh/functions",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "aliases",
+                        "description": "Zsh aliases for common commands and shortcuts.",
+                        "source": "aliases",
+                        "destination": "${HOME}/.aliases",
+                        "type": "symlink"
+                    }
+                ]
+            },
+            "bash": {
+                "available": [
+                    "cachyos",
+                    "macos",
+                    "debian",
+                    "windows-wsl",
+                    "windows-bash"
+                ],
+                "files": [
+                    {
+                        "name": "bashrc",
+                        "description": "Bash startup file: prompt, shell options, and entry point for the aliases and functions it sources.",
+                        "source": "bashrc",
+                        "destination": "${HOME}/.bashrc",
+                        "type": "copy"
+                    }
+                ]
+            },
+            "pwsh": {
+                "available": ["windows", "windows-bash"],
+                "files": [
+                    {
+                        "name": "Profile",
+                        "description": "PowerShell profile: sets module paths, imports aliases and functions, and configures the prompt.",
+                        "source": "windows.ps1",
+                        "destination": "${HOME}/Documents/Powershell/Microsoft.PowerShell_profile.ps1",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "Functions",
+                        "description": "Directory of PowerShell function scripts, placed in the Scripts folder for automatic discovery.",
+                        "source": "functions",
+                        "destination": "${HOME}/Documents/Powershell/Scripts/Functions",
+                        "type": "symlink"
+                    },
+                    {
+                        "name": "Set-MSVC-Environment",
+                        "description": "PowerShell function that initialises the Windows MSVC compiler environment for the current session.",
+                        "source": "Set-MSVC-Environment.ps1",
+                        "destination": "${HOME}/Documents/Powershell/Scripts/Set-MSVC-Environment.ps1",
+                        "type": "symlink"
+                    }
+                ]
+            }
+        },
+        "git": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "gitconfig",
+                    "description": "Global git configuration generated from a template: identity, core behaviour, aliases, and diff settings.",
+                    "source": "gitconfig.in",
+                    "destination": "${HOME}/.gitconfig",
+                    "type": "generate"
+                },
+                {
+                    "name": "gitignore",
+                    "description": "Global gitignore patterns for OS junk, editor temp files, and common build artefacts.",
+                    "source": "gitignore",
+                    "destination": "${HOME}/.gitignore",
+                    "type": "symlink"
+                },
+                {
+                    "name": "gitattributes",
+                    "description": "Global gitattributes: line-ending normalisation, language detection, and diff/merge driver assignments.",
+                    "source": "gitattributes",
+                    "destination": "${HOME}/.gitattributes",
+                    "type": "symlink"
+                },
+                {
+                    "name": "diff-so-fancy",
+                    "description": "Script that colours and highlights git diffs, wired in as the external diff command.",
+                    "source": "diff-so-fancy",
+                    "destination": "${HOME}/.local/bin/diff-so-fancy",
+                    "type": "symlink",
+                    "post_install": "chmod +x ${HOME}/.local/bin/diff-so-fancy"
+                }
+            ]
+        },
+        "ssh": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "config",
+                    "description": "SSH client configuration: host aliases, identity files, and per-host connection options.",
+                    "source": "config",
+                    "destination": "${HOME}/.ssh/config",
+                    "type": "symlink",
+                    "post_install": "chmod 600 ${HOME}/.ssh/config"
+                },
+                {
+                    "name": "allowed_signers",
+                    "description": "Generated list of approved SSH signing key public keys used to verify signatures.",
+                    "source": "allowed_signers.in",
+                    "destination": "${HOME}/.ssh/allowed_signers",
+                    "type": "generate",
+                    "post_install": "chmod 600 ${HOME}/.ssh/allowed_signers"
+                }
+            ]
+        },
+        "dev": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "cmakepreset",
+                    "description": "Python utility for generating a CMakeUserPresets.json",
+                    "source": "cmakepreset.py",
+                    "destination": "${HOME}/.local/bin/cmakepreset.py",
+                    "type": "symlink",
+                    "post_install": "chmod 600 ${HOME}/.local/bin/cmakepreset.py"
+                },
+                {
+                    "name": "internal-flags",
+                    "description": "Shared CMake module defining internal compiler and build flags for personal projects.",
+                    "source": "internal-flags.cmake",
+                    "destination": "${HOME}/dev/internal-flags.cmake",
+                    "type": "symlink"
+                },
+                {
+                    "name": "cmake-format",
+                    "description": "Standalone cmake-format script for formatting CMake files, installed privately under the dev directory.",
+                    "source": "cmake-format.py",
+                    "destination": "${HOME}/dev/.cmake-format.py",
+                    "type": "symlink"
+                },
+                {
+                    "name": "clang-format",
+                    "description": "clang-format style configuration for C/C++ code formatting.",
+                    "source": "clang-format",
+                    "destination": "${HOME}/dev/.clang-format",
+                    "type": "symlink"
+                },
+                {
+                    "name": "clang-tidy",
+                    "description": "clang-tidy configuration: enabled checks and static analysis options.",
+                    "source": "clang-tidy",
+                    "destination": "${HOME}/dev/.clang-tidy",
+                    "type": "symlink"
+                },
+                {
+                    "name": "editorconfig",
+                    "description": "EditorConfig rules keeping indentation, line endings, and encoding consistent across editors.",
+                    "source": "editorconfig",
+                    "destination": "${HOME}/dev/.editorconfig",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "topgrade": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "topgrade.toml",
+                    "description": "Topgrade configuration: which package managers and tools to update, and how.",
+                    "source": "topgrade.toml",
+                    "destination": {
+                        "default": "${XDG_CONFIG_HOME:-${HOME}/.config}/topgrade.toml",
+                        "windows": "${HOME}/topgrade/topgrade.toml",
+                        "windows-bash": "${HOME}/topgrade/topgrade.toml"
+                    },
+                    "type": "symlink"
+                }
+            ]
+        },
+        "fastfetch": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "config",
+                    "description": "fastfetch configuration: logo, displayed modules, colours, and output layout.",
+                    "source": "config.jsonc",
+                    "destination": "${HOME}/.config/fastfetch/config.jsonc",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "tmux": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "tmux.conf",
+                    "description": "tmux configuration: key bindings, options, plugins, and status bar settings.",
+                    "source": "tmux.conf",
+                    "destination": "${HOME}/.tmux.conf",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "curl": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "curlrc",
+                    "description": "Default options for curl requests (extra flags, user agent, and SSL behaviour).",
+                    "source": "curlrc",
+                    "destination": "${HOME}/.curlrc",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "wget": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "wgetrc",
+                    "description": "Default options for wget (retries, timestamping, and progress display).",
+                    "source": "wgetrc",
+                    "destination": "${HOME}/.wgetrc",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "shellcheck": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "shellcheckrc",
+                    "description": "shellcheck configuration: shell dialect, enabled or disabled checks, and minimum severity.",
+                    "source": "shellcheckrc",
+                    "destination": "${HOME}/.shellcheckrc",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "claude": {
+            "available": [
+                "cachyos",
+                "macos",
+                "debian",
+                "windows",
+                "windows-wsl",
+                "windows-bash"
+            ],
+            "files": [
+                {
+                    "name": "settings",
+                    "description": "Claude Code configuration: model selection, permissions, and environment defaults.",
+                    "source": "settings.json",
+                    "destination": "${HOME}/.claude/settings.json",
+                    "type": "symlink"
+                },
+                {
+                    "name": "plugins",
+                    "description": "Plugin manifest registering local Claude Code plugins and extensions.",
+                    "source": "plugin.json",
+                    "destination": "${HOME}/.claude/plugin.json",
+                    "type": "symlink"
+                }
+            ]
+        },
+        "oh-my-posh": {
+            "available": ["windows"],
+            "files": [
+                {
+                    "name": "themes",
+                    "description": "Directory of oh-my-posh prompt themes, symlinked into the oh-my-posh themes folder.",
+                    "source": "themes",
+                    "destination": "${HOME}/.oh-my-posh/themes",
+                    "type": "symlink"
+                }
+            ]
+        }
+    }
+}
