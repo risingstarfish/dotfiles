@@ -24,8 +24,9 @@ set(CPACK_PACKAGE_VENDOR "Pierce Katai")
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # DIXME: cache bool
+set(CMAKE_THREAD_PREFER_PTHREAD ON)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 # TODO: cpack
-
 
 if(${PROJECT_IS_TOP_LEVEL})
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
@@ -38,7 +39,6 @@ include(GNUInstallDirs)
 set(DOTFILES_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${DOTFILES_CMAKE_DIR}")
 
-
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
 # Export compile commands if we can (useful in LSPs like clangd)
@@ -47,14 +47,15 @@ if(CMAKE_GENERATOR STREQUAL "Unix Makefiles" OR CMAKE_GENERATOR MATCHES "^Ninja"
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
-
 #
 # option list
 #
 
 # debug
 option(DOTFILES_ALL_WARNINGS "dotfiles: enable all compiler warnings" ON)
-option(DOTFILES_ALL_WARNINGS_3RD_PARTY "dotfiles: enable all compiler warnings in 3rd party libs" OFF)
+option(DOTFILES_ALL_WARNINGS_3RD_PARTY "dotfiles: enable all compiler warnings in 3rd party libs"
+       OFF
+)
 
 # build
 option(
@@ -67,8 +68,10 @@ if(DOTFILES_BUILD_STATIC_LIB AND NOT BUILD_SHARED_LIBS)
     message(WARNING "DOTFILES_BUILD_STATIC_LIB only makes sense if BUILD_SHARED_LIBS is set to ON")
     message(WARNING "You might be building and installing two identical static libraries.")
 endif()
-option(DOTFILES_OPT_INSTALL "dotfiles: generate and install dotfiles target" ${PROJECT_IS_TOP_LEVEL})
-option(DOTFILES_OPT_INSTALL_PACKAGE_XML "dotfiles: include package.xml when installing" )
+option(DOTFILES_OPT_INSTALL "dotfiles: generate and install dotfiles target"
+       ${PROJECT_IS_TOP_LEVEL}
+)
+option(DOTFILES_OPT_INSTALL_PACKAGE_XML "dotfiles: include package.xml when installing" OFF)
 option(DOTFILES_FATAL_WARNINGS "dotfiles: enable -Werror flag" OFF)
 
 # modules
@@ -79,25 +82,66 @@ if(DOTFILES_MODULE_IMPORT_STD AND NOT DOTFILES_CXX_MODULES_ENABLED)
 endif()
 
 # sanitizers
-option(DOTFILES_SANITIZE_ADDRESS   "dotfiles: enable address sanitizer"   OFF)
+option(DOTFILES_SANITIZE_ADDRESS "dotfiles: enable address sanitizer" OFF)
 option(DOTFILES_SANITIZE_UNDEFINED "dotfiles: enable undefined sanitizer" OFF)
-option(DOTFILES_SANITIZE_THREAD    "dotfiles: enable thread sanitizer"    OFF)
-option(DOTFILES_SANITIZE_MEMORY    "dotfiles: enable memory sanitizer"    OFF)
+option(DOTFILES_SANITIZE_THREAD "dotfiles: enable thread sanitizer" OFF)
 
 # extra artifacts
 option(DOTFILES_OPT_BUILD_TESTS "dotfiles: build tests" ${PROJECT_IS_TOP_LEVEL})
 option(DOTFILES_OPT_BUILD_EXAMPLES "dotfiles: build examples" ${PROJECT_IS_TOP_LEVEL})
 
-add_library(${PROJECT_NAME}-core INTERFACE)
+# other flags
+option(DOTFILES_USE_LIBCPP "Use the libc++ library" OFF)
+option(DOTFILES_ENABLE_HARDENING "Enable standard library hardening" ON)
+option(DOTFILES_ENABLE_CONTRACTS "Enable contract assertions" OFF)
 
-include(reflection-flags)
-apply_reflection_flags(${PROJECT_NAME}-core)
-include(standard-flags)
-apply_standard_flags(${PROJECT_NAME}-core)
-include(sanitizer-flags)
-apply_sanitizer_flags(${PROJECT_NAME}-core)
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_FLAGS "-fcontracts -std=c++26")
+check_cxx_source_compiles(
+    "
+    void fun(int x) pre(x >= 0) { }
+    int main() { fun(1); return 0; }
+"
+    DOTFILES_SUPPORT_CONTRACTS
+)
+unset(CMAKE_REQUIRED_FLAGS)
 
-target_include_directories(${PROJECT_NAME}-core INTERFACE include)
+add_library(internal-flags INTERFACE)
+
+if(DOTFILES_ENABLE_CONTRACTS)
+    if(NOT DOTFILES_SUPPORT_CONTRACTS)
+        message(WARNING "Contracts detection test returned true but has been explicitly disabled")
+    else()
+        message(STATUS "Enabling contract assertions")
+        target_compile_options(internal-flags INTERFACE -fcontracts)
+    endif()
+endif()
+
+set(DOTFILES_PRECOMPILE_HEADERS
+    # NOTE: keep alphabetical
+    <array>
+    <concepts>
+    <cstddef>
+    <cstdint>
+    <cstdlib>
+    <filesystem>
+    <format>
+    <iterator>
+    <meta>
+    <print>
+    <ranges>
+    <string>
+    <string_view>
+    <type_traits>
+    <utility>
+)
+target_precompile_headers(internal-flags INTERFACE ${DOTFILES_PRECOMPILE_HEADERS})
+
+include(reflection)
+include(compiler-flags)
+include(sanitizers)
+
+target_include_directories(internal-flags INTERFACE include)
 
 add_subdirectory(src)
 

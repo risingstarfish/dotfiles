@@ -34,7 +34,7 @@
 #include "dotfiles/fixed_string.hpp"
 #include "dotfiles/timer.hpp"
 
-int main(int argc, char *argv[]) {
+int main([[maybe_unused]] int argc, [[maybe_unused]] char *argv[]) {
     using namespace dotfiles;
 
     utility::print_start();
