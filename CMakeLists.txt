@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28...4.4)
+cmake_minimum_required(VERSION 3.28...4.4.0)
 
 if(DOTFILES_MODULE_IMPORT_STD
    AND DOTFILES_CXX_MODULES_ENABLED
@@ -21,7 +21,13 @@ project(
 )
 set(CPACK_PACKAGE_VENDOR "Pierce Katai")
 
-if(PROJECT_IS_TOP_LEVEL)
+set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # DIXME: cache bool
+# TODO: cpack
+
+
+if(${PROJECT_IS_TOP_LEVEL})
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
     set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
     set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -32,80 +38,76 @@ include(GNUInstallDirs)
 set(DOTFILES_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}/cmake")
 list(APPEND CMAKE_MODULE_PATH "${DOTFILES_CMAKE_DIR}")
 
-set(CMAKE_CXX_STANDARD 26)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_SCAN_FOR_MODULES OFF) # FIXME:
 
 message(STATUS "CXX: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
 # Export compile commands if we can (useful in LSPs like clangd)
 # https://cmake.org/cmake/help/v3.31/variable/CMAKE_EXPORT_COMPILE_COMMANDS.html
 if(CMAKE_GENERATOR STREQUAL "Unix Makefiles" OR CMAKE_GENERATOR MATCHES "^Ninja")
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
+
+#
+# option list
+#
+
+# debug
+option(DOTFILES_ALL_WARNINGS "dotfiles: enable all compiler warnings" ON)
+option(DOTFILES_ALL_WARNINGS_3RD_PARTY "dotfiles: enable all compiler warnings in 3rd party libs" OFF)
+
+# build
 option(
     DOTFILES_BUILD_STATIC_LIB
     "Build dotfiles_static library along with dotfiles (only makes sense if BUILD_SHARED_LIBS=ON)"
     OFF
 )
+option(BUILD_SHARED_LIBS "dotfiles: build dotfiles as a shared library" ${PROJECT_IS_TOP_LEVEL})
 if(DOTFILES_BUILD_STATIC_LIB AND NOT BUILD_SHARED_LIBS)
     message(WARNING "DOTFILES_BUILD_STATIC_LIB only makes sense if BUILD_SHARED_LIBS is set to ON")
-    message(WARNING "You might be building and installing a two identical static libraries.")
+    message(WARNING "You might be building and installing two identical static libraries.")
 endif()
+option(DOTFILES_OPT_INSTALL "dotfiles: generate and install dotfiles target" ${PROJECT_IS_TOP_LEVEL})
+option(DOTFILES_OPT_INSTALL_PACKAGE_XML "dotfiles: include package.xml when installing" )
+option(DOTFILES_FATAL_WARNINGS "dotfiles: enable -Werror flag" OFF)
 
-if(${PROJECT_IS_TOP_LEVEL})
-    option(DOTFILES_DEVELOPER_MODE "Enable targets for developing dotfiles" OFF)
-    option(BUILD_SHARED_LIBS "Build dotfiles as a shared library" OFF)
-endif()
-
-option(DOTFILES_OPT_BUILD_TESTS "Build and perform dotfiles tests" ${PROJECT_IS_TOP_LEVEL})
-option(DOTFILES_OPT_INSTALL "Generate and install dotfiles target" ${PROJECT_IS_TOP_LEVEL})
-option(DOTFILES_CXX_MODULES_ENABLED "Build the dotfiles C++26 module target" OFF)
-option(DOTFILES_MODULE_IMPORT_STD "Build the module target with import std" OFF)
-option(DOTFILES_OPT_INSTALL_PACKAGE_XML "Include package.xml when installing"
-       ${DOTFILES_OPT_INSTALL}
-)
-
+# modules
+option(DOTFILES_CXX_MODULES_ENABLED "dotfiles: build the dotfiles C++26 module target" OFF)
+option(DOTFILES_MODULE_IMPORT_STD "dotfiles: build the module target with import std" OFF)
 if(DOTFILES_MODULE_IMPORT_STD AND NOT DOTFILES_CXX_MODULES_ENABLED)
     message(FATAL_ERROR "DOTFILES_MODULE_IMPORT_STD requires DOTFILES_CXX_MODULES_ENABLED=ON")
 endif()
-option(DOTFILES_OPT_TEST_INSTALLED_VERSION "Test against an installed dotfiles CMake package" OFF)
-option(DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG
-       "Test against an installed dotfiles pkg-config package" OFF
-)
 
-if(DOTFILES_OPT_TEST_INSTALLED_VERSION AND DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG)
-    message(
-        FATAL_ERROR
-            "DOTFILES_OPT_TEST_INSTALLED_VERSION and DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG are mutually exclusive"
-    )
+# sanitizers
+option(DOTFILES_SANITIZE_ADDRESS   "dotfiles: enable address sanitizer"   OFF)
+option(DOTFILES_SANITIZE_UNDEFINED "dotfiles: enable undefined sanitizer" OFF)
+option(DOTFILES_SANITIZE_THREAD    "dotfiles: enable thread sanitizer"    OFF)
+option(DOTFILES_SANITIZE_MEMORY    "dotfiles: enable memory sanitizer"    OFF)
+
+# extra artifacts
+option(DOTFILES_OPT_BUILD_TESTS "dotfiles: build tests" ${PROJECT_IS_TOP_LEVEL})
+option(DOTFILES_OPT_BUILD_EXAMPLES "dotfiles: build examples" ${PROJECT_IS_TOP_LEVEL})
+
+add_library(${PROJECT_NAME}-core INTERFACE)
+
+include(reflection-flags)
+apply_reflection_flags(${PROJECT_NAME}-core)
+include(standard-flags)
+apply_standard_flags(${PROJECT_NAME}-core)
+include(sanitizer-flags)
+apply_sanitizer_flags(${PROJECT_NAME}-core)
+
+target_include_directories(${PROJECT_NAME}-core INTERFACE include)
+
+add_subdirectory(src)
+
+if(DOTFILES_OPT_BUILD_EXAMPLES)
+    add_subdirectory(examples)
 endif()
-if(DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG AND DOTFILES_CXX_MODULES_ENABLED)
-    message(
-        FATAL_ERROR
-            "DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG does not support DOTFILES_CXX_MODULES_ENABLED"
-    )
-endif()
 
-add_executable(${PROJECT_NAME} src/dotfiles.cpp)
-target_include_directories(${PROJECT_NAME} PRIVATE include)
-target_compile_options(${PROJECT_NAME} PRIVATE -freflection)
-
-if(DOTFILES_OPT_TEST_INSTALLED_VERSION
-   OR DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG
-   OR DOTFILES_OPT_BUILD_TESTS
-)
-    include("${DOTFILES_CMAKE_DIR}/CPM.cmake")
-endif()
-
-if(DOTFILES_OPT_TEST_INSTALLED_VERSION OR DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG)
-    if(DOTFILES_OPT_TEST_INSTALLED_VERSION OR DOTFILES_OPT_TEST_INSTALLED_VERSION_PKGCONFIG)
-        enable_testing()
-        add_subdirectory(tests)
-    endif()
-    return()
+if(DOTFILES_OPT_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()
 
 include(ccache)
