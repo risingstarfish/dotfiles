@@ -31,11 +31,29 @@
 
 
 #include "dotfiles/banners.hpp"
-#include "dotfiles/fixed_string.hpp"
 #include "dotfiles/timer.hpp"
+#include "dotfiles/utility/cli.hpp"
+#include "dotfiles/utility/fixed_string.hpp"
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] char *argv[]) {
-    using namespace dotfiles;
+
+using namespace risingstarfish::cli;
+using namespace dotfiles;
+
+
+struct args : clap {
+    static constexpr metadata metadata_ {
+      .name    = "dotfiles",
+      .version = "0.1.0",
+      .about   = "Dotfiles installer for Mac, Linux, Windows, and WSL.",
+      .author  = "Pierce Katai",
+    };
+
+    option<bool, flags {.use_short = true, .use_long = true}> update {false, "Update from Git before installing."};
+};
+
+int main(int argc, const char **argv) {
+    timer                 timer {"main"};
+    [[maybe_unused]] auto opts = args {}.parse(argc, argv);
 
     utility::print_start();
 

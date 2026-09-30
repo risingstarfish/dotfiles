@@ -53,9 +53,7 @@ endif()
 
 # debug
 option(DOTFILES_ALL_WARNINGS "dotfiles: enable all compiler warnings" ON)
-option(DOTFILES_ALL_WARNINGS_3RD_PARTY "dotfiles: enable all compiler warnings in 3rd party libs"
-       OFF
-)
+#option(DOTFILES_ALL_WARNINGS_3RD_PARTY "dotfiles: enable all compiler warnings in 3rd party libs" OFF)
 
 # build
 option(
@@ -73,13 +71,9 @@ option(DOTFILES_OPT_INSTALL "dotfiles: generate and install dotfiles target"
 )
 option(DOTFILES_OPT_INSTALL_PACKAGE_XML "dotfiles: include package.xml when installing" OFF)
 option(DOTFILES_FATAL_WARNINGS "dotfiles: enable -Werror flag" OFF)
-
-# modules
-option(DOTFILES_CXX_MODULES_ENABLED "dotfiles: build the dotfiles C++26 module target" OFF)
-option(DOTFILES_MODULE_IMPORT_STD "dotfiles: build the module target with import std" OFF)
-if(DOTFILES_MODULE_IMPORT_STD AND NOT DOTFILES_CXX_MODULES_ENABLED)
-    message(FATAL_ERROR "DOTFILES_MODULE_IMPORT_STD requires DOTFILES_CXX_MODULES_ENABLED=ON")
-endif()
+option(DOTFILES_USE_LIBCPP "Use the libc++ library" OFF)
+option(DOTFILES_ENABLE_HARDENING "Enable standard library hardening" ON)
+option(DOTFILES_ENABLE_CONTRACTS "Enable contract assertions" OFF)
 
 # sanitizers
 option(DOTFILES_SANITIZE_ADDRESS "dotfiles: enable address sanitizer" OFF)
@@ -90,27 +84,53 @@ option(DOTFILES_SANITIZE_THREAD "dotfiles: enable thread sanitizer" OFF)
 option(DOTFILES_OPT_BUILD_TESTS "dotfiles: build tests" ${PROJECT_IS_TOP_LEVEL})
 option(DOTFILES_OPT_BUILD_EXAMPLES "dotfiles: build examples" ${PROJECT_IS_TOP_LEVEL})
 
-# other flags
-option(DOTFILES_USE_LIBCPP "Use the libc++ library" OFF)
-option(DOTFILES_ENABLE_HARDENING "Enable standard library hardening" ON)
-option(DOTFILES_ENABLE_CONTRACTS "Enable contract assertions" OFF)
+# modules
+option(DOTFILES_CXX_MODULES_ENABLED "dotfiles: build the dotfiles C++26 module target" OFF)
+option(DOTFILES_MODULE_IMPORT_STD "dotfiles: build the module target with import std" OFF)
+if(DOTFILES_MODULE_IMPORT_STD AND NOT DOTFILES_CXX_MODULES_ENABLED)
+    message(FATAL_ERROR "DOTFILES_MODULE_IMPORT_STD requires DOTFILES_CXX_MODULES_ENABLED=ON")
+endif()
 
-include(CheckCXXSourceCompiles)
-set(CMAKE_REQUIRED_FLAGS "-fcontracts -std=c++26")
-check_cxx_source_compiles(
-    "
-    void fun(int x) pre(x >= 0) { }
-    int main() { fun(1); return 0; }
-"
-    DOTFILES_SUPPORT_CONTRACTS
-)
-unset(CMAKE_REQUIRED_FLAGS)
+include("${DOTFILES_CMAKE_DIR}/CPM.cmake")
 
 add_library(internal-flags INTERFACE)
 
+cpmaddpackage(
+    NAME
+    reflex
+    VERSION
+    0.1.3
+    SYSTEM
+    YES
+    GIT_REPOSITORY
+    https://github.com/Garcia6l20/reflex.git
+    GIT_TAG
+    075e37633a2008b9286744588e408e750e9196e1
+    OPTIONS
+    "REFLEX_CLI_ENABLED ON"
+    "REFLEX_POLY_ENABLED OFF"
+    "REFLEX_SERDE_ENABLED OFF"
+    "REFLEX_JINJA_ENABLED OFF"
+    "REFLEX_PY_ENABLED OFF"
+)
+
+target_link_libraries(internal-flags INTERFACE reflex.common_flags)
+
 if(DOTFILES_ENABLE_CONTRACTS)
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_FLAGS "-fcontracts -std=c++26")
+    check_cxx_source_compiles(
+        "
+    #include <contracts>
+    void fun(int x) pre(x >= 0) { return 0; }
+    int main() { return fun(1); }
+"
+        DOTFILES_SUPPORT_CONTRACTS
+    )
+    unset(CMAKE_REQUIRED_FLAGS)
+
     if(NOT DOTFILES_SUPPORT_CONTRACTS)
-        message(WARNING "Contracts detection test returned true but has been explicitly disabled")
+        message(WARNING "Contracts detection test returned false but has been explicitly enabled")
     else()
         message(STATUS "Enabling contract assertions")
         target_compile_options(internal-flags INTERFACE -fcontracts)
