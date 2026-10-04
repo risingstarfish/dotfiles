@@ -94,3 +94,6 @@
 	fsckObjects = true
 [help]
 	autoCorrect = 1
+	
+[safe]
+	directory = %(prefix)///192.168.0.220/programming/Private/FATCAT/FATCAT-dist
